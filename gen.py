@@ -192,19 +192,19 @@ def generate_training_qtransform(num):
     ####------------------------------------------------------------------####
  
     plt.figure(figsize=(12,8), facecolor=None)
-    plt.pcolormesh(noisy_gwpy_eccentric.q_transform(logf=True, norm='mean', frange=(20,512), whiten=True, qrange=(4, 64)))
+    plt.pcolormesh(noisy_gwpy_eccentric.q_transform(logf=True, norm='mean', frange=(20,512), whiten=False, qrange=(4, 64)))
     plt.axis('off')
     plt.savefig(training_data_path / f'eccentric_{num}.png', transparent=True, pad_inches=0, bbox_inches='tight')
     plt.close()
 
     plt.figure(figsize=(12,8), facecolor=None)
-    plt.pcolormesh(noisy_gwpy_lensed.q_transform(logf=True, norm='mean', frange=(20,512), whiten=True, qrange=(4, 64)))
+    plt.pcolormesh(noisy_gwpy_lensed.q_transform(logf=True, norm='mean', frange=(20,512), whiten=False, qrange=(4, 64)))
     plt.axis('off')
     plt.savefig(training_data_path / f'lensed_{num}.png', transparent=True, pad_inches=0, bbox_inches='tight')
     plt.close()
     
     plt.figure(figsize=(12,8), facecolor=None)
-    plt.pcolormesh(noisy_gwpy_unlensed.q_transform(logf=True, norm='mean', frange=(20,512), whiten=True, qrange=(4, 64)))
+    plt.pcolormesh(noisy_gwpy_unlensed.q_transform(logf=True, norm='mean', frange=(20,512), whiten=False, qrange=(4, 64)))
     plt.axis('off')
     plt.savefig(training_data_path / f'unlensed_{num}.png', transparent=True, pad_inches=0, bbox_inches='tight')
     plt.close()
