@@ -63,7 +63,7 @@ print(f"Length of parameters_list: {len(samples)}")
 
 def generate_noise(signal):
     flow = 10
-    delta_f = 1 / 32
+    delta_f = 1 / 8
     flen = int(4096 / (2 * delta_f)) + 1
     psd = pycbc.psd.aLIGOZeroDetHighPower(flen, delta_f, flow)
 
