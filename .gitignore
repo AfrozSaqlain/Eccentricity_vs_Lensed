@@ -3,3 +3,4 @@ O3/
 nn_on_real_data.py
 generate_frame_files.py
 real_data.*
+gen copy.py
