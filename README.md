@@ -41,3 +41,6 @@ Then finally we generate the `q_transforms` of each signal and save them as `PNG
 | `polarization`  | `Uniform` (periodic)               | [0, π]                        |
 | `Log_Mlz`       | `Uniform`                          | [3, 5]                        |
 | `yl`            | `PowerLaw` (`α = 1`)               | [0.01, 1.0]                   |
+
+
+**Note:** The `gen.py` code also generates a Lookup table for SNR values corresponding to each sample and each category. 
