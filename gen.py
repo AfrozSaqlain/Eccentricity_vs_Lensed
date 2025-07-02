@@ -1,7 +1,7 @@
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-
+import csv
 from multiprocessing.pool import Pool
 import bilby
 import numpy as np
@@ -136,48 +136,23 @@ def generate_training_qtransform(num):
 
     eccentric_signal = taper_timeseries(eccentric_signal, tapermethod="TAPER_STARTEND", return_lal=False)
 
-    # noise_eccentric = generate_noise()
-
-    # padded_signal_eccentric, delta_t_eccentric, start_time_eccentric = inject_signal_with_peak_in_window(
-    #                                         signal_ts=eccentric_signal,
-    #                                         noise_ts=noise_eccentric,
-    #                                         peak_window=(2.0, 2.2))
-    
-    # eccentric_noisy = pycbc.types.TimeSeries(np.array(padded_signal_eccentric) + np.array(noise_eccentric), delta_t=delta_t_eccentric, epoch=start_time_eccentric)
-
-    # padded_signal_eccentric = pycbc.types.TimeSeries(padded_signal_eccentric, delta_t=delta_t_eccentric, epoch=start_time_eccentric)
-
-    eccentric_noisy = scale_signal(eccentric_signal, num)
+    eccentric_noisy, eccentric_snr = scale_signal(eccentric_signal, num)
 
     ####-----------------------Lensed Signal + Noise---------------------####
 
     lensed_signal = taper_timeseries(lensed_signal, tapermethod="TAPER_STARTEND", return_lal=False)
 
-    # noise_lensed = generate_noise()
-
-    # padded_signal_lensed, delta_t_lensed, start_time_lensed = inject_signal_with_peak_in_window(
-    #                                         signal_ts=lensed_signal,
-    #                                         noise_ts=noise_lensed,
-    #                                         peak_window=(2.0, 2.2))
-
-    # lensed_noisy = pycbc.types.TimeSeries(np.array(padded_signal_lensed) + np.array(noise_lensed), delta_t=delta_t_lensed, epoch=start_time_lensed)
-
-    lensed_noisy = scale_signal(lensed_signal, num)
+    lensed_noisy, lensed_snr = scale_signal(lensed_signal, num)
 
     ####-----------------------Unlensed Signal + Noise---------------------####
 
     unlensed_signal = taper_timeseries(unlensed_signal, tapermethod="TAPER_STARTEND", return_lal=False)
 
-    # noise_unlensed = generate_noise()
+    unlensed_noisy, unlensed_snr = scale_signal(unlensed_signal, num)
 
-    # padded_signal_unlensed, delta_t_unlensed, start_time_unlensed = inject_signal_with_peak_in_window(
-    #                                         signal_ts=unlensed_signal,
-    #                                         noise_ts=noise_unlensed,
-    #                                         peak_window=(2.0, 2.2))
+    ####-------------------Generate SNR Lookup Table---------------------####
+    
 
-    # unlensed_noisy = pycbc.types.TimeSeries(np.array(padded_signal_unlensed) + np.array(noise_unlensed), delta_t=delta_t_unlensed, epoch=start_time_unlensed)
-
-    unlensed_noisy = scale_signal(unlensed_signal, num)
 
     ####-------Cropping the signal such that it has duration of 8s-------####
 
@@ -190,22 +165,6 @@ def generate_training_qtransform(num):
     noisy_gwpy_eccentric = TimeSeries.from_pycbc(eccentric_noisy)
     noisy_gwpy_lensed = TimeSeries.from_pycbc(lensed_noisy)
     noisy_gwpy_unlensed = TimeSeries.from_pycbc(unlensed_noisy)
-
-    # noisy_gwpy_eccentric = noisy_gwpy_eccentric.crop(start=18)
-    # # noisy_gwpy_eccentric = noisy_gwpy_eccentric.highpass(1024)
-
-    # noisy_gwpy_lensed = noisy_gwpy_lensed.crop(start=18)
-    # # noisy_gwpy_lensed = noisy_gwpy_lensed.highpass(1024)
-
-    # noisy_gwpy_unlensed = noisy_gwpy_unlensed.crop(start=18)
-    # # noisy_gwpy_unlensed = noisy_gwpy_unlensed.highpass(1024)
-
-    # plt.figure(figsize=(12,8), facecolor=None)
-    # plt.pcolormesh(noisy_gwpy_eccentric.q_transform(logf=True, norm='mean', frange=(5,512), whiten=True, qrange=(4, 64)))
-    # plt.yscale('log')
-    # plt.show()
-
-    # return
 
     ####------------------------------------------------------------------####
     try:
@@ -232,8 +191,25 @@ def generate_training_qtransform(num):
     except Exception as e:
         print(f"Error generating Q-transform for sample {num}: {e}")
         return None
+    
+    return {
+        'sample': num,
+        'eccentric_snr': float(eccentric_snr),
+        'lensed_snr': float(lensed_snr),
+        'unlensed_snr': float(unlensed_snr)
+    }
 
 num_range = list(range(int(num_samples)))
 
 with Pool(processes=num_processess) as pool:
         qtransforms = pool.map(generate_training_qtransform, num_range)
+
+snr_table = [entry for entry in qtransforms if entry is not None]
+
+snr_csv_path = "./snr_lookup_table.csv"
+with open(snr_csv_path, mode='w', newline='') as f:
+    writer = csv.DictWriter(f, fieldnames=['sample', 'eccentric_snr', 'lensed_snr', 'unlensed_snr'])
+    writer.writeheader()
+    writer.writerows(snr_table)
+
+print(f"SNR lookup table saved to {snr_csv_path}")

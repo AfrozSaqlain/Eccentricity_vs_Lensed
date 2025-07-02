@@ -55,7 +55,7 @@ def scale_signal(signal_ts, num):
     # plt.legend()
     # plt.show()
 
-    return data
+    return data, peak_snr
 
 def inject_signal_with_peak_in_window(signal_ts, noise_ts, peak_window=(2.0, 2.2)):
     """

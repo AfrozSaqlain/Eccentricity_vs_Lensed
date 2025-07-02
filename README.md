@@ -17,6 +17,8 @@ Each wave is then tapered. Then we generated noise from `aLIGOZeroDetHighPower` 
 Next we pad each GW signal and add it to the noise such that the peak of the signal lies within 2.2 seconds to 2 seconds window before the noise ends. This is done to make the training process robust to moderate time
 translations in the signal.
 
+We also ensure that the signal's SNR is always greater than a minimum threshold, i.e. 10 by multiplying the signal by a sampled `scale_factor`.
+
 The signal is then cropped so that the data is of 8s duration.
 
 Then finally we generate the `q_transforms` of each signal and save them as `PNG` file with naming convention such that if the signal is `lensed` then the name of the file is `lensed_{num},png`, where `num` just represnts file number.
