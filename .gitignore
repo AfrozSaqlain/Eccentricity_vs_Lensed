@@ -3,3 +3,4 @@ data_tmp/
 experimentation/
 gen copy.py
 *.pth
+cnn\ copy.ipynb
