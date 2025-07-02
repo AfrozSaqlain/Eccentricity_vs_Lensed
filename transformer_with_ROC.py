@@ -306,7 +306,7 @@ def plot_roc_curves(fpr, tpr, roc_auc, class_names, title_suffix=""):
     """
     Plot ROC curves for multi-class classification
     """
-    plt.figure(figsize=(12, 8))
+    # plt.figure(figsize=(12, 8))
     
     colors = ['blue', 'red', 'green', 'orange', 'purple', 'brown']
     
@@ -351,7 +351,7 @@ def plot_confusion_matrix(y_true, y_pred, class_names, title_suffix=""):
             row.append(f"{count}\n({percentage:.1f}%)")
         annotations.append(row)
 
-    plt.figure(figsize=(10, 8))
+    # plt.figure(figsize=(10, 8))
     sns.heatmap(cm, annot=annotations, fmt='', cmap='Blues',
                xticklabels=class_names, yticklabels=class_names)
     plt.title(f'Confusion Matrix{title_suffix}', fontsize=14)
@@ -400,12 +400,12 @@ print("\nGenerating ROC curve plots...")
 
 # Validation ROC curves
 val_fig = plot_roc_curves(val_fpr, val_tpr, val_roc_auc, class_names, " (Validation Set)")
-plt.savefig('roc_curves_validation.png', dpi=300, bbox_inches='tight')
+plt.savefig('ROC_Curves_Validation.png', dpi=300, bbox_inches='tight')
 plt.show()
 
 # Test ROC curves
 test_fig = plot_roc_curves(test_fpr, test_tpr, test_roc_auc, class_names, " (Test Set)")
-plt.savefig('roc_curves_test.png', dpi=300, bbox_inches='tight')
+plt.savefig('ROC_Curves_Test.png', dpi=300, bbox_inches='tight')
 plt.show()
 
 # Plot confusion matrices
@@ -413,12 +413,12 @@ print("Generating confusion matrices...")
 
 # Validation confusion matrix
 val_cm_fig = plot_confusion_matrix(val_labels, val_predictions, class_names, " (Validation Set)")
-plt.savefig('confusion_matrix_validation.png', dpi=300, bbox_inches='tight')
+plt.savefig('Confusion_Matrix_Validation.png', dpi=300, bbox_inches='tight')
 plt.show()
 
 # Test confusion matrix
 test_cm_fig = plot_confusion_matrix(test_labels, test_predictions, class_names, " (Test Set)")
-plt.savefig('confusion_matrix_test.png', dpi=300, bbox_inches='tight')
+plt.savefig('Confusion_Matrix_Test.png', dpi=300, bbox_inches='tight')
 plt.show()
 
 # Print classification reports
@@ -465,7 +465,7 @@ plt.legend()
 plt.grid(True, alpha=0.3)
 
 plt.tight_layout()
-plt.savefig('training_curves.png', dpi=300, bbox_inches='tight')
+plt.savefig('Training_curves.png', dpi=300, bbox_inches='tight')
 plt.show()
 
 print("\n" + "="*50)
