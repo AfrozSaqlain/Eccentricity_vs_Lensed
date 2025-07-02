@@ -19,7 +19,8 @@ import sys
 from pycbc.detector.ground import Detector
 from pathlib import Path
 
-from modules.inject_signal import inject_signal_with_peak_in_window
+from modules.gw_utils import inject_signal_with_peak_in_window
+from modules.gw_utils import scale_signal, generate_noise
 
 num_processess = os.cpu_count()
 num_samples = int(sys.argv[1])
@@ -31,8 +32,8 @@ path_name = str(sys.argv[2])
 if path_name == 'test':
     num_samples //= 10
 
-os.makedirs(f'data_tmp/{path_name}', exist_ok=True)
-training_data_path = Path(f"data_tmp/{path_name}")
+os.makedirs(f'data_tmp_2/{path_name}', exist_ok=True)
+training_data_path = Path(f"data_tmp_2/{path_name}")
 
 f_lower = 5.0       
 
@@ -62,18 +63,6 @@ samples = [
 ]
 
 print(f"Length of parameters_list: {len(samples)}")
-
-def generate_noise():
-    flow = 10
-    delta_f = 1 / 32
-    flen = int(4096 / (2 * delta_f)) + 1
-    psd = pycbc.psd.aLIGOZeroDetHighPower(flen, delta_f, flow)
-
-    delta_t = 1.0 / 4096
-    tsamples = int(32 / delta_t)
-    noise = pycbc.noise.noise_from_psd(tsamples, delta_t, psd, seed=None)
-
-    return noise
 
 
 def generate_training_qtransform(num):
@@ -147,40 +136,48 @@ def generate_training_qtransform(num):
 
     eccentric_signal = taper_timeseries(eccentric_signal, tapermethod="TAPER_STARTEND", return_lal=False)
 
-    noise_eccentric = generate_noise()
+    # noise_eccentric = generate_noise()
 
-    padded_signal_eccentric, delta_t_eccentric, start_time_eccentric = inject_signal_with_peak_in_window(
-                                            signal_ts=eccentric_signal,
-                                            noise_ts=noise_eccentric,
-                                            peak_window=(2.0, 2.2))
-     
-    eccentric_noisy = pycbc.types.TimeSeries(np.array(padded_signal_eccentric) + np.array(noise_eccentric), delta_t=delta_t_eccentric, epoch=start_time_eccentric)
+    # padded_signal_eccentric, delta_t_eccentric, start_time_eccentric = inject_signal_with_peak_in_window(
+    #                                         signal_ts=eccentric_signal,
+    #                                         noise_ts=noise_eccentric,
+    #                                         peak_window=(2.0, 2.2))
+    
+    # eccentric_noisy = pycbc.types.TimeSeries(np.array(padded_signal_eccentric) + np.array(noise_eccentric), delta_t=delta_t_eccentric, epoch=start_time_eccentric)
+
+    # padded_signal_eccentric = pycbc.types.TimeSeries(padded_signal_eccentric, delta_t=delta_t_eccentric, epoch=start_time_eccentric)
+
+    eccentric_noisy = scale_signal(eccentric_signal, num)
 
     ####-----------------------Lensed Signal + Noise---------------------####
 
     lensed_signal = taper_timeseries(lensed_signal, tapermethod="TAPER_STARTEND", return_lal=False)
 
-    noise_lensed = generate_noise()
+    # noise_lensed = generate_noise()
 
-    padded_signal_lensed, delta_t_lensed, start_time_lensed = inject_signal_with_peak_in_window(
-                                            signal_ts=lensed_signal,
-                                            noise_ts=noise_lensed,
-                                            peak_window=(2.0, 2.2))
+    # padded_signal_lensed, delta_t_lensed, start_time_lensed = inject_signal_with_peak_in_window(
+    #                                         signal_ts=lensed_signal,
+    #                                         noise_ts=noise_lensed,
+    #                                         peak_window=(2.0, 2.2))
 
-    lensed_noisy = pycbc.types.TimeSeries(np.array(padded_signal_lensed) + np.array(noise_lensed), delta_t=delta_t_lensed, epoch=start_time_lensed)
+    # lensed_noisy = pycbc.types.TimeSeries(np.array(padded_signal_lensed) + np.array(noise_lensed), delta_t=delta_t_lensed, epoch=start_time_lensed)
+
+    lensed_noisy = scale_signal(lensed_signal, num)
 
     ####-----------------------Unlensed Signal + Noise---------------------####
 
     unlensed_signal = taper_timeseries(unlensed_signal, tapermethod="TAPER_STARTEND", return_lal=False)
 
-    noise_unlensed = generate_noise()
+    # noise_unlensed = generate_noise()
 
-    padded_signal_unlensed, delta_t_unlensed, start_time_unlensed = inject_signal_with_peak_in_window(
-                                            signal_ts=unlensed_signal,
-                                            noise_ts=noise_unlensed,
-                                            peak_window=(2.0, 2.2))
+    # padded_signal_unlensed, delta_t_unlensed, start_time_unlensed = inject_signal_with_peak_in_window(
+    #                                         signal_ts=unlensed_signal,
+    #                                         noise_ts=noise_unlensed,
+    #                                         peak_window=(2.0, 2.2))
 
-    unlensed_noisy = pycbc.types.TimeSeries(np.array(padded_signal_unlensed) + np.array(noise_unlensed), delta_t=delta_t_unlensed, epoch=start_time_unlensed)
+    # unlensed_noisy = pycbc.types.TimeSeries(np.array(padded_signal_unlensed) + np.array(noise_unlensed), delta_t=delta_t_unlensed, epoch=start_time_unlensed)
+
+    unlensed_noisy = scale_signal(unlensed_signal, num)
 
     ####-------Cropping the signal such that it has duration of 8s-------####
 
