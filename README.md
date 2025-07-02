@@ -14,7 +14,8 @@ The waveforms are then projected onto `H!` detector by using `ra`, `dec`, and `p
 
 Each wave is then tapered. Then we generated noise from `aLIGOZeroDetHighPower` PSD.
 
-Next we pad each GW signal and add it to the noise such that the peak of the signal lies within 2.2 seconds to 2 seconds window before the noise ends.
+Next we pad each GW signal and add it to the noise such that the peak of the signal lies within 2.2 seconds to 2 seconds window before the noise ends. This is done to make the training process robust to moderate time
+translations in the signal.
 
 The signal is then cropped so that the data is of 8s duration.
 
