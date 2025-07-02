@@ -10,7 +10,7 @@ We use `TEOBResumS` to generate signals assuming `f_lower` = 5. Two sets of data
 
 The Non-Eccentric waveform is then used to generate unlensed data as well as lensed data. Lensing is done using `GWMAT` package.
 
-The waveforms are then projected onto `H!` detector by using `ra`, `dec`, and `polarization` values sampled from the prior
+The waveforms are then projected onto `H1` detector by using `ra`, `dec`, and `polarization` values sampled from the prior
 
 Each wave is then tapered. Then we generated noise from `aLIGOZeroDetHighPower` PSD.
 
