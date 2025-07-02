@@ -306,7 +306,7 @@ def plot_roc_curves(fpr, tpr, roc_auc, class_names, title_suffix=""):
     """
     Plot ROC curves for multi-class classification
     """
-    # plt.figure(figsize=(12, 8))
+    plt.figure(figsize=(12, 8))
     
     colors = ['blue', 'red', 'green', 'orange', 'purple', 'brown']
     
@@ -351,7 +351,7 @@ def plot_confusion_matrix(y_true, y_pred, class_names, title_suffix=""):
             row.append(f"{count}\n({percentage:.1f}%)")
         annotations.append(row)
 
-    # plt.figure(figsize=(10, 8))
+    plt.figure(figsize=(10, 8))
     sns.heatmap(cm, annot=annotations, fmt='', cmap='Blues',
                xticklabels=class_names, yticklabels=class_names)
     plt.title(f'Confusion Matrix{title_suffix}', fontsize=14)
