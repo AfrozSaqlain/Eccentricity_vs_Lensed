@@ -20,3 +20,21 @@ The signal is then cropped so that the data is of 8s duration.
 
 Then finally we generate the `q_transforms` of each signal and save them as `PNG` file with naming convention such that if the signal is `lensed` then the name of the file is `lensed_{num},png`, where `num` just represnts file number.
 
+## 📋 Prior Distributions Table
+
+| **Parameter**   | **Distribution Type**              | **Range / Description**       |
+|------------------|------------------------------------|-------------------------------|
+| `mass1`         | `Constraint`                       | [10, 100]                     |
+| `mass2`         | `Constraint`                       | [10, 100]                     |
+| `mass_ratio`    | `UniformInComponentsMassRatio`     | [0.2, 10]                     |
+| `chirp_mass`    | `UniformInComponentsChirpMass`     | [25, 100]                     |
+| `spin1z`        | `Uniform`                          | [0.0, 0.9]                    |
+| `spin2z`        | `Uniform`                          | [0.0, 0.9]                    |
+| `eccentricity`  | `Uniform`                          | [0.1, 0.6]                    |
+| `coa_phase`     | `Uniform`                          | [0.0, 2π]                     |
+| `distance`      | `Uniform`                          | [100, 1000]                   |
+| `dec`           | `Cosine`                           | [−π/2, π/2]                   |
+| `ra`            | `Uniform` (periodic)               | [0, 2π]                       |
+| `polarization`  | `Uniform` (periodic)               | [0, π]                        |
+| `Log_Mlz`       | `Uniform`                          | [3, 5]                        |
+| `yl`            | `PowerLaw` (`α = 1`)               | [0.01, 1.0]                   |
