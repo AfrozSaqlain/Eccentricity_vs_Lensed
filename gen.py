@@ -132,6 +132,30 @@ def generate_training_qtransform(num):
 
     unlensed_signal = detector.project_wave(sp, sc, ra = parameters['ra'], dec = parameters['dec'], polarization = parameters['polarization'])
 
+    plt.plot(eccentric_signal.sample_times, eccentric_signal, label='Eccentric Signal')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Strain')
+    plt.title(f'Eccentric Signal')
+    plt.legend()
+    plt.savefig(training_data_path / f'Waveform_Eccentric_{num}.png')
+    plt.close()
+
+    plt.plot(lensed_signal.sample_times, lensed_signal, label='Lensed Signal')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Strain')
+    plt.title(f'Lensed Signal')
+    plt.legend()
+    plt.savefig(training_data_path / f'Waveform_Lensed_{num}.png')
+    plt.close()
+
+    plt.plot(unlensed_signal.sample_times, unlensed_signal, label='Unlensed Signal')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Strain')
+    plt.title(f'Unlensed Signal')
+    plt.legend()
+    plt.savefig(training_data_path / f'Waveform_Unlensed_{num}.png')
+    plt.close()
+
     ####-----------------------Eccentric Signal + Noise---------------------####
 
     eccentric_signal = taper_timeseries(eccentric_signal, tapermethod="TAPER_STARTEND", return_lal=False)
