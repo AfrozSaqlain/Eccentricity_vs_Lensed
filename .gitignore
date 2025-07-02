@@ -1,7 +1,5 @@
 data/
-O3/
-nn_on_real_data.py
-generate_frame_files.py
-real_data.*
-gen copy.py
 data_tmp/
+experimentation/
+gen copy.py
+*.pth

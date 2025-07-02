@@ -217,7 +217,18 @@ else:
     ).to(device)
 
 
+################################################################################################
 
+file_path = "./model.pth"
+
+if os.path.exists(file_path):
+    print("Pre-trained model found. Training continued...")
+    model_path = 'model.pth'
+    model.load_state_dict(torch.load(model_path))
+else:
+    print("Pre-trained model not found. Training from beginning...")
+
+################################################################################################
 
 criterion = nn.CrossEntropyLoss()
 

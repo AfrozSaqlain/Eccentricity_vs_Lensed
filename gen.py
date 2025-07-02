@@ -19,6 +19,8 @@ import sys
 from pycbc.detector.ground import Detector
 from pathlib import Path
 
+from modules.inject_signal import inject_signal_with_peak_in_window
+
 num_processess = os.cpu_count()
 num_samples = int(sys.argv[1])
 path_name = str(sys.argv[2])
@@ -29,19 +31,19 @@ path_name = str(sys.argv[2])
 if path_name == 'test':
     num_samples //= 10
 
-os.makedirs(f'data_2/{path_name}', exist_ok=True)
-training_data_path = Path(f"data_2/{path_name}")
+os.makedirs(f'data_tmp/{path_name}', exist_ok=True)
+training_data_path = Path(f"data_tmp/{path_name}")
 
-f_lower = 10.0       
+f_lower = 5.0       
 
 priors = bilby.core.prior.PriorDict()
 
-priors["mass1"] = bilby.core.prior.Constraint(name="mass1", minimum=5, maximum=100)
-priors["mass2"] = bilby.core.prior.Constraint(name="mass2", minimum=5, maximum=100)
-priors['mass_ratio'] = bilby.gw.prior.UniformInComponentsMassRatio(name='mass_ratio', minimum=0.125, maximum=1)
+priors["mass1"] = bilby.core.prior.Constraint(name="mass1", minimum=10, maximum=100)
+priors["mass2"] = bilby.core.prior.Constraint(name="mass2", minimum=10, maximum=100)
+priors['mass_ratio'] = bilby.gw.prior.UniformInComponentsMassRatio(name='mass_ratio', minimum=0.2, maximum=10)
 priors['chirp_mass'] = bilby.gw.prior.UniformInComponentsChirpMass(name='chirp_mass', minimum=25, maximum=100)
-priors['spin1z'] = bilby.core.prior.Uniform(name='spin1z', minimum=0.09, maximum=0.9)
-priors['spin2z'] = bilby.core.prior.Uniform(name='spin2z', minimum=0.09, maximum=0.9)
+priors['spin1z'] = bilby.core.prior.Uniform(name='spin1z', minimum=0.0, maximum=0.9)
+priors['spin2z'] = bilby.core.prior.Uniform(name='spin2z', minimum=0.0, maximum=0.9)
 priors['eccentricity'] = bilby.core.prior.Uniform(name='eccentricity', minimum=0.1, maximum=0.6)
 priors['coa_phase'] = bilby.core.prior.Uniform(name='coa_phase', minimum=0.0, maximum=2 * np.pi)
 priors['distance'] = bilby.core.prior.Uniform(name='distance', minimum=100, maximum=1000)
@@ -61,15 +63,14 @@ samples = [
 
 print(f"Length of parameters_list: {len(samples)}")
 
-def generate_noise(signal):
+def generate_noise():
     flow = 10
-    delta_f = 1 / 8
+    delta_f = 1 / 32
     flen = int(4096 / (2 * delta_f)) + 1
     psd = pycbc.psd.aLIGOZeroDetHighPower(flen, delta_f, flow)
 
     delta_t = 1.0 / 4096
-    tsamples = int(8 / delta_t)
-    # tsamples = len(signal)
+    tsamples = int(32 / delta_t)
     noise = pycbc.noise.noise_from_psd(tsamples, delta_t, psd, seed=None)
 
     return noise
@@ -95,7 +96,7 @@ def generate_training_qtransform(num):
         delta_t=1.0 / 4096 ,
         ecc=parameters['eccentricity'],
         coa_phase=parameters['coa_phase'],
-        f_lower=10,
+        f_lower=5,
     )
 
     sp, sc = get_td_waveform(
@@ -110,7 +111,7 @@ def generate_training_qtransform(num):
         delta_t=1.0 / 4096 ,
         ecc=0,
         coa_phase=parameters['coa_phase'],
-        f_lower=10,
+        f_lower=5,
     )
 
     ####---------------------Generating Lensed Waveform--------------------####
@@ -146,42 +147,46 @@ def generate_training_qtransform(num):
 
     eccentric_signal = taper_timeseries(eccentric_signal, tapermethod="TAPER_STARTEND", return_lal=False)
 
-    noise_eccentric = generate_noise(eccentric_signal)
+    noise_eccentric = generate_noise()
 
-    # noise_eccentric.resize(len(eccentric_signal))
-    eccentric_signal.resize(len(noise_eccentric))
+    padded_signal_eccentric, delta_t_eccentric, start_time_eccentric = inject_signal_with_peak_in_window(
+                                            signal_ts=eccentric_signal,
+                                            noise_ts=noise_eccentric,
+                                            peak_window=(2.0, 2.2))
      
-    eccentric_noisy = pycbc.types.TimeSeries(np.array(eccentric_signal) + np.array(noise_eccentric), delta_t = eccentric_signal.delta_t, epoch = eccentric_signal.start_time)
+    eccentric_noisy = pycbc.types.TimeSeries(np.array(padded_signal_eccentric) + np.array(noise_eccentric), delta_t=delta_t_eccentric, epoch=start_time_eccentric)
 
     ####-----------------------Lensed Signal + Noise---------------------####
 
     lensed_signal = taper_timeseries(lensed_signal, tapermethod="TAPER_STARTEND", return_lal=False)
 
-    noise_lensed = generate_noise(lensed_signal)
+    noise_lensed = generate_noise()
 
-    # noise_lensed.resize(len(lensed_signal))
-    lensed_signal.resize(len(noise_lensed))
+    padded_signal_lensed, delta_t_lensed, start_time_lensed = inject_signal_with_peak_in_window(
+                                            signal_ts=lensed_signal,
+                                            noise_ts=noise_lensed,
+                                            peak_window=(2.0, 2.2))
 
-    lensed_noisy = pycbc.types.TimeSeries(np.array(lensed_signal) + np.array(noise_lensed), delta_t = lensed_signal.delta_t, epoch = lensed_signal.start_time)
+    lensed_noisy = pycbc.types.TimeSeries(np.array(padded_signal_lensed) + np.array(noise_lensed), delta_t=delta_t_lensed, epoch=start_time_lensed)
 
     ####-----------------------Unlensed Signal + Noise---------------------####
 
     unlensed_signal = taper_timeseries(unlensed_signal, tapermethod="TAPER_STARTEND", return_lal=False)
 
-    noise_unlensed = generate_noise(unlensed_signal)
+    noise_unlensed = generate_noise()
 
-    # noise_unlensed.resize(len(unlensed_signal))
-    unlensed_signal.resize(len(noise_unlensed))
+    padded_signal_unlensed, delta_t_unlensed, start_time_unlensed = inject_signal_with_peak_in_window(
+                                            signal_ts=unlensed_signal,
+                                            noise_ts=noise_unlensed,
+                                            peak_window=(2.0, 2.2))
 
-    unlensed_noisy = pycbc.types.TimeSeries(np.array(unlensed_signal) + np.array(noise_unlensed), delta_t = unlensed_signal.delta_t, epoch = unlensed_signal.start_time)
+    unlensed_noisy = pycbc.types.TimeSeries(np.array(padded_signal_unlensed) + np.array(noise_unlensed), delta_t=delta_t_unlensed, epoch=start_time_unlensed)
 
-    ####------------------------------------------------------------------####
+    ####-------Cropping the signal such that it has duration of 8s-------####
 
-    # print(eccentric_noisy.duration)
-    # print(lensed_noisy.duration)
-    # print(unlensed_noisy.duration)
-
-    # return
+    eccentric_noisy = eccentric_noisy.crop(left=24, right=0)
+    lensed_noisy = lensed_noisy.crop(left=24, right=0)
+    unlensed_noisy = unlensed_noisy.crop(left=24, right=0)
 
     ####------------------------------------------------------------------####
 
@@ -189,25 +194,47 @@ def generate_training_qtransform(num):
     noisy_gwpy_lensed = TimeSeries.from_pycbc(lensed_noisy)
     noisy_gwpy_unlensed = TimeSeries.from_pycbc(unlensed_noisy)
 
-    ####------------------------------------------------------------------####
- 
-    plt.figure(figsize=(12,8), facecolor=None)
-    plt.pcolormesh(noisy_gwpy_eccentric.q_transform(logf=True, norm='mean', frange=(20,512), whiten=False, qrange=(4, 64)))
-    plt.axis('off')
-    plt.savefig(training_data_path / f'eccentric_{num}.png', transparent=True, pad_inches=0, bbox_inches='tight')
-    plt.close()
+    # noisy_gwpy_eccentric = noisy_gwpy_eccentric.crop(start=18)
+    # # noisy_gwpy_eccentric = noisy_gwpy_eccentric.highpass(1024)
 
-    plt.figure(figsize=(12,8), facecolor=None)
-    plt.pcolormesh(noisy_gwpy_lensed.q_transform(logf=True, norm='mean', frange=(20,512), whiten=False, qrange=(4, 64)))
-    plt.axis('off')
-    plt.savefig(training_data_path / f'lensed_{num}.png', transparent=True, pad_inches=0, bbox_inches='tight')
-    plt.close()
-    
-    plt.figure(figsize=(12,8), facecolor=None)
-    plt.pcolormesh(noisy_gwpy_unlensed.q_transform(logf=True, norm='mean', frange=(20,512), whiten=False, qrange=(4, 64)))
-    plt.axis('off')
-    plt.savefig(training_data_path / f'unlensed_{num}.png', transparent=True, pad_inches=0, bbox_inches='tight')
-    plt.close()
+    # noisy_gwpy_lensed = noisy_gwpy_lensed.crop(start=18)
+    # # noisy_gwpy_lensed = noisy_gwpy_lensed.highpass(1024)
+
+    # noisy_gwpy_unlensed = noisy_gwpy_unlensed.crop(start=18)
+    # # noisy_gwpy_unlensed = noisy_gwpy_unlensed.highpass(1024)
+
+    # plt.figure(figsize=(12,8), facecolor=None)
+    # plt.pcolormesh(noisy_gwpy_eccentric.q_transform(logf=True, norm='mean', frange=(5,512), whiten=True, qrange=(4, 64)))
+    # plt.yscale('log')
+    # plt.show()
+
+    # return
+
+    ####------------------------------------------------------------------####
+    try:
+        plt.figure(figsize=(12,8), facecolor=None)
+        plt.pcolormesh(noisy_gwpy_eccentric.q_transform(logf=True, norm='mean', frange=(5,512), whiten=True, qrange=(4, 64)))
+        plt.axis('off')
+        plt.yscale('log')
+        plt.savefig(training_data_path / f'eccentric_{num}.png', transparent=True, pad_inches=0, bbox_inches='tight')
+        plt.close()
+
+        plt.figure(figsize=(12,8), facecolor=None)
+        plt.pcolormesh(noisy_gwpy_lensed.q_transform(logf=True, norm='mean', frange=(5,512), whiten=True, qrange=(4, 64)))
+        plt.axis('off')
+        plt.yscale('log')
+        plt.savefig(training_data_path / f'lensed_{num}.png', transparent=True, pad_inches=0, bbox_inches='tight')
+        plt.close()
+        
+        plt.figure(figsize=(12,8), facecolor=None)
+        plt.pcolormesh(noisy_gwpy_unlensed.q_transform(logf=True, norm='mean', frange=(5,512), whiten=True, qrange=(4, 64)))
+        plt.axis('off')
+        plt.yscale('log')
+        plt.savefig(training_data_path / f'unlensed_{num}.png', transparent=True, pad_inches=0, bbox_inches='tight')
+        plt.close()
+    except Exception as e:
+        print(f"Error generating Q-transform for sample {num}: {e}")
+        return None
 
 num_range = list(range(int(num_samples)))
 
