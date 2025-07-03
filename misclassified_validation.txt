@@ -1,0 +1,646 @@
+MISCLASSIFIED FILES - VALIDATION SET
+============================================================
+Total misclassified files: 105
+
+
+----------------------------------------
+True Class: Unlensed (34 misclassified)
+----------------------------------------
+File Number: 999.png
+File Path: ./data_2/train/unlensed_999.png
+Predicted as: Eccentric
+Prediction Probabilities: [0.00779168 0.94852614 0.04368214]
+Max Probability: 0.9485
+
+File Number: 957.png
+File Path: ./data_2/train/unlensed_957.png
+Predicted as: Eccentric
+Prediction Probabilities: [0.00230235 0.951355   0.04634265]
+Max Probability: 0.9514
+
+File Number: 688.png
+File Path: ./data_2/train/unlensed_688.png
+Predicted as: Eccentric
+Prediction Probabilities: [0.00595588 0.6922498  0.30179432]
+Max Probability: 0.6922
+
+File Number: 475.png
+File Path: ./data_2/train/unlensed_475.png
+Predicted as: Lensed
+Prediction Probabilities: [0.5010944  0.05561205 0.44329354]
+Max Probability: 0.5011
+
+File Number: 69.png
+File Path: ./data_2/train/unlensed_69.png
+Predicted as: Eccentric
+Prediction Probabilities: [0.01019827 0.55157    0.43823174]
+Max Probability: 0.5516
+
+File Number: 229.png
+File Path: ./data_2/train/unlensed_229.png
+Predicted as: Eccentric
+Prediction Probabilities: [0.00657491 0.5828985  0.41052657]
+Max Probability: 0.5829
+
+File Number: 173.png
+File Path: ./data_2/train/unlensed_173.png
+Predicted as: Eccentric
+Prediction Probabilities: [0.00775999 0.8244757  0.16776434]
+Max Probability: 0.8245
+
+File Number: 317.png
+File Path: ./data_2/train/unlensed_317.png
+Predicted as: Eccentric
+Prediction Probabilities: [0.00426286 0.82056016 0.17517698]
+Max Probability: 0.8206
+
+File Number: 426.png
+File Path: ./data_2/train/unlensed_426.png
+Predicted as: Eccentric
+Prediction Probabilities: [0.06220802 0.56246126 0.37533072]
+Max Probability: 0.5625
+
+File Number: 825.png
+File Path: ./data_2/train/unlensed_825.png
+Predicted as: Lensed
+Prediction Probabilities: [0.6994371  0.01822447 0.28233838]
+Max Probability: 0.6994
+
+File Number: 600.png
+File Path: ./data_2/train/unlensed_600.png
+Predicted as: Eccentric
+Prediction Probabilities: [0.00509292 0.70163643 0.2932707 ]
+Max Probability: 0.7016
+
+File Number: 500.png
+File Path: ./data_2/train/unlensed_500.png
+Predicted as: Eccentric
+Prediction Probabilities: [0.00700261 0.6850724  0.30792502]
+Max Probability: 0.6851
+
+File Number: 77.png
+File Path: ./data_2/train/unlensed_77.png
+Predicted as: Eccentric
+Prediction Probabilities: [0.00887992 0.5432378  0.4478823 ]
+Max Probability: 0.5432
+
+File Number: 683.png
+File Path: ./data_2/train/unlensed_683.png
+Predicted as: Lensed
+Prediction Probabilities: [0.87953407 0.00832703 0.1121389 ]
+Max Probability: 0.8795
+
+File Number: 451.png
+File Path: ./data_2/train/unlensed_451.png
+Predicted as: Lensed
+Prediction Probabilities: [0.85851616 0.00430544 0.13717832]
+Max Probability: 0.8585
+
+File Number: 730.png
+File Path: ./data_2/train/unlensed_730.png
+Predicted as: Eccentric
+Prediction Probabilities: [0.01365209 0.86424446 0.12210345]
+Max Probability: 0.8642
+
+File Number: 470.png
+File Path: ./data_2/train/unlensed_470.png
+Predicted as: Eccentric
+Prediction Probabilities: [0.03731357 0.6749035  0.28778288]
+Max Probability: 0.6749
+
+File Number: 843.png
+File Path: ./data_2/train/unlensed_843.png
+Predicted as: Lensed
+Prediction Probabilities: [0.8649214  0.00709682 0.12798172]
+Max Probability: 0.8649
+
+File Number: 281.png
+File Path: ./data_2/train/unlensed_281.png
+Predicted as: Eccentric
+Prediction Probabilities: [0.01185406 0.5016622  0.48648375]
+Max Probability: 0.5017
+
+File Number: 903.png
+File Path: ./data_2/train/unlensed_903.png
+Predicted as: Eccentric
+Prediction Probabilities: [0.00246261 0.9622331  0.03530424]
+Max Probability: 0.9622
+
+File Number: 799.png
+File Path: ./data_2/train/unlensed_799.png
+Predicted as: Eccentric
+Prediction Probabilities: [0.01244687 0.77183414 0.21571898]
+Max Probability: 0.7718
+
+File Number: 663.png
+File Path: ./data_2/train/unlensed_663.png
+Predicted as: Eccentric
+Prediction Probabilities: [0.00274106 0.607355   0.38990396]
+Max Probability: 0.6074
+
+File Number: 439.png
+File Path: ./data_2/train/unlensed_439.png
+Predicted as: Lensed
+Prediction Probabilities: [0.5180941  0.00258693 0.4793189 ]
+Max Probability: 0.5181
+
+File Number: 114.png
+File Path: ./data_2/train/unlensed_114.png
+Predicted as: Eccentric
+Prediction Probabilities: [0.02806418 0.48608962 0.48584613]
+Max Probability: 0.4861
+
+File Number: 424.png
+File Path: ./data_2/train/unlensed_424.png
+Predicted as: Lensed
+Prediction Probabilities: [0.6431171  0.03439536 0.32248753]
+Max Probability: 0.6431
+
+File Number: 442.png
+File Path: ./data_2/train/unlensed_442.png
+Predicted as: Lensed
+Prediction Probabilities: [0.5980066  0.12145077 0.28054258]
+Max Probability: 0.5980
+
+File Number: 687.png
+File Path: ./data_2/train/unlensed_687.png
+Predicted as: Lensed
+Prediction Probabilities: [0.8091452  0.00208741 0.18876737]
+Max Probability: 0.8091
+
+File Number: 296.png
+File Path: ./data_2/train/unlensed_296.png
+Predicted as: Eccentric
+Prediction Probabilities: [0.00835919 0.49675232 0.49488848]
+Max Probability: 0.4968
+
+File Number: 988.png
+File Path: ./data_2/train/unlensed_988.png
+Predicted as: Eccentric
+Prediction Probabilities: [0.00865319 0.6848102  0.3065366 ]
+Max Probability: 0.6848
+
+File Number: 902.png
+File Path: ./data_2/train/unlensed_902.png
+Predicted as: Lensed
+Prediction Probabilities: [0.41501674 0.1721171  0.41286615]
+Max Probability: 0.4150
+
+File Number: 536.png
+File Path: ./data_2/train/unlensed_536.png
+Predicted as: Eccentric
+Prediction Probabilities: [0.00458179 0.6240812  0.371337  ]
+Max Probability: 0.6241
+
+File Number: 714.png
+File Path: ./data_2/train/unlensed_714.png
+Predicted as: Eccentric
+Prediction Probabilities: [0.00933828 0.6708421  0.3198196 ]
+Max Probability: 0.6708
+
+File Number: 582.png
+File Path: ./data_2/train/unlensed_582.png
+Predicted as: Eccentric
+Prediction Probabilities: [0.00179969 0.8209975  0.17720288]
+Max Probability: 0.8210
+
+File Number: 496.png
+File Path: ./data_2/train/unlensed_496.png
+Predicted as: Lensed
+Prediction Probabilities: [0.7501821  0.01901802 0.23079996]
+Max Probability: 0.7502
+
+
+----------------------------------------
+True Class: Lensed (8 misclassified)
+----------------------------------------
+File Number: 336.png
+File Path: ./data_2/train/lensed_336.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.07230745 0.24233589 0.6853567 ]
+Max Probability: 0.6854
+
+File Number: 16.png
+File Path: ./data_2/train/lensed_16.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.05829228 0.34063342 0.6010743 ]
+Max Probability: 0.6011
+
+File Number: 101.png
+File Path: ./data_2/train/lensed_101.png
+Predicted as: Eccentric
+Prediction Probabilities: [0.01133461 0.5050398  0.4836256 ]
+Max Probability: 0.5050
+
+File Number: 892.png
+File Path: ./data_2/train/lensed_892.png
+Predicted as: Eccentric
+Prediction Probabilities: [0.00846676 0.5272057  0.4643275 ]
+Max Probability: 0.5272
+
+File Number: 956.png
+File Path: ./data_2/train/lensed_956.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.02335886 0.01645033 0.9601908 ]
+Max Probability: 0.9602
+
+File Number: 687.png
+File Path: ./data_2/train/lensed_687.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.1316113  0.00334886 0.8650398 ]
+Max Probability: 0.8650
+
+File Number: 833.png
+File Path: ./data_2/train/lensed_833.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00846232 0.00418097 0.98735666]
+Max Probability: 0.9874
+
+File Number: 491.png
+File Path: ./data_2/train/lensed_491.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.07153365 0.13777402 0.7906924 ]
+Max Probability: 0.7907
+
+
+----------------------------------------
+True Class: Eccentric (63 misclassified)
+----------------------------------------
+File Number: 683.png
+File Path: ./data_2/train/eccentric_683.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00277343 0.40995    0.58727664]
+Max Probability: 0.5873
+
+File Number: 909.png
+File Path: ./data_2/train/eccentric_909.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.01363049 0.48546457 0.5009049 ]
+Max Probability: 0.5009
+
+File Number: 669.png
+File Path: ./data_2/train/eccentric_669.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00506288 0.48390427 0.5110328 ]
+Max Probability: 0.5110
+
+File Number: 298.png
+File Path: ./data_2/train/eccentric_298.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00178093 0.30533502 0.692884  ]
+Max Probability: 0.6929
+
+File Number: 255.png
+File Path: ./data_2/train/eccentric_255.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00432375 0.0474463  0.94823   ]
+Max Probability: 0.9482
+
+File Number: 341.png
+File Path: ./data_2/train/eccentric_341.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00347929 0.3966928  0.59982795]
+Max Probability: 0.5998
+
+File Number: 424.png
+File Path: ./data_2/train/eccentric_424.png
+Predicted as: Lensed
+Prediction Probabilities: [0.96099454 0.0115139  0.02749155]
+Max Probability: 0.9610
+
+File Number: 430.png
+File Path: ./data_2/train/eccentric_430.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.01566567 0.343574   0.64076036]
+Max Probability: 0.6408
+
+File Number: 877.png
+File Path: ./data_2/train/eccentric_877.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.14408392 0.10160039 0.75431573]
+Max Probability: 0.7543
+
+File Number: 746.png
+File Path: ./data_2/train/eccentric_746.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00329958 0.4644695  0.532231  ]
+Max Probability: 0.5322
+
+File Number: 170.png
+File Path: ./data_2/train/eccentric_170.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00600901 0.11940859 0.8745824 ]
+Max Probability: 0.8746
+
+File Number: 641.png
+File Path: ./data_2/train/eccentric_641.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00709844 0.25001064 0.742891  ]
+Max Probability: 0.7429
+
+File Number: 775.png
+File Path: ./data_2/train/eccentric_775.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.01186041 0.3436822  0.64445734]
+Max Probability: 0.6445
+
+File Number: 21.png
+File Path: ./data_2/train/eccentric_21.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00315629 0.27495447 0.72188926]
+Max Probability: 0.7219
+
+File Number: 102.png
+File Path: ./data_2/train/eccentric_102.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00342206 0.28437364 0.71220434]
+Max Probability: 0.7122
+
+File Number: 645.png
+File Path: ./data_2/train/eccentric_645.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00180178 0.36221588 0.63598233]
+Max Probability: 0.6360
+
+File Number: 427.png
+File Path: ./data_2/train/eccentric_427.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00387197 0.41212854 0.5839995 ]
+Max Probability: 0.5840
+
+File Number: 349.png
+File Path: ./data_2/train/eccentric_349.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.02770045 0.256059   0.7162406 ]
+Max Probability: 0.7162
+
+File Number: 864.png
+File Path: ./data_2/train/eccentric_864.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00317647 0.07939775 0.9174259 ]
+Max Probability: 0.9174
+
+File Number: 41.png
+File Path: ./data_2/train/eccentric_41.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00224333 0.37343088 0.6243258 ]
+Max Probability: 0.6243
+
+File Number: 219.png
+File Path: ./data_2/train/eccentric_219.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00368401 0.14770934 0.8486067 ]
+Max Probability: 0.8486
+
+File Number: 439.png
+File Path: ./data_2/train/eccentric_439.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00470611 0.45957378 0.5357201 ]
+Max Probability: 0.5357
+
+File Number: 129.png
+File Path: ./data_2/train/eccentric_129.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00599694 0.43382502 0.560178  ]
+Max Probability: 0.5602
+
+File Number: 921.png
+File Path: ./data_2/train/eccentric_921.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00390223 0.16529404 0.8308037 ]
+Max Probability: 0.8308
+
+File Number: 8.png
+File Path: ./data_2/train/eccentric_8.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.2826808  0.11366491 0.6036542 ]
+Max Probability: 0.6037
+
+File Number: 619.png
+File Path: ./data_2/train/eccentric_619.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00420106 0.46252382 0.5332751 ]
+Max Probability: 0.5333
+
+File Number: 984.png
+File Path: ./data_2/train/eccentric_984.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.10274303 0.11737137 0.7798856 ]
+Max Probability: 0.7799
+
+File Number: 475.png
+File Path: ./data_2/train/eccentric_475.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.10937574 0.21458925 0.67603505]
+Max Probability: 0.6760
+
+File Number: 622.png
+File Path: ./data_2/train/eccentric_622.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.0022821 0.457195  0.5405229]
+Max Probability: 0.5405
+
+File Number: 548.png
+File Path: ./data_2/train/eccentric_548.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00467784 0.37883508 0.6164871 ]
+Max Probability: 0.6165
+
+File Number: 46.png
+File Path: ./data_2/train/eccentric_46.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00306294 0.2951562  0.70178086]
+Max Probability: 0.7018
+
+File Number: 481.png
+File Path: ./data_2/train/eccentric_481.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00409069 0.38734466 0.6085647 ]
+Max Probability: 0.6086
+
+File Number: 505.png
+File Path: ./data_2/train/eccentric_505.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00518519 0.46386823 0.53094655]
+Max Probability: 0.5309
+
+File Number: 243.png
+File Path: ./data_2/train/eccentric_243.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.0072255  0.11511712 0.87765735]
+Max Probability: 0.8777
+
+File Number: 500.png
+File Path: ./data_2/train/eccentric_500.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.01668082 0.12661056 0.8567086 ]
+Max Probability: 0.8567
+
+File Number: 630.png
+File Path: ./data_2/train/eccentric_630.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00406388 0.42909908 0.5668371 ]
+Max Probability: 0.5668
+
+File Number: 931.png
+File Path: ./data_2/train/eccentric_931.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00295474 0.35772884 0.6393164 ]
+Max Probability: 0.6393
+
+File Number: 107.png
+File Path: ./data_2/train/eccentric_107.png
+Predicted as: Lensed
+Prediction Probabilities: [0.59743726 0.04143524 0.36112753]
+Max Probability: 0.5974
+
+File Number: 206.png
+File Path: ./data_2/train/eccentric_206.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.01626826 0.06098277 0.9227489 ]
+Max Probability: 0.9227
+
+File Number: 836.png
+File Path: ./data_2/train/eccentric_836.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.01131544 0.19245866 0.7962259 ]
+Max Probability: 0.7962
+
+File Number: 851.png
+File Path: ./data_2/train/eccentric_851.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00518103 0.3303953  0.66442364]
+Max Probability: 0.6644
+
+File Number: 727.png
+File Path: ./data_2/train/eccentric_727.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.0058979  0.26375788 0.73034424]
+Max Probability: 0.7303
+
+File Number: 537.png
+File Path: ./data_2/train/eccentric_537.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00451888 0.35578462 0.6396965 ]
+Max Probability: 0.6397
+
+File Number: 783.png
+File Path: ./data_2/train/eccentric_783.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.08088736 0.32571033 0.5934023 ]
+Max Probability: 0.5934
+
+File Number: 604.png
+File Path: ./data_2/train/eccentric_604.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.0043501  0.31361365 0.6820362 ]
+Max Probability: 0.6820
+
+File Number: 286.png
+File Path: ./data_2/train/eccentric_286.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.10266928 0.3526335  0.54469717]
+Max Probability: 0.5447
+
+File Number: 352.png
+File Path: ./data_2/train/eccentric_352.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00871116 0.38940457 0.60188425]
+Max Probability: 0.6019
+
+File Number: 657.png
+File Path: ./data_2/train/eccentric_657.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00190868 0.12428951 0.87380177]
+Max Probability: 0.8738
+
+File Number: 266.png
+File Path: ./data_2/train/eccentric_266.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00268668 0.38636512 0.61094826]
+Max Probability: 0.6109
+
+File Number: 66.png
+File Path: ./data_2/train/eccentric_66.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.0080212  0.01464266 0.9773361 ]
+Max Probability: 0.9773
+
+File Number: 694.png
+File Path: ./data_2/train/eccentric_694.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.02002832 0.12120673 0.858765  ]
+Max Probability: 0.8588
+
+File Number: 90.png
+File Path: ./data_2/train/eccentric_90.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00547399 0.03970934 0.9548167 ]
+Max Probability: 0.9548
+
+File Number: 224.png
+File Path: ./data_2/train/eccentric_224.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.02095045 0.14811718 0.83093244]
+Max Probability: 0.8309
+
+File Number: 542.png
+File Path: ./data_2/train/eccentric_542.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.20210262 0.17076844 0.6271289 ]
+Max Probability: 0.6271
+
+File Number: 261.png
+File Path: ./data_2/train/eccentric_261.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00325396 0.23065946 0.7660866 ]
+Max Probability: 0.7661
+
+File Number: 268.png
+File Path: ./data_2/train/eccentric_268.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00415438 0.4175733  0.57827234]
+Max Probability: 0.5783
+
+File Number: 916.png
+File Path: ./data_2/train/eccentric_916.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.01359513 0.37643272 0.6099722 ]
+Max Probability: 0.6100
+
+File Number: 313.png
+File Path: ./data_2/train/eccentric_313.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00741076 0.16259591 0.8299933 ]
+Max Probability: 0.8300
+
+File Number: 418.png
+File Path: ./data_2/train/eccentric_418.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00279452 0.05681816 0.94038737]
+Max Probability: 0.9404
+
+File Number: 331.png
+File Path: ./data_2/train/eccentric_331.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.1698754  0.16878596 0.6613386 ]
+Max Probability: 0.6613
+
+File Number: 210.png
+File Path: ./data_2/train/eccentric_210.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00188744 0.09468194 0.90343064]
+Max Probability: 0.9034
+
+File Number: 244.png
+File Path: ./data_2/train/eccentric_244.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00329541 0.31491116 0.6817934 ]
+Max Probability: 0.6818
+
+File Number: 3.png
+File Path: ./data_2/train/eccentric_3.png
+Predicted as: Unlensed
+Prediction Probabilities: [0.00274666 0.18897069 0.8082827 ]
+Max Probability: 0.8083
+

@@ -1,6 +1,9 @@
 data/
 data_tmp/
+data_2/
 experimentation/
 gen copy.py
 *.pth
 cnn\ copy.ipynb
+train_data_snr_lookup_table.csv
+test_data_snr_lookup_table.csv

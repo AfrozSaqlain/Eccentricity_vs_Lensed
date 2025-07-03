@@ -173,10 +173,6 @@ def generate_training_qtransform(num):
 
     unlensed_noisy, unlensed_snr = scale_signal(unlensed_signal, num)
 
-    ####-------------------Generate SNR Lookup Table---------------------####
-    
-
-
     ####-------Cropping the signal such that it has duration of 8s-------####
 
     eccentric_noisy = eccentric_noisy.crop(left=24, right=0)
@@ -215,20 +211,57 @@ def generate_training_qtransform(num):
         print(f"Error generating Q-transform for sample {num}: {e}")
         return None
     
-    return {
+    # Create parameter dictionary for this sample
+    # Get original parameters before they were modified
+    original_params = samples[num].copy()
+    
+    # Add computed values
+    param_dict = {
         'sample': num,
+        'mass1': float(mass1),
+        'mass2': float(mass2),
+        'mass_ratio': float(original_params['mass_ratio']),
+        'chirp_mass': float(original_params['chirp_mass']),
+        'spin1z': float(original_params['spin1z']),
+        'spin2z': float(original_params['spin2z']),
+        'eccentricity': float(original_params['eccentricity']),
+        'coa_phase': float(original_params['coa_phase']),
+        'distance': float(original_params['distance']),
+        'dec': float(original_params['dec']),
+        'ra': float(original_params['ra']),
+        'polarization': float(original_params['polarization']),
+        'Log_Mlz': float(original_params['Log_Mlz']),
+        'yl': float(original_params['yl']),
+        'm_lens': float(m_lens),
+        'y_lens': float(y_lens),
+        'time_delay': float(time_Delay),
         'eccentric_snr': float(eccentric_snr),
         'lensed_snr': float(lensed_snr),
         'unlensed_snr': float(unlensed_snr)
     }
+    
+    return param_dict
 
 num_range = list(range(int(num_samples)))
 
 with Pool(processes=num_processess) as pool:
-        qtransforms = pool.map(generate_training_qtransform, num_range)
+        results = pool.map(generate_training_qtransform, num_range)
 
-snr_table = [entry for entry in qtransforms if entry is not None]
+# Filter out None results
+valid_results = [entry for entry in results if entry is not None]
 
+# Create SNR lookup table (backward compatibility)
+snr_table = [
+    {
+        'sample': entry['sample'],
+        'eccentric_snr': entry['eccentric_snr'],
+        'lensed_snr': entry['lensed_snr'],
+        'unlensed_snr': entry['unlensed_snr']
+    }
+    for entry in valid_results
+]
+
+# Save SNR lookup table
 snr_csv_path = f"./{path_name}_data_snr_lookup_table.csv"
 with open(snr_csv_path, mode='w', newline='') as f:
     writer = csv.DictWriter(f, fieldnames=['sample', 'eccentric_snr', 'lensed_snr', 'unlensed_snr'])
@@ -236,3 +269,14 @@ with open(snr_csv_path, mode='w', newline='') as f:
     writer.writerows(snr_table)
 
 print(f"SNR lookup table saved to {snr_csv_path}")
+
+# Save parameters table
+params_csv_path = f"./{path_name}_data_parameters.csv"
+with open(params_csv_path, mode='w', newline='') as f:
+    if valid_results:
+        fieldnames = list(valid_results[0].keys())
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(valid_results)
+
+print(f"Parameters table saved to {params_csv_path}")
