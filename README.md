@@ -1,6 +1,7 @@
 # A guide to Files
-- `gen.py`: This is used to generate qtransform spectrograms of synthetic GW signals assuming aLIGO sensitivity. Sampling frequency is 4096 Hz.
+- `gen.py` orr `gen_with_additional_functionalities.py`: This is used to generate qtransform spectrograms of synthetic GW signals assuming aLIGO sensitivity. Sampling frequency is 4096 Hz.
 - `tranformer.py` and `cnn.ipynb`: These are the neural network code where I have defined the model's structure and done training and testing.
+- `transformer_with_ROC_and_File_Classification.py`: This not only trains the model but alsos generates ROC curve, AUC score, and also tells which data were wrongly classified, and stores that as an additional information in `misclassified_{}.txt` file.
 
 # How GW waveforms are generated
 
@@ -43,4 +44,4 @@ Then finally we generate the `q_transforms` of each signal and save them as `PNG
 | `yl`            | `PowerLaw` (`α = 1`)               | [0.01, 1.0]                   |
 
 
-**Note:** The `gen.py` code also generates a Lookup table for SNR values corresponding to each sample and each category. Also sample `data` generated is given in `data_tmp_2` folder alongwith its `Lookup Table`.
+**Note:** The `gen_with_additional_functionalities.py` code also generates a Lookup table for SNR values and parameter values corresponding to each sample and each category. Also sample `data` generated is given in `data_for_reference` folder alongwith its `SNR Lookup Table` as well as `Parameter Reference` in csv format.
