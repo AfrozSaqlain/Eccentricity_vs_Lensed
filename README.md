@@ -13,9 +13,9 @@
 │   ├── snr_lookup_table.csv
 │   └── test_data_snr_lookup_table.csv
 └── scripts
+    ├── modules
     ├── gen.py
     ├── gen_with_additional_functionalities.py
-    ├── modules
     ├── transformer.py
     ├── transformer_with_ROC_and_File_Classification.py
     └── transformer_with_ROC.py
