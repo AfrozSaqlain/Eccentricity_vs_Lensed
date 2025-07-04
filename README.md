@@ -3,6 +3,7 @@
 - `tranformer.py` and `cnn.ipynb`: These are the neural network code where I have defined the model's structure and done training and testing.
 - `transformer_with_ROC_and_File_Classification.py`: This not only trains the model but alsos generates ROC curve, AUC score, and also tells which data were wrongly classified, and stores that as an additional information in `misclassified_{}.txt` file.
 
+<pre> \`\`\` 
 .
 ├── data_for_reference
 ├── notebooks
@@ -21,7 +22,7 @@
     ├── transformer.py
     ├── transformer_with_ROC_and_File_Classification.py
     └── transformer_with_ROC.py
-
+\`\`\` </pre>
 
 # How GW waveforms are generated
 
