@@ -31,8 +31,11 @@ path_name = str(sys.argv[2])
 if path_name == 'test':
     num_samples //= 10
 
-os.makedirs(f'data_2/{path_name}', exist_ok=True)
-training_data_path = Path(f"data_2/{path_name}")
+os.makedirs(f'../data/{path_name}', exist_ok=True)
+os.makedirs('../results', exist_ok=True)
+
+training_data_path = Path(f"../data/{path_name}")
+results_dir = Path('../results')
 
 f_lower = 5.0       
 
@@ -40,7 +43,7 @@ priors = bilby.core.prior.PriorDict()
 
 priors["mass1"] = bilby.core.prior.Constraint(name="mass1", minimum=10, maximum=100)
 priors["mass2"] = bilby.core.prior.Constraint(name="mass2", minimum=10, maximum=100)
-priors['mass_ratio'] = bilby.gw.prior.UniformInComponentsMassRatio(name='mass_ratio', minimum=0.2, maximum=10)
+priors['mass_ratio'] = bilby.gw.prior.UniformInComponentsMassRatio(name='mass_ratio', minimum=0.1, maximum=1)
 priors['chirp_mass'] = bilby.gw.prior.UniformInComponentsChirpMass(name='chirp_mass', minimum=25, maximum=100)
 priors['spin1z'] = bilby.core.prior.Uniform(name='spin1z', minimum=0.0, maximum=0.9)
 priors['spin2z'] = bilby.core.prior.Uniform(name='spin2z', minimum=0.0, maximum=0.9)
@@ -131,29 +134,29 @@ def generate_training_qtransform(num):
 
     unlensed_signal = detector.project_wave(sp, sc, ra = parameters['ra'], dec = parameters['dec'], polarization = parameters['polarization'])
 
-    plt.plot(eccentric_signal.sample_times, eccentric_signal, label='Eccentric Signal')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Strain')
-    plt.title(f'Eccentric Signal')
-    plt.legend()
-    plt.savefig(training_data_path / f'Waveform_Eccentric_{num}.png')
-    plt.close()
+    # plt.plot(eccentric_signal.sample_times, eccentric_signal, label='Eccentric Signal')
+    # plt.xlabel('Time (s)')
+    # plt.ylabel('Strain')
+    # plt.title(f'Eccentric Signal')
+    # plt.legend()
+    # plt.savefig(training_data_path / f'Waveform_Eccentric_{num}.png')
+    # plt.close()
 
-    plt.plot(lensed_signal.sample_times, lensed_signal, label='Lensed Signal')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Strain')
-    plt.title(f'Lensed Signal')
-    plt.legend()
-    plt.savefig(training_data_path / f'Waveform_Lensed_{num}.png')
-    plt.close()
+    # plt.plot(lensed_signal.sample_times, lensed_signal, label='Lensed Signal')
+    # plt.xlabel('Time (s)')
+    # plt.ylabel('Strain')
+    # plt.title(f'Lensed Signal')
+    # plt.legend()
+    # plt.savefig(training_data_path / f'Waveform_Lensed_{num}.png')
+    # plt.close()
 
-    plt.plot(unlensed_signal.sample_times, unlensed_signal, label='Unlensed Signal')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Strain')
-    plt.title(f'Unlensed Signal')
-    plt.legend()
-    plt.savefig(training_data_path / f'Waveform_Unlensed_{num}.png')
-    plt.close()
+    # plt.plot(unlensed_signal.sample_times, unlensed_signal, label='Unlensed Signal')
+    # plt.xlabel('Time (s)')
+    # plt.ylabel('Strain')
+    # plt.title(f'Unlensed Signal')
+    # plt.legend()
+    # plt.savefig(training_data_path / f'Waveform_Unlensed_{num}.png')
+    # plt.close()
 
     ####-----------------------Eccentric Signal + Noise---------------------####
 
@@ -262,7 +265,7 @@ snr_table = [
 ]
 
 # Save SNR lookup table
-snr_csv_path = f"./{path_name}_data_snr_lookup_table.csv"
+snr_csv_path = results_dir / f"{path_name}_data_snr_lookup_table.csv"
 with open(snr_csv_path, mode='w', newline='') as f:
     writer = csv.DictWriter(f, fieldnames=['sample', 'eccentric_snr', 'lensed_snr', 'unlensed_snr'])
     writer.writeheader()
@@ -271,7 +274,7 @@ with open(snr_csv_path, mode='w', newline='') as f:
 print(f"SNR lookup table saved to {snr_csv_path}")
 
 # Save parameters table
-params_csv_path = f"./{path_name}_data_parameters.csv"
+params_csv_path = results_dir / f"{path_name}_data_parameters.csv"
 with open(params_csv_path, mode='w', newline='') as f:
     if valid_results:
         fieldnames = list(valid_results[0].keys())
