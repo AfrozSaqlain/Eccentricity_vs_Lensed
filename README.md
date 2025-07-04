@@ -3,6 +3,26 @@
 - `tranformer.py` and `cnn.ipynb`: These are the neural network code where I have defined the model's structure and done training and testing.
 - `transformer_with_ROC_and_File_Classification.py`: This not only trains the model but alsos generates ROC curve, AUC score, and also tells which data were wrongly classified, and stores that as an additional information in `misclassified_{}.txt` file.
 
+.
+├── data_for_reference
+├── notebooks
+│   ├── cnn.ipynb
+├── results
+│   ├── misclassified_test.txt
+│   ├── misclassified_validation.txt
+│   ├── parameters_reference.csv
+│   ├── Plots
+│   ├── snr_lookup_table.csv
+│   └── test_data_snr_lookup_table.csv
+└── scripts
+    ├── gen.py
+    ├── gen_with_additional_functionalities.py
+    ├── modules
+    ├── transformer.py
+    ├── transformer_with_ROC_and_File_Classification.py
+    └── transformer_with_ROC.py
+
+
 # How GW waveforms are generated
 
 We use `TEOBResumS` to generate signals assuming `f_lower` = 5. Two sets of data are generated: 
