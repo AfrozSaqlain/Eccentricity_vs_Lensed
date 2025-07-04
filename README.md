@@ -1,7 +1,4 @@
 # A guide to Files
-- `gen.py` orr `gen_with_additional_functionalities.py`: This is used to generate qtransform spectrograms of synthetic GW signals assuming aLIGO sensitivity. Sampling frequency is 4096 Hz.
-- `tranformer.py` and `cnn.ipynb`: These are the neural network code where I have defined the model's structure and done training and testing.
-- `transformer_with_ROC_and_File_Classification.py`: This not only trains the model but alsos generates ROC curve, AUC score, and also tells which data were wrongly classified, and stores that as an additional information in `misclassified_{}.txt` file.
 
 <pre>
 .
@@ -23,6 +20,11 @@
     ├── transformer_with_ROC_and_File_Classification.py
     └── transformer_with_ROC.py
 </pre>
+
+- `gen.py` orr `gen_with_additional_functionalities.py`: This is used to generate qtransform spectrograms of synthetic GW signals assuming aLIGO sensitivity. Sampling frequency is 4096 Hz.
+- `tranformer.py` and `cnn.ipynb`: These are the neural network code where I have defined the model's structure and done training and testing.
+- `transformer_with_ROC_and_File_Classification.py`: This not only trains the model but alsos generates ROC curve, AUC score, and also tells which data were wrongly classified, and stores that as an additional information in `misclassified_{}.txt` file.
+
 
 # How GW waveforms are generated
 
@@ -51,7 +53,7 @@ Then finally we generate the `q_transforms` of each signal and save them as `PNG
 |------------------|------------------------------------|-------------------------------|
 | `mass1`         | `Constraint`                       | [10, 100]                     |
 | `mass2`         | `Constraint`                       | [10, 100]                     |
-| `mass_ratio`    | `UniformInComponentsMassRatio`     | [0.2, 10]                     |
+| `mass_ratio`    | `UniformInComponentsMassRatio`     | [0.1, 1]                     |
 | `chirp_mass`    | `UniformInComponentsChirpMass`     | [25, 100]                     |
 | `spin1z`        | `Uniform`                          | [0.0, 0.9]                    |
 | `spin2z`        | `Uniform`                          | [0.0, 0.9]                    |
