@@ -51,13 +51,14 @@ seed_everything(seed)
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f"The device is {device}")
 
-os.makedirs('../results', exist_ok=True)
 os.makedirs('../models', exist_ok=True)
+os.makedirs('../results', exist_ok=True)
+os.makedirs('../results/transformer_results', exist_ok=True)
 
-train_dir = '../data/train'
-test_dir = '../data/test'
+train_dir = '../data_2/data/train'
+test_dir = '../data_2/data/test'
 
-results_dir = Path('../results')
+results_dir = Path('../results/transformer_results')
 
 train_list = glob.glob(os.path.join(train_dir,'*.png'))
 test_list = glob.glob(os.path.join(test_dir, '*.png'))
