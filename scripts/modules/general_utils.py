@@ -161,6 +161,47 @@ def save_misclassified_files_to_txt(misclassified_info, dataset_name, filename):
                 f.write(f"Max Probability: {info['prediction_probabilities'].max():.4f}\n")
                 f.write("\n")
 
+
+def save_misclassified_files_to_dict(misclassified_info, filename):
+    """
+    Save misclassified files information to a dictionary and save it to a file
+    
+    Args:
+        misclassified_info: List of dictionaries containing misclassification info
+        dataset_name: Name of the dataset
+        filename: Path to save the dictionary file
+    
+    Returns:
+        dict: Dictionary where keys are true classes and values are lists of filenames
+    """
+    # Initialize the result dictionary
+    misclassified_dict = {}
+    
+    # If no misclassified files, return empty dict
+    if len(misclassified_info) == 0:
+        return misclassified_dict
+    
+    # Group by true class
+    for info in misclassified_info:
+        true_class = info['true_class']
+        
+        # Initialize list for this true class if not exists
+        if true_class not in misclassified_dict:
+            misclassified_dict[true_class] = []
+        
+        # Extract just the filename from the full path
+        filename_only = info['file_path'].split('/')[-1]
+        
+        # Add just the filename to the appropriate true class
+        misclassified_dict[true_class].append(filename_only)
+    
+    # Save the dictionary to a file
+    import pickle
+    with open(filename, 'wb') as f:
+        pickle.dump(misclassified_dict, f)
+    
+    return misclassified_dict
+
 def plot_roc_curves(fpr, tpr, roc_auc, class_names, title_suffix="", results_dir=None):
     """
     Plot ROC curves for multi-class classification
