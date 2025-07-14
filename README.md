@@ -2,28 +2,38 @@
 
 <pre>
 .
-├── data_for_reference
 ├── notebooks
+│   ├── analysis.ipynb
 │   ├── cnn.ipynb
+│   ├── eval_based_on_ln_B.ipynb
+│   ├── gen.ipynb
+│   └── gw_utils.py
+├── README.md
 ├── results
-│   ├── misclassified_test.txt
-│   ├── misclassified_validation.txt
-│   ├── parameters_reference.csv
-│   ├── Plots
-│   ├── snr_lookup_table.csv
-│   └── test_data_snr_lookup_table.csv
+│   ├── cnn_results
+│   ├── test_data_parameters.csv
+│   ├── train_data_parameters.csv
+│   └── transformer_results
 └── scripts
-    ├── modules
+    ├── cnn_eval.py
+    ├── cnn.py
     ├── gen.py
     ├── gen_with_additional_functionalities.py
+    ├── gw_signal_gen_on_ln_B_basis.py
+    ├── modules
     ├── transformer.py
     ├── transformer_with_ROC_and_File_Classification.py
     └── transformer_with_ROC.py
+
+
 </pre>
 
 - `gen.py` orr `gen_with_additional_functionalities.py`: This is used to generate qtransform spectrograms of synthetic GW signals assuming aLIGO sensitivity. Sampling frequency is 4096 Hz.
-- `tranformer.py` and `cnn.ipynb`: These are the neural network code where I have defined the model's structure and done training and testing.
+- `gw_signal_gen_on_ln_B_basis.py`: This script generates GW signal of eccentric type, clacualtes the $\ln B^{Ecc}_{Qc}$ and segregates them in 3 bins on the basis of $\ln B^{Ecc}_{Qc}$, ensuring each bin has almost same number of data.
+- `tranformer.py`, `cnn.py` and `cnn.ipynb`: These are the neural network script files where I have defined the model's structure and done training and testing.
 - `transformer_with_ROC_and_File_Classification.py`: This not only trains the model but alsos generates ROC curve, AUC score, and also tells which data were wrongly classified, and stores that as an additional information in `misclassified_{}.txt` file.
+- `cnn_eval.py`: A script file just to test the trained neural network model on testing data.
+- `eval_based_on_ln_B.ipynb`: This file makes an evaluation of data generated using `gw_signal_gen_on_ln_B_basis.py` file and tells how many misclassification are there corresponding to each $\ln B$ bin.
 
 
 # How GW waveforms are generated
