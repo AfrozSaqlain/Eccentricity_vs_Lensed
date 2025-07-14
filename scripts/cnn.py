@@ -28,7 +28,7 @@ from modules.general_utils import compute_roc_auc_with_misclassifications, plot_
 
 RANDOM_SEED = 42
 BATCH_SIZE = 128
-EPOCHS = 5
+EPOCHS = 10
 LR = 3e-4
 GAMMA = 0.7
 

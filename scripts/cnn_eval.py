@@ -1,5 +1,4 @@
 import os
-import sys
 
 # os.makedirs('../models', exist_ok = True)
 # os.makedirs('../results', exist_ok=True)
@@ -12,12 +11,9 @@ from torchvision import transforms
 from torch.utils.data import DataLoader, Dataset
 
 import numpy as np
-import matplotlib.pyplot as plt
 import glob
 from pathlib import Path
 from PIL import Image
-
-from sklearn.model_selection import train_test_split
 
 from modules.general_utils import compute_roc_auc_with_misclassifications, plot_roc_curves, plot_confusion_matrix, save_misclassified_files_to_dict
 
@@ -31,19 +27,11 @@ results_dir = Path('../results/cnn_results')
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-train_dir = '../data_2/data/train'
 test_dir = '../data_2/data/test'
 
 test_list = glob.glob(os.path.join(test_dir, '*.png'))
 
 print(f"Test Data: {len(test_list)}")
-
-val_transforms = transforms.Compose(
-    [
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-    ]
-)
 
 test_transforms = transforms.Compose(
     [

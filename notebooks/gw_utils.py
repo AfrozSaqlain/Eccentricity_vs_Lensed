@@ -8,7 +8,7 @@ delta_f = 1 / 32
 flen = int(4096 / (2 * delta_f)) + 1
 psd = pycbc.psd.aLIGOZeroDetHighPower(flen, delta_f, flow)
 
-def scale_signal(signal_ts, num):
+def scale_signal(signal_ts):
 
     noise = generate_noise()
 
@@ -27,15 +27,15 @@ def scale_signal(signal_ts, num):
 
     # print(f"SNR before scaling: {peak_snr}")
 
-    if peak_snr < 10:
-        snr_desired = np.random.uniform(10, 20)
-        print(f"Scaling signal to achieve SNR of {snr_desired:.2f} for sample {num}")
-        scale_factor = snr_desired / peak_snr
-        template *= scale_factor
-        data = pycbc.types.TimeSeries(np.asarray(template) + np.asarray(noise), delta_t=delta_t_eccentric, epoch=start_time_eccentric)
-        snr = matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=flow)
+    # if peak_snr < 10:
+    #     snr_desired = np.random.uniform(10, 20)
+    #     print(f"Scaling signal to achieve SNR of {snr_desired:.2f} for sample {num}")
+    #     scale_factor = snr_desired / peak_snr
+    #     template *= scale_factor
+    #     data = pycbc.types.TimeSeries(np.asarray(template) + np.asarray(noise), delta_t=delta_t_eccentric, epoch=start_time_eccentric)
+    #     snr = matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=flow)
 
-        peak_snr = abs(snr).numpy().max()
+    #     peak_snr = abs(snr).numpy().max()
 
         # print(f"SNR after scaling: {peak_snr}")
 
