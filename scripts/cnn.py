@@ -24,20 +24,22 @@ import seaborn as sns
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
 
-from modules.general_utils import compute_roc_auc_with_misclassifications, plot_roc_curves, plot_confusion_matrix
+from modules.general_utils import compute_roc_auc_with_misclassifications, plot_roc_curves, plot_confusion_matrix, plot_training_curves
+from modules.neural_net import CNN_Model
 
 RANDOM_SEED = 42
 BATCH_SIZE = 128
-EPOCHS = 10
+EPOCHS = 5
 LR = 3e-4
 GAMMA = 0.7
 
 results_dir = Path('../results/cnn_results')
+os.makedirs(results_dir / 'Plots', exist_ok=True)
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-train_dir = '../data_2/data/train'
-test_dir = '../data_2/data/test'
+train_dir = '../data/train'
+test_dir = '../data/test'
 
 train_list = glob.glob(os.path.join(train_dir,'*.png'))
 test_list = glob.glob(os.path.join(test_dir, '*.png'))
@@ -126,27 +128,6 @@ print(f"Train Dataset Length: {len(train_data)}, Train Dataloader Length: {len(t
 
 print(f"Validation Dataset Length: {len(valid_data)}, Validation Dataloader Length: {len(valid_loader)}")
 
-class CNN_Model(nn.Module):
-    def __init__(self):
-        super(CNN_Model, self).__init__()
-        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
-        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1)
-        self.fc1 = nn.Linear(128 * 28 * 28, 256)
-        self.fc2 = nn.Linear(256, 3)
-
-    def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.max_pool2d(x, 2)
-        x = F.relu(self.conv2(x))
-        x = F.max_pool2d(x, 2)
-        x = F.relu(self.conv3(x))
-        x = F.max_pool2d(x, 2)
-        x = x.view(x.size(0), -1)
-        x = F.relu(self.fc1(x))
-        x = self.fc2(x)
-        return x
-
 model0 = CNN_Model().to(device)
 
 model_path = '../models/cnn_model0.pth'
@@ -165,6 +146,8 @@ scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=GAMMA)
 def train_model(model, train_loader, valid_loader, loss_fn, optimizer, scheduler, epochs=EPOCHS):
     train_losses = []
     val_losses = []
+    train_accuracies = []
+    val_accuracies = []
 
     for epoch in range(epochs):
         model.train()
@@ -189,6 +172,7 @@ def train_model(model, train_loader, valid_loader, loss_fn, optimizer, scheduler
         epoch_loss = running_loss / len(train_loader.dataset)
         epoch_acc = correct / total
         train_losses.append(epoch_loss)
+        train_accuracies.append(epoch_acc)
 
         print(f"Epoch [{epoch+1}/{epochs}], Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.4f}")
         
@@ -212,15 +196,16 @@ def train_model(model, train_loader, valid_loader, loss_fn, optimizer, scheduler
             epoch_valid_loss = valid_loss / len(valid_loader.dataset)
             epoch_valid_acc = valid_correct / valid_total
             val_losses.append(epoch_valid_loss)
+            val_accuracies.append(epoch_valid_acc)
 
             print(f"Validation Loss: {epoch_valid_loss:.4f}, Validation Accuracy: {epoch_valid_acc:.4f}")
         
         scheduler.step()
     
-    return train_losses, val_losses
+    return train_losses, val_losses, train_accuracies, val_accuracies
 
 
-train_model(model0, train_loader, valid_loader, loss_fn, optimizer, scheduler, epochs=EPOCHS)
+train_losses, val_losses, train_accuracies, val_accuracies = train_model(model0, train_loader, valid_loader, loss_fn, optimizer, scheduler, epochs=EPOCHS)
 
 class_names=["Lensed", "Eccentric", "Unlensed"]
 
@@ -230,6 +215,8 @@ fpr, tpr, roc_auc, labels, predictions, _, misclassified = compute_roc_auc_with_
 roc_fig = plot_roc_curves(fpr=fpr, tpr=tpr, roc_auc=roc_auc, class_names=class_names, title_suffix=" (Test Set)", results_dir=results_dir)
 
 plot_confusion_matrix(y_true=labels, y_pred=predictions, class_names=class_names, title_suffix=" (Test Set)", results_dir=results_dir)
+
+plot_training_curves(train_losses, val_losses, train_accuracies, val_accuracies, results_dir)
 
 torch.save(model0.state_dict(), model_path)
 

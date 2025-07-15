@@ -16,6 +16,7 @@ from pathlib import Path
 from PIL import Image
 
 from modules.general_utils import compute_roc_auc_with_misclassifications, plot_roc_curves, plot_confusion_matrix, save_misclassified_files_to_dict
+from modules.neural_net import CNN_Model
 
 RANDOM_SEED = 42
 BATCH_SIZE = 128
@@ -27,7 +28,7 @@ results_dir = Path('../results/cnn_results')
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-test_dir = '../data_2/data/test'
+test_dir = '../data/test'
 
 test_list = glob.glob(os.path.join(test_dir, '*.png'))
 
@@ -79,28 +80,6 @@ def custom_collate_fn(batch):
     return images, labels, file_numbers, img_paths
 
 test_loader = DataLoader(dataset = test_data, num_workers=os.cpu_count(), batch_size=BATCH_SIZE, shuffle=False, collate_fn=custom_collate_fn)
-
-
-class CNN_Model(nn.Module):
-    def __init__(self):
-        super(CNN_Model, self).__init__()
-        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
-        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1)
-        self.fc1 = nn.Linear(128 * 28 * 28, 256)
-        self.fc2 = nn.Linear(256, 3)
-
-    def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.max_pool2d(x, 2)
-        x = F.relu(self.conv2(x))
-        x = F.max_pool2d(x, 2)
-        x = F.relu(self.conv3(x))
-        x = F.max_pool2d(x, 2)
-        x = x.view(x.size(0), -1)
-        x = F.relu(self.fc1(x))
-        x = self.fc2(x)
-        return x
 
 model0 = CNN_Model().to(device)
 

@@ -54,8 +54,8 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f"The device is {device}")
 
 
-train_dir = './data/train'
-test_dir = './data/test'
+train_dir = '../data/train'
+test_dir = '../data/test'
 
 
 train_list = glob.glob(os.path.join(train_dir,'*.png'))

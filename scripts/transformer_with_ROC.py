@@ -51,8 +51,8 @@ seed_everything(seed)
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f"The device is {device}")
 
-train_dir = './data_tmp/train'
-test_dir = './data_tmp/test'
+train_dir = '../data/train'
+test_dir = '../data/test'
 
 train_list = glob.glob(os.path.join(train_dir,'*.png'))
 test_list = glob.glob(os.path.join(test_dir, '*.png'))

@@ -23,10 +23,10 @@ from modules.gw_utils import scale_signal
 
 num_processes = os.cpu_count()
 num_samples = int(sys.argv[1])
-path_name = 'data'
-ln_below_10 = 'data/ln_below_10'
-ln_bw_10_and_30 = 'data/ln_bw_10_and_30'
-ln_above_30 = 'data/ln_above_30'
+path_name = 'data_for_testing'
+ln_below_10 = 'data_for_testing/ln_below_10'
+ln_bw_10_and_30 = 'data_for_testing/ln_bw_10_and_30'
+ln_above_30 = 'data_for_testing/ln_above_30'
 
 # sys.stdout = open("log.out", "w")
 # sys.stderr = open("error.err", "w")

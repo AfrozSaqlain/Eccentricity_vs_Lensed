@@ -4,8 +4,8 @@
 .
 ├── notebooks
 │   ├── analysis.ipynb
-│   ├── cnn.ipynb
-│   ├── eval_based_on_ln_B.ipynb
+│   ├── eval_based_on_ln_B_cnn.ipynb
+│   ├── eval_based_on_ln_B transformer.ipynb
 │   ├── gen.ipynb
 │   └── gw_utils.py
 ├── README.md
@@ -16,16 +16,14 @@
 │   └── transformer_results
 └── scripts
     ├── cnn_eval.py
-    ├── cnn.py
-    ├── gen.py
-    ├── gen_with_additional_functionalities.py
+    ├── cnn.py
+    ├── gen.py
+    ├── gen_with_additional_functionalities.py
     ├── gw_signal_gen_on_ln_B_basis.py
-    ├── modules
-    ├── transformer.py
-    ├── transformer_with_ROC_and_File_Classification.py
+    ├── modules
+    ├── transformer.py
+    ├── transformer_with_ROC_and_File_Classification.py
     └── transformer_with_ROC.py
-
-
 </pre>
 
 - `gen.py` orr `gen_with_additional_functionalities.py`: This is used to generate qtransform spectrograms of synthetic GW signals assuming aLIGO sensitivity. Sampling frequency is 4096 Hz.

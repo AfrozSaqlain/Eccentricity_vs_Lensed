@@ -30,7 +30,7 @@ model_selection = str(sys.argv[1])
 # sys.stderr = open("error.err", "w")
 
 batch_size = 512
-epochs = 100
+epochs = 20
 lr = 3e-5
 gamma = 0.7
 seed = 42
@@ -55,10 +55,11 @@ os.makedirs('../models', exist_ok=True)
 os.makedirs('../results', exist_ok=True)
 os.makedirs('../results/transformer_results', exist_ok=True)
 
-train_dir = '../data_2/data/train'
-test_dir = '../data_2/data/test'
+train_dir = '../data/train'
+test_dir = '../data/test'
 
 results_dir = Path('../results/transformer_results')
+os.makedirs(results_dir / 'Plots', exist_ok=True)
 
 train_list = glob.glob(os.path.join(train_dir,'*.png'))
 test_list = glob.glob(os.path.join(test_dir, '*.png'))
