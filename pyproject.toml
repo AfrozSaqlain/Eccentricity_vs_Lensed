@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eccentric_ml"
+version = "0.1.0"
+description = "Gravitational wave ML utilities and analysis"
+authors = [
+    { name = "Saqlain Afroz", email = "sa20ms230@iiserkol.ac.in" }
+]
+readme = "README.md"
+requires-python = ">=3.11"
+
+dependencies = [
+    "numpy",
+    "pandas",
+    "matplotlib"
+]
+
+[project.optional-dependencies]
+ml = [
+    "torch==2.7.0+cu128",
+    "torchvision==0.22.0+cu128",
+    "vit-pytorch==1.10.1",
+    "scikit-learn==1.6.1"
+]
+
+gw = [
+    "PyCBC==2.8.3",
+    "bilby==2.5.1",
+    "gwpy==3.0.12"
+]
+
+all = [
+    "torch==2.7.0+cu128",
+    "torchvision==0.22.0+cu128",
+    "vit-pytorch==1.10.1",
+    "scikit-learn==1.6.1",
+    "PyCBC==2.8.3",
+    "bilby==2.5.1",
+    "gwpy==3.0.12"
+]
+
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["eccentric_ml*"]
