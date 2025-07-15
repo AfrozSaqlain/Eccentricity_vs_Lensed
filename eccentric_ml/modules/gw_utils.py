@@ -1,5 +1,6 @@
 import numpy as np
 import pycbc
+import pycbc.psd
 from pycbc.filter.matchedfilter import matched_filter
 import matplotlib.pyplot as plt
 
