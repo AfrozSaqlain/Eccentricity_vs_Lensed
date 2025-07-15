@@ -11,19 +11,31 @@
 ├── README.md
 ├── results
 │   ├── cnn_results
+│   │   ├── misclassified_test.pkl
+│   │   ├── misclassified_test.txt
+│   │   └── Plots
 │   ├── test_data_parameters.csv
 │   ├── train_data_parameters.csv
 │   └── transformer_results
+│       ├── misclassified_test.txt
+│       ├── misclassified_validation.txt
+│       ├── parameters_reference.csv
+│       ├── Plots
+│       ├── snr_lookup_table.csv
+│       └── test_data_snr_lookup_table.csv
 └── scripts
-    ├── cnn_eval.py
-    ├── cnn.py
-    ├── gen.py
-    ├── gen_with_additional_functionalities.py
-    ├── gw_signal_gen_on_ln_B_basis.py
-    ├── modules
-    ├── transformer.py
-    ├── transformer_with_ROC_and_File_Classification.py
-    └── transformer_with_ROC.py
+    ├── cnn_eval.py
+    ├── cnn.py
+    ├── gen.py
+    ├── gen_with_additional_functionalities.py
+    ├── gw_signal_gen_on_ln_B_basis.py
+    ├── modules
+    │   ├── general_utils.py
+    │   ├── gw_utils.py
+    │   └── neural_net.py
+    ├── transformer.py
+    ├── transformer_with_ROC_and_File_Classification.py
+    └── transformer_with_ROC.py
 </pre>
 
 - `gen.py` orr `gen_with_additional_functionalities.py`: This is used to generate qtransform spectrograms of synthetic GW signals assuming aLIGO sensitivity. Sampling frequency is 4096 Hz.
