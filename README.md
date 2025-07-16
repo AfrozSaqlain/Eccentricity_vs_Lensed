@@ -2,40 +2,44 @@
 
 <pre>
 .
+├── gwtorch
+│   ├── modules
+│   │   ├── general_utils.py
+│   │   ├── gw_utils.py
+│   │   └── neural_net.py
+│   ├── waveform_generation
+│   │    ├── gen.py
+│   │    ├── gen_with_additional_functionalities.py
+│   │    └── gw_signal_gen_on_ln_B_basis.py
+│   ├── training
+│   │   ├── cnn.py
+│   │   ├── transformer.py
+│   │   ├── transformer_with_ROC_and_File_Classification.py
+│   │   └── transformer_with_ROC.py
+│   └── inference
+│       └── cnn_eval.py
 ├── notebooks
 │   ├── analysis.ipynb
 │   ├── eval_based_on_ln_B_cnn.ipynb
 │   ├── eval_based_on_ln_B transformer.ipynb
 │   ├── gen.ipynb
 │   └── gw_utils.py
+├── pyproject.toml
 ├── README.md
-├── results
-│   ├── cnn_results
-│   │   ├── misclassified_test.pkl
-│   │   ├── misclassified_test.txt
-│   │   └── Plots
-│   ├── test_data_parameters.csv
-│   ├── train_data_parameters.csv
-│   └── transformer_results
-│       ├── misclassified_test.txt
-│       ├── misclassified_validation.txt
-│       ├── parameters_reference.csv
-│       ├── Plots
-│       ├── snr_lookup_table.csv
-│       └── test_data_snr_lookup_table.csv
-└── scripts
-    ├── cnn_eval.py
-    ├── cnn.py
-    ├── gen.py
-    ├── gen_with_additional_functionalities.py
-    ├── gw_signal_gen_on_ln_B_basis.py
-    ├── modules
-    │   ├── general_utils.py
-    │   ├── gw_utils.py
-    │   └── neural_net.py
-    ├── transformer.py
-    ├── transformer_with_ROC_and_File_Classification.py
-    └── transformer_with_ROC.py
+└── results
+    ├── cnn_results
+    │   ├── misclassified_test.pkl
+    │   ├── misclassified_test.txt
+    │   └── Plots
+    ├── transformer_results
+    │   ├── misclassified_test.txt
+    │   ├── misclassified_validation.txt
+    │   ├── parameters_reference.csv
+    │   ├── Plots
+    │   ├── snr_lookup_table.csv
+    │   └── test_data_snr_lookup_table.csv
+    ├── test_data_parameters.csv
+    └── train_data_parameters.csv
 </pre>
 
 - `gen.py` orr `gen_with_additional_functionalities.py`: This is used to generate qtransform spectrograms of synthetic GW signals assuming aLIGO sensitivity. Sampling frequency is 4096 Hz.

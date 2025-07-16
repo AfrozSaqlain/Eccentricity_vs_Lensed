@@ -15,8 +15,8 @@ import glob
 from pathlib import Path
 from PIL import Image
 
-from modules.general_utils import compute_roc_auc_with_misclassifications, plot_roc_curves, plot_confusion_matrix, save_misclassified_files_to_dict
-from modules.neural_net import CNN_Model
+from gwtorch.modules.general_utils import compute_roc_auc_with_misclassifications, plot_roc_curves, plot_confusion_matrix, save_misclassified_files_to_dict
+from gwtorch.modules.neural_net import CNN_Model
 
 RANDOM_SEED = 42
 BATCH_SIZE = 128

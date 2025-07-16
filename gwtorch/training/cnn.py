@@ -24,8 +24,8 @@ import seaborn as sns
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
 
-from modules.general_utils import compute_roc_auc_with_misclassifications, plot_roc_curves, plot_confusion_matrix, plot_training_curves
-from modules.neural_net import CNN_Model
+from gwtorch.modules.general_utils import compute_roc_auc_with_misclassifications, plot_roc_curves, plot_confusion_matrix, plot_training_curves
+from gwtorch.modules.neural_net import CNN_Model
 
 RANDOM_SEED = 42
 BATCH_SIZE = 128

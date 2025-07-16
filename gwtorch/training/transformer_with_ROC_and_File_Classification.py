@@ -22,7 +22,7 @@ from sklearn.metrics import classification_report
 from vit_pytorch.efficient import ViT
 from vit_pytorch.cvt import CvT
 
-from modules.general_utils import compute_roc_auc_with_misclassifications, plot_roc_curves, plot_confusion_matrix, print_misclassified_files, save_misclassified_files_to_txt, plot_training_curves
+from gwtorch.modules.general_utils import compute_roc_auc_with_misclassifications, plot_roc_curves, plot_confusion_matrix, print_misclassified_files, save_misclassified_files_to_txt, plot_training_curves
 
 model_selection = str(sys.argv[1])
 

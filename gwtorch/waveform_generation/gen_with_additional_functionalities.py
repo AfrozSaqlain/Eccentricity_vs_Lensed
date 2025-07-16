@@ -19,7 +19,7 @@ import sys
 from pycbc.detector.ground import Detector
 from pathlib import Path
 
-from modules.gw_utils import scale_signal
+from gwtorch.modules.gw_utils import scale_signal
 
 num_processess = os.cpu_count()
 num_samples = int(sys.argv[1])
