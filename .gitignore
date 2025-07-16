@@ -6,3 +6,4 @@ models/
 train_data_snr_lookup_table.csv
 test_data_snr_lookup_table.csv
 __pycache__/
+gwtorch.egg-info/
