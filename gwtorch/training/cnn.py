@@ -133,6 +133,8 @@ def main():
     os.makedirs('./results/cnn_results/Plots', exist_ok=True)
     results_dir = Path('./results/cnn_results')
 
+    print(f"Using device: {device}")
+
     train_loader, valid_loader, test_loader = setup_data_loaders('./data/train', './data/test', args.batch_size)
 
     model = CNN_Model().to(device)

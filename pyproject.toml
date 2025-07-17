@@ -43,7 +43,9 @@ all = [
 ]
 
 [project.scripts]
-generate_waveform = "gwtorch.waveform_generation.gen_with_additional_functionalities:main"
+generate_waveform_gwtorch = "gwtorch.waveform_generation.gen_with_additional_functionalities:main"
+cnn_train_gwtorch = "gwtorch.training.cnn:main"
+transformers_train_gwtorch = "gwtorch.training.transformer_with_ROC_and_File_Classification:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -17,6 +17,7 @@ from pycbc.psd import aLIGOZeroDetHighPower
 from pycbc.types import FrequencySeries
 from pycbc.waveform import get_td_waveform, taper_timeseries
 
+import gwmat
 from gwmat import point_lens
 from gwtorch.modules.gw_utils import scale_signal
 
@@ -58,7 +59,7 @@ def compute_lensed_waveform(sp, sc, m_lens, y_lens):
     sc_freq = sc.to_frequencyseries(delta_f=sc.delta_f)
     freqs = sp_freq.sample_frequencies
 
-    Ffs = np.vectorize(lambda f: point_lens.Ff_effective(f, ml=m_lens, y=y_lens))(freqs)
+    Ffs = np.vectorize(lambda f: gwmat.cythonized_point_lens.Ff_effective(f, ml=m_lens, y=y_lens))(freqs)
     t_delay = point_lens.time_delay(ml=m_lens, y=y_lens)
 
     sp_lens = FrequencySeries(np.conj(Ffs) * sp_freq.numpy(), delta_f=sp_freq.delta_f).cyclic_time_shift(-(0.1 + t_delay))
@@ -104,9 +105,9 @@ def generate_sample(args):
         sp_lensed, sc_lensed, t_delay = compute_lensed_waveform(sp, sc, m_lens, y_lens)
 
         detector = Detector(DETECTOR_NAME)
-        ecc = taper_timeseries(detector.project_wave(hp, hc, **{k: params[k] for k in ['ra', 'dec', 'polarization']}))
-        unlensed = taper_timeseries(detector.project_wave(sp, sc, **{k: params[k] for k in ['ra', 'dec', 'polarization']}))
-        lensed = taper_timeseries(detector.project_wave(sp_lensed, sc_lensed, **{k: params[k] for k in ['ra', 'dec', 'polarization']}))
+        ecc = taper_timeseries(detector.project_wave(hp, hc, **{k: params[k] for k in ['ra', 'dec', 'polarization']}), tapermethod="TAPER_STARTEND", return_lal=False)
+        unlensed = taper_timeseries(detector.project_wave(sp, sc, **{k: params[k] for k in ['ra', 'dec', 'polarization']}), tapermethod="TAPER_STARTEND", return_lal=False)
+        lensed = taper_timeseries(detector.project_wave(sp_lensed, sc_lensed, **{k: params[k] for k in ['ra', 'dec', 'polarization']}), tapermethod="TAPER_STARTEND", return_lal=False)
 
         ecc_noisy, snr_e = scale_signal(ecc, num)
         lens_noisy, snr_l = scale_signal(lensed, num)

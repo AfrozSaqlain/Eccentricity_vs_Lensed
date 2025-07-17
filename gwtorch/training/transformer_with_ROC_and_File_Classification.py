@@ -42,7 +42,7 @@ def setup_directories():
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train Transformer for GW classification")
-    parser.add_argument('--model', type=str, default='CvT', choices=['CvT', 'ViT'], help='Model to train')
+    parser.add_argument('--model', type=str, default='ViT', choices=['CvT', 'ViT'], help='Model to train')
     parser.add_argument('--batch_size', type=int, default=512)
     parser.add_argument('--epochs', type=int, default=20)
     parser.add_argument('--lr', type=float, default=3e-5)
@@ -74,8 +74,8 @@ def custom_collate_fn(batch):
     return torch.stack(images), torch.tensor(labels), file_numbers, img_paths
 
 def load_data(seed, batch_size):
-    train_list = glob.glob('../../data/train/*.png')
-    test_list = glob.glob('../../data/test/*.png')
+    train_list = glob.glob('./data/train/*.png')
+    test_list = glob.glob('./data/test/*.png')
     labels = [path.split('/')[-1].split('_')[0] for path in train_list]
 
     train_list, valid_list = train_test_split(train_list, test_size=0.2, stratify=labels, shuffle=True, random_state=seed)
