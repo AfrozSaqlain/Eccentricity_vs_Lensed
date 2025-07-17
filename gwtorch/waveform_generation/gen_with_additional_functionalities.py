@@ -177,7 +177,7 @@ def main():
     save_csv(results_dir / f"{args.path_name}_data_snr_lookup_table.csv",
              [{'sample': r['sample'], 'eccentric_snr': r['eccentric_snr'], 'lensed_snr': r['lensed_snr'],
                'unlensed_snr': r['unlensed_snr']} for r in valid_results])
-    print("Data generation complete.")
+    print("Data generation complete!!!")
 
 
 def save_csv(path, rows):
