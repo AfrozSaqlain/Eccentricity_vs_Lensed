@@ -87,8 +87,8 @@ def generate_sample(args):
         mass1, mass2 = bilby.gw.conversion.chirp_mass_and_mass_ratio_to_component_masses(
             params['chirp_mass'], params['mass_ratio'])
 
-        m_lens = 10 ** params.pop("Log_Mlz")
-        y_lens = params.pop("yl")
+        m_lens = 10 ** params["Log_Mlz"]
+        y_lens = params["yl"]
 
         hp, hc = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
                                  lambda1=0, lambda2=0,

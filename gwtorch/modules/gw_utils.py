@@ -13,14 +13,14 @@ def scale_signal(signal_ts, num):
 
     noise = generate_noise()
 
-    template, delta_t_eccentric, start_time_eccentric = inject_signal_with_peak_in_window(
+    template, delta_t, start_time = inject_signal_with_peak_in_window(
                                             signal_ts=signal_ts,
                                             noise_ts=noise,
                                             peak_window=(2.0, 2.2))
     
-    data = pycbc.types.TimeSeries(np.asarray(template) + np.asarray(noise), delta_t=delta_t_eccentric, epoch=start_time_eccentric)
+    data = pycbc.types.TimeSeries(np.asarray(template) + np.asarray(noise), delta_t=delta_t, epoch=start_time)
     
-    template = pycbc.types.TimeSeries(template, delta_t=delta_t_eccentric, epoch=start_time_eccentric)
+    template = pycbc.types.TimeSeries(template, delta_t=delta_t, epoch=start_time)
 
     snr = matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=flow)
 
@@ -33,7 +33,7 @@ def scale_signal(signal_ts, num):
         # print(f"Scaling signal to achieve SNR of {snr_desired:.2f} for sample {num}")
         scale_factor = snr_desired / peak_snr
         template *= scale_factor
-        data = pycbc.types.TimeSeries(np.asarray(template) + np.asarray(noise), delta_t=delta_t_eccentric, epoch=start_time_eccentric)
+        data = pycbc.types.TimeSeries(np.asarray(template) + np.asarray(noise), delta_t=delta_t, epoch=start_time)
         snr = matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=flow)
 
         peak_snr = abs(snr).numpy().max()
