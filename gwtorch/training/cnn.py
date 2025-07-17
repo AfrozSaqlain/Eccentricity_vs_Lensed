@@ -24,7 +24,7 @@ from gwtorch.modules.neural_net import CNN_Model
 # ----------------- Constants -----------------
 RANDOM_SEED = 42
 BATCH_SIZE = 128
-EPOCHS = 1
+EPOCHS = 20
 LR = 3e-4
 GAMMA = 0.7
 device = 'cuda' if torch.cuda.is_available() else 'cpu'

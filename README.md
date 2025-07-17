@@ -41,13 +41,18 @@
         └── snr_lookup_table.csv
 </pre>
 
-- `gen.py` orr `gen_with_additional_functionalities.py`: This is used to generate qtransform spectrograms of synthetic GW signals assuming aLIGO sensitivity. Sampling frequency is 4096 Hz.
+- `gen_with_additional_functionalities.py`: This is used to generate qtransform spectrograms of synthetic GW signals assuming aLIGO sensitivity. Sampling frequency is 4096 Hz.
 - `gw_signal_gen_on_ln_B_basis.py`: This script generates GW signal of eccentric type, clacualtes the $\ln B^{Ecc}_{Qc}$ and segregates them in 3 bins on the basis of $\ln B^{Ecc}_{Qc}$, ensuring each bin has almost same number of data.
-- `tranformer.py`, `cnn.py` and `cnn.ipynb`: These are the neural network script files where I have defined the model's structure and done training and testing.
+- `tranformer.py` and `cnn.py`: These are the neural network script files where I have defined the model's structure and done training and testing.
 - `transformer_with_ROC_and_File_Classification.py`: This not only trains the model but alsos generates ROC curve, AUC score, and also tells which data were wrongly classified, and stores that as an additional information in `misclassified_{}.txt` file.
 - `cnn_eval.py`: A script file just to test the trained neural network model on testing data.
 - `eval_based_on_ln_B.ipynb`: This file makes an evaluation of data generated using `gw_signal_gen_on_ln_B_basis.py` file and tells how many misclassification are there corresponding to each $\ln B$ bin.
 
+# Command Line Interface
+
+- `generate_waveform_gwtorch --num-samples [int] --path-name ['train', 'test']` : Used to generate qtransform of the waveform samples.
+- `cnn_train_gwtorch --batch_size [default: 128] --epochs [default: 20] --lr [default: 3e-4] --gamma [default: 0.7] --model_path [default: ./models/cnn_model0.pth]`: Train the CNN model on the data generated using previous code. The directory `models` is created if it doesn't exist.
+- `transformers_train_gwtorch --model [default: ViT] --batch_size [default: 512] --epochs [default 20] --lr [default: 3e-5] --gamma [default: 0.7] --seed [default: 42]`:  Train the Transformer model on the data generated.
 
 # How GW waveforms are generated
 
