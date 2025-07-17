@@ -58,13 +58,22 @@ def define_priors(models):
 
 
 
-def save_qtransform_plot(signal, num, path):
+def save_qtransform_plot(signal, num, path, models):
+    if models == 'Ecc_Qc':
+        file_name = 'Eccentric'
+    elif models == 'L_U':
+        file_name = 'Lensed'
+    elif models == 'Qc_Ecc':
+        file_name = 'Quasi_Circular'
+    elif models == 'U_L':
+        file_name = 'Unlensed'
+
     noisy_gwpy_eccentric = TimeSeries.from_pycbc(signal)
     plt.figure(figsize=(12, 8), facecolor=None)
     plt.pcolormesh(noisy_gwpy_eccentric.q_transform(logf=True, norm='mean', frange=(5, 512), whiten=True, qrange=(4, 64)))
     plt.axis('off')
     plt.yscale('log')
-    plt.savefig(path / f'eccentric_{num}.png', transparent=True, pad_inches=0, bbox_inches='tight')
+    plt.savefig(path / f'{file_name}_{num}.png', transparent=True, pad_inches=0, bbox_inches='tight')
     plt.close()
 
 def compute_lensed_waveform(sp, sc, m_lens, y_lens):
@@ -124,6 +133,9 @@ def generate_waveform(parameters, models):
     if models in ['L_U', 'U_L']:
         sp, sc, t_delay = compute_lensed_waveform(sp, sc, m_lens, y_lens)
 
+    if models in ['Qc_Ecc', 'L_U']:
+        hp, hc, sp, sc = sp, sc, hp, hc
+
     return hp, hc, sp, sc
 
 
@@ -158,7 +170,7 @@ def generate_additional_waveforms(num, models, indicator, match, signal_snr, sam
         hp, hc, sp, sc = generate_waveform(parameters, models)
         ln_B, noisy_signal, match, signal_snr = project_signal_and_compute_ln_Bayes(hp, hc, sp, sc, parameters, num)
         assert expected_condition(ln_B), f"ln_B should be between {lower_bound} and {upper_bound}, but was {ln_B}"
-        save_qtransform_plot(noisy_signal, num, save_path)
+        save_qtransform_plot(noisy_signal, num, save_path, models)
 
     if indicator < 10:
         adjust_distance_and_generate(np.random.uniform(10, 30), lambda x: 10 < x < 30, ln_bw_10_and_30, 10, 30)
@@ -178,11 +190,11 @@ def generate_training_qtransform(num, samples, models, ln_below_10, ln_bw_10_and
 
     try:
         if ln_B <= 10:
-            save_qtransform_plot(noisy_signal, num, ln_below_10)
+            save_qtransform_plot(noisy_signal, num, ln_below_10, models)
         elif 10 < ln_B < 30:
-            save_qtransform_plot(noisy_signal, num, ln_bw_10_and_30)
+            save_qtransform_plot(noisy_signal, num, ln_bw_10_and_30, models)
         else:
-            save_qtransform_plot(noisy_signal, num, ln_above_30)
+            save_qtransform_plot(noisy_signal, num, ln_above_30, models)
 
         generate_additional_waveforms(num, models, ln_B, match, signal_snr, samples, ln_below_10, ln_bw_10_and_30, ln_above_30)
     except Exception as e:
