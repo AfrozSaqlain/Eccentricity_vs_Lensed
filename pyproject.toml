@@ -42,6 +42,8 @@ all = [
     "gwpy==3.0.12"
 ]
 
+[project.scripts]
+generate_waveform = "gwtorch.waveform_generation.gen_with_additional_functionalities:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

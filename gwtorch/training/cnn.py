@@ -1,224 +1,166 @@
 import os
 import sys
-
-os.makedirs('../models', exist_ok = True)
-os.makedirs('../results', exist_ok=True)
-os.makedirs('../results/cnn_results', exist_ok=True)
-
-# sys.stdout = open("../results/cnn_results/log.out", "w")
-# sys.stderr = open("../results/cnn_results/error.err", "w")
+import glob
+from pathlib import Path
+import argparse
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torchvision import transforms
 from torch.utils.data import DataLoader, Dataset
+from torchvision import transforms
 
-import numpy as np
-import matplotlib.pyplot as plt
-import glob
-from pathlib import Path
 from PIL import Image
-import seaborn as sns
-
+import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import confusion_matrix
 
-from gwtorch.modules.general_utils import compute_roc_auc_with_misclassifications, plot_roc_curves, plot_confusion_matrix, plot_training_curves
+from gwtorch.modules.general_utils import (
+    compute_roc_auc_with_misclassifications,
+    plot_roc_curves,
+    plot_confusion_matrix,
+    plot_training_curves,
+)
 from gwtorch.modules.neural_net import CNN_Model
 
+# ----------------- Constants -----------------
 RANDOM_SEED = 42
 BATCH_SIZE = 128
-EPOCHS = 5
+EPOCHS = 1
 LR = 3e-4
 GAMMA = 0.7
-
-results_dir = Path('../results/cnn_results')
-os.makedirs(results_dir / 'Plots', exist_ok=True)
-
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
+class_names = ["Lensed", "Eccentric", "Unlensed"]
 
-train_dir = '../data/train'
-test_dir = '../data/test'
-
-train_list = glob.glob(os.path.join(train_dir,'*.png'))
-test_list = glob.glob(os.path.join(test_dir, '*.png'))
-
-print(f"Train Data: {len(train_list)}")
-print(f"Test Data: {len(test_list)}")
-
-labels = [path.split('/')[-1].split('_')[0] for path in train_list]
-
-train_list, valid_list = train_test_split(train_list, 
-                                          test_size=0.2,
-                                          stratify=labels,
-                                          shuffle=True,
-                                          random_state=RANDOM_SEED)
-
-print(f"Train Data: {len(train_list)}")
-print(f"Validation Data: {len(valid_list)}")
-print(f"Test Data: {len(test_list)}")
-
-train_transforms = transforms.Compose(
-    [
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-    ]
-)
-
-val_transforms = transforms.Compose(
-    [
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-    ]
-)
-
-test_transforms = transforms.Compose(
-    [
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-    ]
-)
-
+# ----------------- Dataset Class -----------------
 class GWDataset(Dataset):
     def __init__(self, file_list, transform=None):
         self.file_list = file_list
         self.transform = transform
 
     def __len__(self):
-        self.filelength = len(self.file_list)
-        return self.filelength
+        return len(self.file_list)
 
     def __getitem__(self, idx):
         img_path = self.file_list[idx]
         img = Image.open(img_path)
-        
-        img_transformed = self.transform(img)
-        img_transformed = img_transformed[:3, :, :]
-
+        img = self.transform(img)[:3, :, :]
         label_str = img_path.split("/")[-1].split("_")[0]
-        if label_str == "eccentric":
-            label = 1
-        elif label_str == "unlensed":
-            label = 2
-        else:
-            label = 0 
-
-        # Extract file number for tracking misclassifications
+        label = {"lensed": 0, "eccentric": 1, "unlensed": 2}.get(label_str, 0)
         file_number = img_path.split("/")[-1].split("_")[1]
+        return img, label, file_number, img_path
 
-        return img_transformed, label, file_number, img_path
-    
-train_data = GWDataset(train_list, transform=train_transforms)
-valid_data = GWDataset(valid_list, transform=test_transforms)
-test_data = GWDataset(test_list, transform=test_transforms)
-
-# Custom collate function to handle the additional file_number and img_path
+# ----------------- Utility Functions -----------------
 def custom_collate_fn(batch):
     images, labels, file_numbers, img_paths = zip(*batch)
-    images = torch.stack(images)
-    labels = torch.tensor(labels)
-    return images, labels, file_numbers, img_paths
+    return torch.stack(images), torch.tensor(labels), file_numbers, img_paths
 
-train_loader = DataLoader(dataset = train_data, num_workers=os.cpu_count(), batch_size=BATCH_SIZE, shuffle=True, collate_fn=custom_collate_fn)
-valid_loader = DataLoader(dataset = valid_data, num_workers=os.cpu_count(), batch_size=BATCH_SIZE, shuffle=True, collate_fn=custom_collate_fn)
-test_loader = DataLoader(dataset = test_data, num_workers=os.cpu_count(), batch_size=BATCH_SIZE, shuffle=False, collate_fn=custom_collate_fn)
+def parse_args():
+    parser = argparse.ArgumentParser(description="Train CNN model for GW classification")
+    parser.add_argument('--batch_size', type=int, default=BATCH_SIZE)
+    parser.add_argument('--epochs', type=int, default=EPOCHS)
+    parser.add_argument('--lr', type=float, default=LR)
+    parser.add_argument('--gamma', type=float, default=GAMMA)
+    parser.add_argument('--model_path', type=str, default='./models/cnn_model0.pth')
+    return parser.parse_args()
 
-print(f"Train Dataset Length: {len(train_data)}, Train Dataloader Length: {len(train_loader)}")
+def setup_data_loaders(train_dir, test_dir, batch_size):
+    train_list = glob.glob(os.path.join(train_dir, '*.png'))
+    test_list = glob.glob(os.path.join(test_dir, '*.png'))
 
-print(f"Validation Dataset Length: {len(valid_data)}, Validation Dataloader Length: {len(valid_loader)}")
+    labels = [path.split('/')[-1].split('_')[0] for path in train_list]
+    train_list, valid_list = train_test_split(train_list, test_size=0.2, stratify=labels, shuffle=True, random_state=RANDOM_SEED)
 
-model0 = CNN_Model().to(device)
+    transform = transforms.Compose([transforms.Resize((224, 224)), transforms.ToTensor()])
+    train_data = GWDataset(train_list, transform)
+    valid_data = GWDataset(valid_list, transform)
+    test_data = GWDataset(test_list, transform)
 
-model_path = '../models/cnn_model0.pth'
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+    valid_loader = DataLoader(valid_data, batch_size=batch_size, shuffle=True, num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+    test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False, num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
 
-if os.path.exists(model_path):
-    model0.load_state_dict(torch.load(model_path, map_location=device))
-    print(f"Model loaded from {model_path}")
-else:
-    print(f"No pre-trained model found at {model_path}, starting training from scratch.")
+    return train_loader, valid_loader, test_loader
 
-loss_fn = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model0.parameters(), lr=LR)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=GAMMA)
-
-
-def train_model(model, train_loader, valid_loader, loss_fn, optimizer, scheduler, epochs=EPOCHS):
-    train_losses = []
-    val_losses = []
-    train_accuracies = []
-    val_accuracies = []
+def train_model(model, train_loader, valid_loader, loss_fn, optimizer, scheduler, epochs):
+    train_losses, val_losses = [], []
+    train_accuracies, val_accuracies = [], []
 
     for epoch in range(epochs):
         model.train()
-        running_loss = 0.0
-        correct = 0
-        total = 0
-        
-        for images, labels, file_numbers, img_paths in train_loader:
+        correct, total, running_loss = 0, 0, 0.0
+
+        for images, labels, _, _ in train_loader:
             images, labels = images.to(device), labels.to(device)
-            
             optimizer.zero_grad()
             outputs = model(images)
             loss = loss_fn(outputs, labels)
             loss.backward()
             optimizer.step()
-            
+
             running_loss += loss.item() * images.size(0)
-            _, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
+            _, predicted = torch.max(outputs, 1)
             correct += (predicted == labels).sum().item()
-        
-        epoch_loss = running_loss / len(train_loader.dataset)
-        epoch_acc = correct / total
-        train_losses.append(epoch_loss)
-        train_accuracies.append(epoch_acc)
+            total += labels.size(0)
 
-        print(f"Epoch [{epoch+1}/{epochs}], Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.4f}")
-        
-        # Validation
+        train_losses.append(running_loss / total)
+        train_accuracies.append(correct / total)
+        print(f"Epoch {epoch+1}: Train Loss = {train_losses[-1]:.4f}, Accuracy = {train_accuracies[-1]:.4f}")
+
         model.eval()
+        correct, total, val_loss = 0, 0, 0.0
         with torch.no_grad():
-            valid_loss = 0.0
-            valid_correct = 0
-            valid_total = 0
-            
-            for val_images, val_labels, file_numbers, img_paths in valid_loader:
-                val_images, val_labels = val_images.to(device), val_labels.to(device)
-                val_outputs = model(val_images)
-                v_loss = loss_fn(val_outputs, val_labels)
-                
-                valid_loss += v_loss.item() * val_images.size(0)
-                _, v_predicted = torch.max(val_outputs.data, 1)
-                valid_total += val_labels.size(0)
-                valid_correct += (v_predicted == val_labels).sum().item()
-            
-            epoch_valid_loss = valid_loss / len(valid_loader.dataset)
-            epoch_valid_acc = valid_correct / valid_total
-            val_losses.append(epoch_valid_loss)
-            val_accuracies.append(epoch_valid_acc)
+            for images, labels, _, _ in valid_loader:
+                images, labels = images.to(device), labels.to(device)
+                outputs = model(images)
+                loss = loss_fn(outputs, labels)
 
-            print(f"Validation Loss: {epoch_valid_loss:.4f}, Validation Accuracy: {epoch_valid_acc:.4f}")
-        
+                val_loss += loss.item() * images.size(0)
+                _, predicted = torch.max(outputs, 1)
+                correct += (predicted == labels).sum().item()
+                total += labels.size(0)
+
+        val_losses.append(val_loss / total)
+        val_accuracies.append(correct / total)
+        print(f"          Validation Loss = {val_losses[-1]:.4f}, Accuracy = {val_accuracies[-1]:.4f}")
         scheduler.step()
-    
+
     return train_losses, val_losses, train_accuracies, val_accuracies
 
+# ----------------- Main -----------------
+def main():
+    args = parse_args()
 
-train_losses, val_losses, train_accuracies, val_accuracies = train_model(model0, train_loader, valid_loader, loss_fn, optimizer, scheduler, epochs=EPOCHS)
+    os.makedirs('./models', exist_ok=True)
+    os.makedirs('./results/cnn_results/Plots', exist_ok=True)
+    results_dir = Path('./results/cnn_results')
 
-class_names=["Lensed", "Eccentric", "Unlensed"]
+    train_loader, valid_loader, test_loader = setup_data_loaders('./data/train', './data/test', args.batch_size)
 
+    model = CNN_Model().to(device)
+    if os.path.exists(args.model_path):
+        model.load_state_dict(torch.load(args.model_path, map_location=device))
+        print(f"Model loaded from {args.model_path}")
+    else:
+        print(f"No pre-trained model found. Training from scratch.")
 
-fpr, tpr, roc_auc, labels, predictions, _, misclassified = compute_roc_auc_with_misclassifications(model=model0, data_loader=test_loader, device=device)
+    loss_fn = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=args.gamma)
 
-roc_fig = plot_roc_curves(fpr=fpr, tpr=tpr, roc_auc=roc_auc, class_names=class_names, title_suffix=" (Test Set)", results_dir=results_dir)
+    train_losses, val_losses, train_accuracies, val_accuracies = train_model(
+        model, train_loader, valid_loader, loss_fn, optimizer, scheduler, args.epochs
+    )
 
-plot_confusion_matrix(y_true=labels, y_pred=predictions, class_names=class_names, title_suffix=" (Test Set)", results_dir=results_dir)
+    print("Evaluating on test set...")
+    fpr, tpr, roc_auc, labels, predictions, _, misclassified = compute_roc_auc_with_misclassifications(
+        model=model, data_loader=test_loader, device=device
+    )
 
-plot_training_curves(train_losses, val_losses, train_accuracies, val_accuracies, results_dir)
+    plot_roc_curves(fpr, tpr, roc_auc, class_names, " (Test Set)", results_dir)
+    plot_confusion_matrix(labels, predictions, class_names, " (Test Set)", results_dir)
+    plot_training_curves(train_losses, val_losses, train_accuracies, val_accuracies, results_dir)
 
-torch.save(model0.state_dict(), model_path)
+    torch.save(model.state_dict(), args.model_path)
+    print(f"Model saved to {args.model_path}")
 
-# sys.stdout.close()
-# sys.stderr.close()
+if __name__ == "__main__":
+    main()

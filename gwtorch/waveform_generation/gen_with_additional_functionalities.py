@@ -1,285 +1,193 @@
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
+import argparse
 import csv
-from multiprocessing.pool import Pool
-import bilby
-import numpy as np
-from pycbc.waveform import get_td_waveform, taper_timeseries
-import pycbc.types
-import pylab
-import pycbc.noise
-import pycbc.psd
-from gwmat import point_lens
-from gwpy.timeseries import TimeSeries
-import matplotlib.pyplot as plt
-import gwmat
 import os
-import sys
-from pycbc.detector.ground import Detector
+from multiprocessing import Pool
 from pathlib import Path
 
+import bilby
+import matplotlib.pyplot as plt
+import numpy as np
+from gwpy.timeseries import TimeSeries
+from pycbc.detector.ground import Detector
+from pycbc.noise import noise_from_string
+from pycbc.psd import aLIGOZeroDetHighPower
+from pycbc.types import FrequencySeries
+from pycbc.waveform import get_td_waveform, taper_timeseries
+
+from gwmat import point_lens
 from gwtorch.modules.gw_utils import scale_signal
 
-num_processess = os.cpu_count()
-num_samples = int(sys.argv[1])
-path_name = str(sys.argv[2])
+# ---------------------- Constants ---------------------- #
+DELTA_T = 1.0 / 4096
+F_LOWER = 5.0
+DETECTOR_NAME = 'H1'
 
-# sys.stdout = open("log.out", "w")
-# sys.stderr = open("error.err", "w")
+# ---------------------- Utility Functions ---------------------- #
 
-if path_name == 'test':
-    num_samples //= 10
+def generate_prior(num_samples):
+    """Define and sample priors for GW parameters."""
+    priors = bilby.core.prior.PriorDict()
+    priors["mass1"] = bilby.core.prior.Constraint(name="mass1", minimum=10, maximum=100)
+    priors["mass2"] = bilby.core.prior.Constraint(name="mass2", minimum=10, maximum=100)
+    priors['mass_ratio'] = bilby.gw.prior.UniformInComponentsMassRatio(name='mass_ratio', minimum=0.1, maximum=1)
+    priors['chirp_mass'] = bilby.gw.prior.UniformInComponentsChirpMass(name='chirp_mass', minimum=25, maximum=100)
+    priors['spin1z'] = bilby.core.prior.Uniform(name='spin1z', minimum=0.0, maximum=0.9)
+    priors['spin2z'] = bilby.core.prior.Uniform(name='spin2z', minimum=0.0, maximum=0.9)
+    priors['eccentricity'] = bilby.core.prior.Uniform(name='eccentricity', minimum=0.1, maximum=0.6)
+    priors['coa_phase'] = bilby.core.prior.Uniform(name='coa_phase', minimum=0.0, maximum=2 * np.pi)
+    priors['distance'] = bilby.core.prior.Uniform(name='distance', minimum=100, maximum=1000)
+    priors['dec'] = bilby.core.prior.Cosine(minimum=-np.pi/2, maximum=np.pi/2)
+    priors['ra'] = bilby.core.prior.Uniform(minimum=0., maximum=2*np.pi, boundary="periodic")
+    priors['polarization'] = bilby.core.prior.Uniform(minimum=0., maximum=np.pi, boundary="periodic")
+    priors['Log_Mlz'] = bilby.core.prior.Uniform(minimum=3, maximum=5)
+    priors['yl'] = bilby.core.prior.PowerLaw(alpha=1, minimum=0.01, maximum=1.0)
 
-os.makedirs(f'../data/{path_name}', exist_ok=True)
-os.makedirs('../results', exist_ok=True)
-
-training_data_path = Path(f"../data/{path_name}")
-results_dir = Path('../results')
-
-f_lower = 5.0       
-
-priors = bilby.core.prior.PriorDict()
-
-priors["mass1"] = bilby.core.prior.Constraint(name="mass1", minimum=10, maximum=100)
-priors["mass2"] = bilby.core.prior.Constraint(name="mass2", minimum=10, maximum=100)
-priors['mass_ratio'] = bilby.gw.prior.UniformInComponentsMassRatio(name='mass_ratio', minimum=0.1, maximum=1)
-priors['chirp_mass'] = bilby.gw.prior.UniformInComponentsChirpMass(name='chirp_mass', minimum=25, maximum=100)
-priors['spin1z'] = bilby.core.prior.Uniform(name='spin1z', minimum=0.0, maximum=0.9)
-priors['spin2z'] = bilby.core.prior.Uniform(name='spin2z', minimum=0.0, maximum=0.9)
-priors['eccentricity'] = bilby.core.prior.Uniform(name='eccentricity', minimum=0.1, maximum=0.6)
-priors['coa_phase'] = bilby.core.prior.Uniform(name='coa_phase', minimum=0.0, maximum=2 * np.pi)
-priors['distance'] = bilby.core.prior.Uniform(name='distance', minimum=100, maximum=1000)
-priors['dec'] = bilby.core.prior.Cosine(minimum=-np.pi/2, maximum=np.pi/2)
-priors['ra'] = bilby.core.prior.Uniform(minimum=0., maximum=2*np.pi, boundary="periodic")
-priors['polarization'] = bilby.core.prior.Uniform(minimum=0., maximum=np.pi, boundary="periodic")
-
-priors['Log_Mlz'] = bilby.core.prior.Uniform(minimum = 3, maximum = 5)
-priors['yl'] = bilby.core.prior.PowerLaw(alpha = 1, minimum = 0.01, maximum = 1.0)
-
-parameters_list = priors.sample(num_samples)
-
-samples = [
-    {key: parameters_list[key][i] for key in parameters_list}
-    for i in range(num_samples)
-]
-
-print(f"Length of parameters_list: {len(samples)}")
+    parameters = priors.sample(num_samples)
+    return [
+        {key: parameters[key][i] for key in parameters}
+        for i in range(num_samples)
+    ]
 
 
-def generate_training_qtransform(num):
-    parameters = samples[num].copy()
+def compute_lensed_waveform(sp, sc, m_lens, y_lens):
+    """Apply lensing amplification to the unlensed waveform."""
+    sp_freq = sp.to_frequencyseries(delta_f=sp.delta_f)
+    sc_freq = sc.to_frequencyseries(delta_f=sc.delta_f)
+    freqs = sp_freq.sample_frequencies
 
-    mass1, mass2 = bilby.gw.conversion.chirp_mass_and_mass_ratio_to_component_masses(parameters['chirp_mass'], parameters['mass_ratio'])
+    Ffs = np.vectorize(lambda f: point_lens.Ff_effective(f, ml=m_lens, y=y_lens))(freqs)
+    t_delay = point_lens.time_delay(ml=m_lens, y=y_lens)
 
-    m_lens = np.power(10., parameters.pop("Log_Mlz"))
-    y_lens = parameters.pop("yl")
+    sp_lens = FrequencySeries(np.conj(Ffs) * sp_freq.numpy(), delta_f=sp_freq.delta_f).cyclic_time_shift(-(0.1 + t_delay))
+    sc_lens = FrequencySeries(np.conj(Ffs) * sc_freq.numpy(), delta_f=sc_freq.delta_f).cyclic_time_shift(-(0.1 + t_delay))
 
-    hp, hc = get_td_waveform(
-        approximant='teobresums',
-        mass1=mass1,
-        mass2=mass2,
-        lambda1=0,
-        lambda2=0,
-        spin1z=parameters['spin1z'],
-        spin2z=parameters['spin2z'],
-        distance=parameters['distance'],
-        delta_t=1.0 / 4096 ,
-        ecc=parameters['eccentricity'],
-        coa_phase=parameters['coa_phase'],
-        f_lower=5,
-    )
-
-    sp, sc = get_td_waveform(
-        approximant='teobresums',
-        mass1=mass1,
-        mass2=mass2,
-        lambda1=0,
-        lambda2=0,
-        spin1z=parameters['spin1z'],
-        spin2z=parameters['spin2z'],
-        distance=parameters['distance'],
-        delta_t=1.0 / 4096 ,
-        ecc=0,
-        coa_phase=parameters['coa_phase'],
-        f_lower=5,
-    )
-
-    ####---------------------Generating Lensed Waveform--------------------####
-
-    sp_freq = sp.to_frequencyseries(delta_f = sp.delta_f)
-    sc_freq = sc.to_frequencyseries(delta_f = sc.delta_f)
-
-    fs1 = sp_freq.sample_frequencies
-    assert np.allclose(fs1, sc_freq.sample_frequencies), "Sample frequencies do not match!"
-
-    Ffs_sp = np.vectorize(lambda f: gwmat.cythonized_point_lens.Ff_effective(f, ml=m_lens, y=y_lens))(fs1)
-        
-    time_Delay = point_lens.time_delay(ml=m_lens, y=y_lens)
-
-    sp_lensed = pycbc.types.FrequencySeries(np.conj(Ffs_sp) * np.asarray(sp_freq), delta_f=sp_freq.delta_f).cyclic_time_shift(-1 * (0.1 + time_Delay))
-    sc_lensed = pycbc.types.FrequencySeries(np.conj(Ffs_sp) * np.asarray(sc_freq), delta_f=sc_freq.delta_f).cyclic_time_shift(-1 * (0.1 + time_Delay))
-
-    sp_lensed = sp_lensed.to_timeseries(delta_t=sp_lensed.delta_t)
-    sc_lensed = sc_lensed.to_timeseries(delta_t=sc_lensed.delta_t)
+    return sp_lens.to_timeseries(delta_t=sp_lens.delta_t), sc_lens.to_timeseries(delta_t=sc_lens.delta_t), t_delay
 
 
-    ####---------------------Projecting on detector--------------------####
+def save_qtransform(ts, path):
+    """Save Q-transform of a time series."""
+    plt.figure(figsize=(12, 8))
+    plt.pcolormesh(ts.q_transform(logf=True, norm='mean', frange=(5, 512), whiten=True, qrange=(4, 64)))
+    plt.axis('off')
+    plt.yscale('log')
+    plt.savefig(path, transparent=True, bbox_inches='tight', pad_inches=0)
+    plt.close()
 
-    detector = Detector('H1')
 
-    eccentric_signal = detector.project_wave(hp, hc, ra = parameters['ra'], dec = parameters['dec'], polarization = parameters['polarization'])
+# ---------------------- Main Worker ---------------------- #
 
-    lensed_signal = detector.project_wave(sp_lensed, sc_lensed, ra = parameters['ra'], dec = parameters['dec'], polarization = parameters['polarization'])
-
-    unlensed_signal = detector.project_wave(sp, sc, ra = parameters['ra'], dec = parameters['dec'], polarization = parameters['polarization'])
-
-    # plt.plot(eccentric_signal.sample_times, eccentric_signal, label='Eccentric Signal')
-    # plt.xlabel('Time (s)')
-    # plt.ylabel('Strain')
-    # plt.title(f'Eccentric Signal')
-    # plt.legend()
-    # plt.savefig(training_data_path / f'Waveform_Eccentric_{num}.png')
-    # plt.close()
-
-    # plt.plot(lensed_signal.sample_times, lensed_signal, label='Lensed Signal')
-    # plt.xlabel('Time (s)')
-    # plt.ylabel('Strain')
-    # plt.title(f'Lensed Signal')
-    # plt.legend()
-    # plt.savefig(training_data_path / f'Waveform_Lensed_{num}.png')
-    # plt.close()
-
-    # plt.plot(unlensed_signal.sample_times, unlensed_signal, label='Unlensed Signal')
-    # plt.xlabel('Time (s)')
-    # plt.ylabel('Strain')
-    # plt.title(f'Unlensed Signal')
-    # plt.legend()
-    # plt.savefig(training_data_path / f'Waveform_Unlensed_{num}.png')
-    # plt.close()
-
-    ####-----------------------Eccentric Signal + Noise---------------------####
-
-    eccentric_signal = taper_timeseries(eccentric_signal, tapermethod="TAPER_STARTEND", return_lal=False)
-
-    eccentric_noisy, eccentric_snr = scale_signal(eccentric_signal, num)
-
-    ####-----------------------Lensed Signal + Noise---------------------####
-
-    lensed_signal = taper_timeseries(lensed_signal, tapermethod="TAPER_STARTEND", return_lal=False)
-
-    lensed_noisy, lensed_snr = scale_signal(lensed_signal, num)
-
-    ####-----------------------Unlensed Signal + Noise---------------------####
-
-    unlensed_signal = taper_timeseries(unlensed_signal, tapermethod="TAPER_STARTEND", return_lal=False)
-
-    unlensed_noisy, unlensed_snr = scale_signal(unlensed_signal, num)
-
-    ####-------Cropping the signal such that it has duration of 8s-------####
-
-    eccentric_noisy = eccentric_noisy.crop(left=24, right=0)
-    lensed_noisy = lensed_noisy.crop(left=24, right=0)
-    unlensed_noisy = unlensed_noisy.crop(left=24, right=0)
-
-    ####------------------------------------------------------------------####
-
-    noisy_gwpy_eccentric = TimeSeries.from_pycbc(eccentric_noisy)
-    noisy_gwpy_lensed = TimeSeries.from_pycbc(lensed_noisy)
-    noisy_gwpy_unlensed = TimeSeries.from_pycbc(unlensed_noisy)
-
-    ####------------------------------------------------------------------####
+def generate_sample(args):
+    num, samples, output_path = args
     try:
-        plt.figure(figsize=(12,8), facecolor=None)
-        plt.pcolormesh(noisy_gwpy_eccentric.q_transform(logf=True, norm='mean', frange=(5,512), whiten=True, qrange=(4, 64)))
-        plt.axis('off')
-        plt.yscale('log')
-        plt.savefig(training_data_path / f'eccentric_{num}.png', transparent=True, pad_inches=0, bbox_inches='tight')
-        plt.close()
+        params = samples[num].copy()
+        mass1, mass2 = bilby.gw.conversion.chirp_mass_and_mass_ratio_to_component_masses(
+            params['chirp_mass'], params['mass_ratio'])
 
-        plt.figure(figsize=(12,8), facecolor=None)
-        plt.pcolormesh(noisy_gwpy_lensed.q_transform(logf=True, norm='mean', frange=(5,512), whiten=True, qrange=(4, 64)))
-        plt.axis('off')
-        plt.yscale('log')
-        plt.savefig(training_data_path / f'lensed_{num}.png', transparent=True, pad_inches=0, bbox_inches='tight')
-        plt.close()
-        
-        plt.figure(figsize=(12,8), facecolor=None)
-        plt.pcolormesh(noisy_gwpy_unlensed.q_transform(logf=True, norm='mean', frange=(5,512), whiten=True, qrange=(4, 64)))
-        plt.axis('off')
-        plt.yscale('log')
-        plt.savefig(training_data_path / f'unlensed_{num}.png', transparent=True, pad_inches=0, bbox_inches='tight')
-        plt.close()
+        m_lens = 10 ** params.pop("Log_Mlz")
+        y_lens = params.pop("yl")
+
+        hp, hc = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
+                                 lambda1=0, lambda2=0,
+                                 spin1z=params['spin1z'], spin2z=params['spin2z'],
+                                 distance=params['distance'], delta_t=DELTA_T,
+                                 ecc=params['eccentricity'], coa_phase=params['coa_phase'], f_lower=F_LOWER)
+
+        sp, sc = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
+                                 lambda1=0, lambda2=0,
+                                 spin1z=params['spin1z'], spin2z=params['spin2z'],
+                                 distance=params['distance'], delta_t=DELTA_T,
+                                 ecc=0.0, coa_phase=params['coa_phase'], f_lower=F_LOWER)
+
+        sp_lensed, sc_lensed, t_delay = compute_lensed_waveform(sp, sc, m_lens, y_lens)
+
+        detector = Detector(DETECTOR_NAME)
+        ecc = taper_timeseries(detector.project_wave(hp, hc, **{k: params[k] for k in ['ra', 'dec', 'polarization']}))
+        unlensed = taper_timeseries(detector.project_wave(sp, sc, **{k: params[k] for k in ['ra', 'dec', 'polarization']}))
+        lensed = taper_timeseries(detector.project_wave(sp_lensed, sc_lensed, **{k: params[k] for k in ['ra', 'dec', 'polarization']}))
+
+        ecc_noisy, snr_e = scale_signal(ecc, num)
+        lens_noisy, snr_l = scale_signal(lensed, num)
+        unls_noisy, snr_u = scale_signal(unlensed, num)
+
+        ecc_noisy = ecc_noisy.crop(left=24, right=0)
+        lens_noisy = lens_noisy.crop(left=24, right=0)
+        unls_noisy = unls_noisy.crop(left=24, right=0)
+
+        save_qtransform(TimeSeries.from_pycbc(ecc_noisy), output_path / f"eccentric_{num}.png")
+        save_qtransform(TimeSeries.from_pycbc(lens_noisy), output_path / f"lensed_{num}.png")
+        save_qtransform(TimeSeries.from_pycbc(unls_noisy), output_path / f"unlensed_{num}.png")
+
+        return {
+            'sample': num,
+            'mass1': float(mass1), 'mass2': float(mass2),
+            'chirp_mass': float(params['chirp_mass']),
+            'mass_ratio': float(params['mass_ratio']),
+            'spin1z': float(params['spin1z']), 'spin2z': float(params['spin2z']),
+            'eccentricity': float(params['eccentricity']),
+            'coa_phase': float(params['coa_phase']),
+            'distance': float(params['distance']),
+            'ra': float(params['ra']), 'dec': float(params['dec']),
+            'polarization': float(params['polarization']),
+            'm_lens': float(m_lens), 'y_lens': float(y_lens),
+            'Log_Mlz': np.log10(m_lens),
+            'yl': float(y_lens),
+            'time_delay': float(t_delay),
+            'eccentric_snr': float(snr_e),
+            'lensed_snr': float(snr_l),
+            'unlensed_snr': float(snr_u),
+        }
     except Exception as e:
-        print(f"Error generating Q-transform for sample {num}: {e}")
+        print(f"[Sample {num}] Error: {e}")
         return None
-    
-    # Create parameter dictionary for this sample
-    # Get original parameters before they were modified
-    original_params = samples[num].copy()
-    
-    # Add computed values
-    param_dict = {
-        'sample': num,
-        'mass1': float(mass1),
-        'mass2': float(mass2),
-        'mass_ratio': float(original_params['mass_ratio']),
-        'chirp_mass': float(original_params['chirp_mass']),
-        'spin1z': float(original_params['spin1z']),
-        'spin2z': float(original_params['spin2z']),
-        'eccentricity': float(original_params['eccentricity']),
-        'coa_phase': float(original_params['coa_phase']),
-        'distance': float(original_params['distance']),
-        'dec': float(original_params['dec']),
-        'ra': float(original_params['ra']),
-        'polarization': float(original_params['polarization']),
-        'Log_Mlz': float(original_params['Log_Mlz']),
-        'yl': float(original_params['yl']),
-        'm_lens': float(m_lens),
-        'y_lens': float(y_lens),
-        'time_delay': float(time_Delay),
-        'eccentric_snr': float(eccentric_snr),
-        'lensed_snr': float(lensed_snr),
-        'unlensed_snr': float(unlensed_snr)
-    }
-    
-    return param_dict
 
-num_range = list(range(int(num_samples)))
 
-with Pool(processes=num_processess) as pool:
-        results = pool.map(generate_training_qtransform, num_range)
+# ---------------------- Main Script ---------------------- #
 
-# Filter out None results
-valid_results = [entry for entry in results if entry is not None]
+def main():
+    parser = argparse.ArgumentParser(description="Generate Q-transform training dataset.")
+    parser.add_argument('--num-samples', type=int, required=True)
+    parser.add_argument('--path-name', type=str, choices=['train', 'test'], required=True)
+    args = parser.parse_args()
 
-# Create SNR lookup table (backward compatibility)
-snr_table = [
-    {
-        'sample': entry['sample'],
-        'eccentric_snr': entry['eccentric_snr'],
-        'lensed_snr': entry['lensed_snr'],
-        'unlensed_snr': entry['unlensed_snr']
-    }
-    for entry in valid_results
-]
+    num_samples = args.num_samples
+    if args.path_name == 'test':
+        num_samples //= 10
 
-# Save SNR lookup table
-snr_csv_path = results_dir / f"{path_name}_data_snr_lookup_table.csv"
-with open(snr_csv_path, mode='w', newline='') as f:
-    writer = csv.DictWriter(f, fieldnames=['sample', 'eccentric_snr', 'lensed_snr', 'unlensed_snr'])
-    writer.writeheader()
-    writer.writerows(snr_table)
+    output_path = Path(f"./data/{args.path_name}")
+    output_path.mkdir(parents=True, exist_ok=True)
+    results_dir = Path('./results')
+    results_dir.mkdir(exist_ok=True)
 
-print(f"SNR lookup table saved to {snr_csv_path}")
+    samples = generate_prior(num_samples)
 
-# Save parameters table
-params_csv_path = results_dir / f"{path_name}_data_parameters.csv"
-with open(params_csv_path, mode='w', newline='') as f:
-    if valid_results:
-        fieldnames = list(valid_results[0].keys())
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+    print(f"Generating {len(samples)} samples...")
+
+    args_list = [(i, samples, output_path) for i in range(num_samples)]
+
+    with Pool(os.cpu_count()) as pool:
+        results = pool.map(generate_sample, args_list)
+
+    valid_results = [res for res in results if res is not None]
+
+    save_csv(results_dir / f"{args.path_name}_data_parameters.csv", valid_results)
+    save_csv(results_dir / f"{args.path_name}_data_snr_lookup_table.csv",
+             [{'sample': r['sample'], 'eccentric_snr': r['eccentric_snr'], 'lensed_snr': r['lensed_snr'],
+               'unlensed_snr': r['unlensed_snr']} for r in valid_results])
+    print("Data generation complete.")
+
+
+def save_csv(path, rows):
+    """Write dictionary rows to CSV."""
+    if not rows:
+        return
+    with open(path, 'w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         writer.writeheader()
-        writer.writerows(valid_results)
+        writer.writerows(rows)
 
-print(f"Parameters table saved to {params_csv_path}")
+
+if __name__ == '__main__':
+    main()
