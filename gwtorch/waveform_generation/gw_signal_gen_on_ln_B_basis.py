@@ -26,7 +26,7 @@ from gwtorch.modules.gw_utils import scale_signal
 def parse_args():
     parser = argparse.ArgumentParser(description="Generate training data using Q-transform.")
     parser.add_argument('--num-samples', type=int, required=True, help='Number of waveform samples to generate')
-    parser.add_argument('--path-name', type=str, default='data_for_testing', help='Path to save generated data')
+    parser.add_argument('--path-name', type=str, default='data_for_evaluation', help='Path to save generated data')
     return parser.parse_args()
 
 
