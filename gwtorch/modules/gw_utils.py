@@ -30,7 +30,7 @@ def scale_signal(signal_ts, num):
 
     if peak_snr < 10:
         snr_desired = np.random.uniform(10, 20)
-        print(f"Scaling signal to achieve SNR of {snr_desired:.2f} for sample {num}")
+        # print(f"Scaling signal to achieve SNR of {snr_desired:.2f} for sample {num}")
         scale_factor = snr_desired / peak_snr
         template *= scale_factor
         data = pycbc.types.TimeSeries(np.asarray(template) + np.asarray(noise), delta_t=delta_t_eccentric, epoch=start_time_eccentric)

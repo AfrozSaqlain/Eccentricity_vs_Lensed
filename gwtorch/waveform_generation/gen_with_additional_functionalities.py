@@ -154,8 +154,8 @@ def main():
     args = parser.parse_args()
 
     num_samples = args.num_samples
-    if args.path_name == 'test':
-        num_samples //= 10
+    # if args.path_name == 'test':
+    #     num_samples //= 10
 
     output_path = Path(f"./data/{args.path_name}")
     output_path.mkdir(parents=True, exist_ok=True)
