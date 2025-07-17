@@ -19,6 +19,7 @@ import os
 import sys
 from pycbc.detector.ground import Detector
 from pathlib import Path
+from functools import partial
 
 from gwtorch.modules.gw_utils import scale_signal
 
@@ -132,7 +133,7 @@ def project_signal_and_compute_ln_Bayes(hp, hc, sp, sc, parameters, num):
 
 
 def generate_additional_waveforms(num, indicator, match, eccentric_snr, samples, ln_below_10, ln_bw_10_and_30, ln_above_30):
-    def adjust_distance_and_generate(ln_B_required, expected_condition, save_path, lower_bound, upper_bound):
+    def adjust_distance_and_generate(ln_B_required, expected_condition, save_path, lower_bound, upper_bound, match=match, eccentric_snr=eccentric_snr):
         require_snr = np.sqrt(2 * ln_B_required / (1 - match ** 2))
         parameters = samples[num].copy()
         parameters['distance'] = parameters['distance'] * eccentric_snr / require_snr
@@ -170,6 +171,9 @@ def generate_training_qtransform(num, samples, ln_below_10, ln_bw_10_and_30, ln_
         print(f"Error generating Q-transform for sample {num}: {e}")
         return None
 
+def task(i, samples, ln_below_10, ln_bw_10_and_30, ln_above_30):
+    return generate_training_qtransform(i, samples, ln_below_10, ln_bw_10_and_30, ln_above_30)
+
 
 def main():
     args = parse_args()
@@ -186,14 +190,14 @@ def main():
         for i in range(num_samples)
     ]
 
-    num_range = list(range(num_samples))
-    num_processes = os.cpu_count()
+    # Prepare the argument tuples for starmap
+    task_args = [
+        (i, samples, ln_below_10, ln_bw_10_and_30, ln_above_30)
+        for i in range(num_samples)
+    ]
 
-    def task(i):
-        return generate_training_qtransform(i, samples, ln_below_10, ln_bw_10_and_30, ln_above_30)
-
-    with Pool(processes=num_processes) as pool:
-        pool.map(task, num_range)
+    with Pool(processes=os.cpu_count()) as pool:
+        pool.starmap(task, task_args)
 
 
 if __name__ == "__main__":

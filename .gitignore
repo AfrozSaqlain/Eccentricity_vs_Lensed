@@ -8,3 +8,4 @@ test_data_snr_lookup_table.csv
 __pycache__/
 gwtorch.egg-info/
 structure.md
+data_for_evaluation
