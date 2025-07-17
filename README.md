@@ -61,7 +61,7 @@ A machine learning toolkit to classify gravitational wave (GW) signals — eccen
 - **`cnn_train_gwtorch --batch_size [default: 128] --epochs [default: 20] --lr [default: 3e-4] --gamma [default: 0.7] --model_path [default: ./models/cnn_model0.pth]`**: Train the CNN model on the data generated using previous code. The directory `models` is created if it doesn't exist.
 - **`transformers_train_gwtorch --model [default: ViT] --batch_size [default: 512] --epochs [default 20] --lr [default: 3e-5] --gamma [default: 0.7] --seed [default: 42]`**:  Train the Transformer model on the data generated.
 
-# How GW waveforms are generated
+# 🌊 How GW waveforms are generated
 
 We use `TEOBResumS` to generate signals assuming `f_lower` = 5. Two sets of data are generated: 
 - Eccentric: By giving the `eccentricity` parameter, sampled from prior assuming `Uniform` distribution in [0.1, 0.6].
