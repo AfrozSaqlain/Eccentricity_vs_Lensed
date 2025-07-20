@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torchvision import transforms
 import torch.nn.functional as F
-from gwtorch.modules.neural_net import CNN_Model
+from gwtorch.modules.neural_net import CNN_Meta_Model
 from torch.utils.data import DataLoader, Dataset
 from sklearn.model_selection import train_test_split
 
@@ -76,8 +76,8 @@ def plot_confusion_matrix(y_true, y_pred, class_names, title_suffix="", results_
     plt.show()
 
 # --- Models ---
-lensed_unlensed_model = CNN_Model(input_features=3, hidden_features=32, output_features=2)
-eccentric_quasi_circular_model = CNN_Model(input_features=3, hidden_features=32, output_features=2)
+lensed_unlensed_model = CNN_Meta_Model(input_features=3, hidden_features=32, output_features=2)
+eccentric_quasi_circular_model = CNN_Meta_Model(input_features=3, hidden_features=32, output_features=2)
 
 # --- MetaModel ---
 class MetaModel(nn.Module):
