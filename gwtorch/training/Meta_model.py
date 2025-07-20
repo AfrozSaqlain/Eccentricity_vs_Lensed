@@ -69,7 +69,7 @@ def plot_confusion_matrix(y_true, y_pred, class_names, title_suffix="", results_
     if results_dir:
         results_dir = Path(results_dir)
         results_dir.mkdir(parents=True, exist_ok=True)
-        save_path = results_dir / f"Confusion_Matrix_{title}.png"
+        save_path = results_dir / f"Plots/Confusion_Matrix_{title}.png"
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"Confusion matrix saved to: {save_path}")
 
@@ -78,7 +78,6 @@ def plot_confusion_matrix(y_true, y_pred, class_names, title_suffix="", results_
 # --- Models ---
 lensed_unlensed_model = CNN_Model(input_features=3, hidden_features=32, output_features=2)
 eccentric_quasi_circular_model = CNN_Model(input_features=3, hidden_features=32, output_features=2)
-
 
 # --- MetaModel ---
 class MetaModel(nn.Module):
@@ -135,8 +134,8 @@ def custom_collate_fn(batch):
 
 # --- Load Data ---
 def load_data(seed, batch_size):
-    train_list = glob.glob('./data/train/*.png')
-    test_list = glob.glob('./data/test/*.png')
+    train_list = glob.glob('../../results/Meta_model/data/train/*.png')
+    test_list = glob.glob('../../results/Meta_model/data/test/*.png')
     labels = [path.split('/')[-1].split('_')[0] for path in train_list]
 
     train_list, valid_list = train_test_split(train_list, test_size=0.2, stratify=labels, shuffle=True, random_state=seed)
@@ -225,7 +224,7 @@ def evaluate_meta_model(model, loader, device):
 if __name__ == "__main__":
     seed = 42
     batch_size = 64
-    epochs = 50
+    epochs = 1
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     train_loader, valid_loader, test_loader, train_data, valid_data, transform = load_data(seed, batch_size)
@@ -252,6 +251,10 @@ if __name__ == "__main__":
 
     train_submodel(eccentric_quasi_circular_model, train_loader_unlensed, valid_loader_unlensed, morph_optim, morph_criterion, device, epochs, label_map=morph_label_map)
 
+    # --- Load models (if needed) ---
+    lensed_unlensed_model.load_state_dict(torch.load("../../results/Meta_model/lens_model.pth"))
+    eccentric_quasi_circular_model.load_state_dict(torch.load("../../results/Meta_model/morph_model.pth"))
+
     # --- Evaluate Meta Model ---
     meta_model = MetaModel(lensed_unlensed_model, eccentric_quasi_circular_model).to(device)
     wrong_preds = evaluate_meta_model(meta_model, test_loader, device)
@@ -263,14 +266,10 @@ if __name__ == "__main__":
 
     class_names = ['Lensed', 'Eccentric', 'Unlensed']
 
-    plot_roc_curves(fpr, tpr, roc_auc, class_names, " (Test Set)")
+    plot_roc_curves(fpr, tpr, roc_auc, class_names, " (Test Set)", results_dir="../../results/Meta_model")
 
-    plot_confusion_matrix(labels, predictions, class_names, " (Test Set)")
+    plot_confusion_matrix(labels, predictions, class_names, " (Test Set)", results_dir="../../results/Meta_model")
 
     # --- Save models ---
-    torch.save(lensed_unlensed_model.state_dict(), "lens_model.pth")
-    torch.save(eccentric_quasi_circular_model.state_dict(), "morph_model.pth")
-
-    # --- Load models (if needed) ---
-    # lensed_unlensed_model.load_state_dict(torch.load("lens_model.pth"))
-    # eccentric_quasi_circular_model.load_state_dict(torch.load("morph_model.pth"))
+    # torch.save(lensed_unlensed_model.state_dict(), "lens_model.pth")
+    # torch.save(eccentric_quasi_circular_model.state_dict(), "morph_model.pth")
