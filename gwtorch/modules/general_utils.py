@@ -3,6 +3,7 @@
 # ROC CURVE AND AUC COMPUTATION WITH MISCLASSIFICATION TRACKING
 # ==============================================================================
 
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
@@ -10,6 +11,7 @@ import torch.nn.functional as F
 from sklearn.metrics import roc_curve, auc, confusion_matrix
 from sklearn.preprocessing import LabelBinarizer
 import seaborn as sns
+from pathlib import Path
 
 def compute_roc_auc_with_misclassifications(model, data_loader, device, class_names=['Lensed', 'Eccentric', 'Unlensed']):
     """
@@ -244,9 +246,6 @@ def plot_roc_curves(fpr, tpr, roc_auc, class_names, title_suffix="", results_dir
     Plot ROC curves for multi-class classification with log-scaled x-axis.
     """
 
-    import numpy as np
-    import matplotlib.pyplot as plt
-
     title = title_suffix.split(" Set")[0].split("(")[1]
 
     plt.figure(figsize=(12, 8))
@@ -274,7 +273,8 @@ def plot_roc_curves(fpr, tpr, roc_auc, class_names, title_suffix="", results_dir
     plt.xscale('log')
     plt.yscale('log')
     plt.xlim([eps, 1.0])
-    plt.ylim([0.0, 1.05])
+    # plt.ylim([0.0, 1.05])
+    plt.ylim([eps, 1.05])
     plt.xlabel('False Positive Rate (log scale)', fontsize=12)
     plt.ylabel('True Positive Rate', fontsize=12)
     plt.title(f'ROC Curves - Multi-class Classification{title_suffix}', fontsize=14)
@@ -283,6 +283,8 @@ def plot_roc_curves(fpr, tpr, roc_auc, class_names, title_suffix="", results_dir
     plt.tight_layout()
 
     if results_dir:
+        results_dir = Path(results_dir)
+        os.makedirs(results_dir / 'Plots', exist_ok=True)
         plt.savefig(results_dir / f'Plots/ROC_Curves_{title}.png', dpi=300, bbox_inches='tight')
     plt.show()
 

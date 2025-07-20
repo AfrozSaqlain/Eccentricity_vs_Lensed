@@ -9,7 +9,7 @@ delta_f = 1 / 32
 flen = int(4096 / (2 * delta_f)) + 1
 psd = pycbc.psd.aLIGOZeroDetHighPower(flen, delta_f, flow)
 
-def scale_signal(signal_ts, num):
+def scale_signal(signal_ts, num=None):
 
     noise = generate_noise()
 
