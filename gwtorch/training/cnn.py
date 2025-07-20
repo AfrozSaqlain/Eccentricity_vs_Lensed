@@ -138,6 +138,7 @@ def main():
     train_loader, valid_loader, test_loader = setup_data_loaders('./data/train', './data/test', args.batch_size)
 
     model = CNN_Model().to(device)
+    
     if os.path.exists(args.model_path):
         model.load_state_dict(torch.load(args.model_path, map_location=device))
         print(f"Model loaded from {args.model_path}")

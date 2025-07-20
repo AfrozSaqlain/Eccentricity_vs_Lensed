@@ -143,7 +143,15 @@ def generate_sample(args):
     except Exception as e:
         print(f"[Sample {num}] Error: {e}")
         return None
-
+    
+def save_csv(path, rows):
+    """Write dictionary rows to CSV."""
+    if not rows:
+        return
+    with open(path, 'w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(rows)
 
 # ---------------------- Main Script ---------------------- #
 
@@ -154,8 +162,6 @@ def main():
     args = parser.parse_args()
 
     num_samples = args.num_samples
-    # if args.path_name == 'test':
-    #     num_samples //= 10
 
     output_path = Path(f"./data/{args.path_name}")
     output_path.mkdir(parents=True, exist_ok=True)
@@ -178,17 +184,6 @@ def main():
              [{'sample': r['sample'], 'eccentric_snr': r['eccentric_snr'], 'lensed_snr': r['lensed_snr'],
                'unlensed_snr': r['unlensed_snr']} for r in valid_results])
     print("Data generation complete!!!")
-
-
-def save_csv(path, rows):
-    """Write dictionary rows to CSV."""
-    if not rows:
-        return
-    with open(path, 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
-        writer.writeheader()
-        writer.writerows(rows)
-
 
 if __name__ == '__main__':
     main()
