@@ -11,7 +11,6 @@ from multiprocessing import Pool
 
 import bilby
 import pycbc
-from gwpy.timeseries import TimeSeries
 from pycbc.detector.ground import Detector
 from pycbc.waveform import get_td_waveform, taper_timeseries
 
@@ -42,8 +41,8 @@ def generate_prior(num_samples):
     priors['polarization'] = bilby.core.prior.Uniform(minimum=0., maximum=np.pi, boundary="periodic")
     priors['Log_Mlz'] = bilby.core.prior.Uniform(minimum=1, maximum=5)
     priors['yl'] = bilby.core.prior.PowerLaw(alpha=1, minimum=0.01, maximum=1.0)
-    priors['snr'] = bilby.core.prior.Uniform(minimum=10, maximum=100)
-    # priors['snr'] = bilby.core.prior.PowerLaw(minimum=10, maximum=200, alpha=-4)
+    # priors['snr'] = bilby.core.prior.Uniform(minimum=10, maximum=100)
+    priors['snr'] = bilby.core.prior.PowerLaw(minimum=10, maximum=200, alpha=-4)
 
     parameters = priors.sample(num_samples)
     return [
@@ -92,9 +91,11 @@ def generate_sample(args):
         lens_noisy = lens_noisy.crop(left=24, right=0)
         unls_noisy = unls_noisy.crop(left=24, right=0)
 
-        save_qtransform_with_checks(ecc_noisy, snr_e, params, mass1, mass2, distance_e, distance_l, distance_u, m_lens, y_lens, output_path / f"eccentric_{num}.png")
-        save_qtransform_with_checks(lens_noisy, snr_l, params, mass1, mass2, distance_e, distance_l, distance_u, m_lens, y_lens, output_path / f"lensed_{num}.png")
-        save_qtransform_with_checks(unls_noisy, snr_u, params, mass1, mass2, distance_e, distance_l, distance_u, m_lens, y_lens, output_path / f"unlensed_{num}.png")
+        count = {
+            'eccentric_saved': save_qtransform_with_checks(ecc_noisy, snr_e, params, mass1, mass2, distance_e, distance_l, distance_u, m_lens, y_lens, output_path / f"eccentric_{num}.png"),
+            'lensed_saved': save_qtransform_with_checks(lens_noisy, snr_l, params, mass1, mass2, distance_e, distance_l, distance_u, m_lens, y_lens, output_path / f"lensed_{num}.png"),
+            'unlensed_saved': save_qtransform_with_checks(unls_noisy, snr_u, params, mass1, mass2, distance_e, distance_l, distance_u, m_lens, y_lens, output_path / f"unlensed_{num}.png")
+        }
 
         return {
             'sample': num,
@@ -116,6 +117,7 @@ def generate_sample(args):
             'eccentric_snr': float(snr_e),
             'lensed_snr': float(snr_l),
             'unlensed_snr': float(snr_u),
+            **count
         }
     except Exception as e:
         print(f"[Sample {num}] Error: {e}")
@@ -174,7 +176,13 @@ def main():
                'unlensed_snr': r['unlensed_snr'], 'eccentric_distance': r['eccentric_distance'],
                'lensed_distance': r['lensed_distance'], 'unlensed_distance': r['unlensed_distance']} for r in valid_results])
 
-    print(f"Data generation complete! Generated {len(valid_results)} valid samples out of {num_samples} attempted.")
+    n_eccentric = sum(1 for r in valid_results if r.get('eccentric_saved'))
+    n_lensed = sum(1 for r in valid_results if r.get('lensed_saved'))
+    n_unlensed = sum(1 for r in valid_results if r.get('unlensed_saved'))
+
+    print(f"\nData generation complete!")
+    print(f"Total valid samples: {len(valid_results)} / {num_samples}")
+    print(f"Saved eccentric: {n_eccentric}, lensed: {n_lensed}, unlensed: {n_unlensed}")
 
 
 if __name__ == '__main__':

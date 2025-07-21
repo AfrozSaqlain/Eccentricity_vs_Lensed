@@ -5,8 +5,9 @@ import gwmat
 import pycbc
 import pycbc.psd
 from gwmat import point_lens
+from gwpy.timeseries import TimeSeries
+from pycbc.types import FrequencySeries
 from pycbc.detector.ground import Detector
-from pycbc.types import FrequencySeries, TimeSeries
 from pycbc.filter.matchedfilter import matched_filter
 from pycbc.waveform import get_td_waveform, taper_timeseries
 
@@ -406,8 +407,8 @@ def save_qtransform_with_checks(ts, signal_snr, params, mass1, mass2, distance_e
 
         if ln_B < np.log(10):
             sample_number = str(path).split("_")[1].split(".")[0]
-            print(f"Skipping sample {sample_number}")
-            return None
+            print(f"Skipping eccentric sample {sample_number} as $\ln B$ is {ln_B}")
+            return False
         
     elif "lensed" in str(path):
         hp_, _ = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
@@ -443,8 +444,8 @@ def save_qtransform_with_checks(ts, signal_snr, params, mass1, mass2, distance_e
 
         if ln_B < np.log(10):
             sample_number = str(path).split("_")[1].split(".")[0]
-            print(f"Skipping sample {sample_number}")
-            return None
+            print(rf"Skipping lensed sample {sample_number} as $\ln B$ is {ln_B}")
+            return False
 
     ts = TimeSeries.from_pycbc(ts)
 
@@ -454,6 +455,8 @@ def save_qtransform_with_checks(ts, signal_snr, params, mass1, mass2, distance_e
     plt.yscale('log')
     plt.savefig(path, transparent=True, bbox_inches='tight', pad_inches=0)
     plt.close()
+
+    return True
 
 
 
