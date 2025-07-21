@@ -15,9 +15,6 @@ from gwpy.timeseries import TimeSeries
 from pycbc.detector.ground import Detector
 from pycbc.waveform import get_td_waveform, taper_timeseries
 
-import gwmat
-from gwmat import point_lens
-
 from gwtorch.modules.gw_utils import injnect_noise_with_SNR, compute_lensed_waveform
 
 # ---------------------- Constants ---------------------- #
