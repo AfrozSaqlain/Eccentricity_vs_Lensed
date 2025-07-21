@@ -15,7 +15,7 @@ from gwpy.timeseries import TimeSeries
 from pycbc.detector.ground import Detector
 from pycbc.waveform import get_td_waveform, taper_timeseries
 
-from gwtorch.modules.gw_utils import injnect_noise_with_SNR, compute_lensed_waveform
+from gwtorch.modules.gw_utils import inject_noise_with_target_SNR, compute_lensed_waveform, save_qtransform
 
 # ---------------------- Constants ---------------------- #
 DELTA_T = 1.0 / 4096
@@ -42,22 +42,14 @@ def generate_prior(num_samples):
     priors['polarization'] = bilby.core.prior.Uniform(minimum=0., maximum=np.pi, boundary="periodic")
     priors['Log_Mlz'] = bilby.core.prior.Uniform(minimum=1, maximum=5)
     priors['yl'] = bilby.core.prior.PowerLaw(alpha=1, minimum=0.01, maximum=1.0)
-    priors['snr'] = bilby.core.prior.PowerLaw(minimum=10, maximum=100, alpha=-4)
+    priors['snr'] = bilby.core.prior.Uniform(minimum=10, maximum=100)
+    # priors['snr'] = bilby.core.prior.PowerLaw(minimum=10, maximum=200, alpha=-4)
 
     parameters = priors.sample(num_samples)
     return [
         {key: parameters[key][i] for key in parameters}
         for i in range(num_samples)
     ]
-
-def save_qtransform(ts, path):
-    """Save Q-transform of a time series."""
-    plt.figure(figsize=(12, 8))
-    plt.pcolormesh(ts.q_transform(logf=True, norm='mean', frange=(5, 512), whiten=True, qrange=(4, 64)))
-    plt.axis('off')
-    plt.yscale('log')
-    plt.savefig(path, transparent=True, bbox_inches='tight', pad_inches=0)
-    plt.close()
 
 # ---------------------- Main Worker ---------------------- #
 
@@ -92,9 +84,9 @@ def generate_sample(args):
 
         target_snr = params.pop('snr')
         
-        ecc_noisy, snr_e, distance_e = injnect_noise_with_SNR(ecc, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='eccentric')
-        lens_noisy, snr_l, distance_l = injnect_noise_with_SNR(lensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='lensed')
-        unls_noisy, snr_u, distance_u = injnect_noise_with_SNR(unlensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='quasi_circular')
+        ecc_noisy, snr_e, distance_e = inject_noise_with_target_SNR(ecc, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='eccentric')
+        lens_noisy, snr_l, distance_l = inject_noise_with_target_SNR(lensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='lensed')
+        unls_noisy, snr_u, distance_u = inject_noise_with_target_SNR(unlensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='quasi_circular')
 
         ecc_noisy = ecc_noisy.crop(left=24, right=0)
         lens_noisy = lens_noisy.crop(left=24, right=0)
