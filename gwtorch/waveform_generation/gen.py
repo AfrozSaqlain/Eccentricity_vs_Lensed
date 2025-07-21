@@ -40,9 +40,9 @@ def generate_prior(num_samples):
     priors['dec'] = bilby.core.prior.Cosine(minimum=-np.pi/2, maximum=np.pi/2)
     priors['ra'] = bilby.core.prior.Uniform(minimum=0., maximum=2*np.pi, boundary="periodic")
     priors['polarization'] = bilby.core.prior.Uniform(minimum=0., maximum=np.pi, boundary="periodic")
-    priors['Log_Mlz'] = bilby.core.prior.Uniform(minimum=3, maximum=5)
+    priors['Log_Mlz'] = bilby.core.prior.Uniform(minimum=1, maximum=5)
     priors['yl'] = bilby.core.prior.PowerLaw(alpha=1, minimum=0.01, maximum=1.0)
-    priors['snr'] = bilby.core.prior.Uniform(minimum=12, maximum=80)
+    priors['snr'] = bilby.core.prior.PowerLaw(minimum=10, maximum=100, alpha=-4)
 
     parameters = priors.sample(num_samples)
     return [

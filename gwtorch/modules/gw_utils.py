@@ -48,6 +48,8 @@ def injnect_noise_with_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens, snr_
     
     template = pycbc.types.TimeSeries(template, delta_t=delta_t, epoch=start_time)
 
+    ########### Add seed to matched_filter ###########
+    
     snr = pycbc.filter.matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=flow)
 
     peak_snr_0 = abs(snr).numpy().max()
