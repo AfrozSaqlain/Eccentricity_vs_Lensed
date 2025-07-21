@@ -334,53 +334,53 @@ def save_qtransform(ts, path):
 
 
 
-# def scale_signal(signal_ts, num=None):
+def scale_signal(signal_ts, num=None):
 
-#     SEED = np.random.uniform(20, 200)
+    SEED = np.random.uniform(20, 200)
 
-#     noise = generate_noise(SEED)
+    noise = generate_noise(SEED)
 
-#     template, delta_t, start_time = inject_signal_with_peak_in_window(
-#                                             signal_ts=signal_ts,
-#                                             noise_ts=noise,
-#                                             peak_window=(2.0, 2.2))
+    template, delta_t, start_time = inject_signal_with_peak_in_window(
+                                            signal_ts=signal_ts,
+                                            noise_ts=noise,
+                                            peak_window=(2.0, 2.2))
     
-#     data = pycbc.types.TimeSeries(np.asarray(template) + np.asarray(noise), delta_t=delta_t, epoch=start_time)
+    data = pycbc.types.TimeSeries(np.asarray(template) + np.asarray(noise), delta_t=delta_t, epoch=start_time)
     
-#     template = pycbc.types.TimeSeries(template, delta_t=delta_t, epoch=start_time)
+    template = pycbc.types.TimeSeries(template, delta_t=delta_t, epoch=start_time)
 
-#     snr = matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=flow)
+    snr = matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=flow)
 
-#     peak_snr = abs(snr).numpy().max()
+    peak_snr = abs(snr).numpy().max()
 
-#     # print(f"SNR before scaling: {peak_snr}")
+    # print(f"SNR before scaling: {peak_snr}")
 
-#     if peak_snr < 10:
-#         snr_desired = np.random.uniform(10, 20)
-#         # print(f"Scaling signal to achieve SNR of {snr_desired:.2f} for sample {num}")
-#         scale_factor = snr_desired / peak_snr
-#         template *= scale_factor
-#         data = pycbc.types.TimeSeries(np.asarray(template) + np.asarray(noise), delta_t=delta_t, epoch=start_time)
-#         snr = matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=flow)
+    if peak_snr < 10:
+        snr_desired = np.random.uniform(10, 20)
+        # print(f"Scaling signal to achieve SNR of {snr_desired:.2f} for sample {num}")
+        scale_factor = snr_desired / peak_snr
+        template *= scale_factor
+        data = pycbc.types.TimeSeries(np.asarray(template) + np.asarray(noise), delta_t=delta_t, epoch=start_time)
+        snr = matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=flow)
 
-#         peak_snr = abs(snr).numpy().max()
+        peak_snr = abs(snr).numpy().max()
 
-#         # print(f"SNR after scaling: {peak_snr}")
+        # print(f"SNR after scaling: {peak_snr}")
 
 
-#     # plt.plot(snr.sample_times, abs(snr), label='SNR')
-#     # plt.xlabel('Time (s)')
-#     # plt.ylabel('SNR')
-#     # plt.title(f'SNR Timeseries')
-#     # plt.legend()
-#     # plt.show()
+    # plt.plot(snr.sample_times, abs(snr), label='SNR')
+    # plt.xlabel('Time (s)')
+    # plt.ylabel('SNR')
+    # plt.title(f'SNR Timeseries')
+    # plt.legend()
+    # plt.show()
 
-#     # plt.plot(data.sample_times, data, label='Eccentric Signal + Noise')
-#     # plt.plot(template.sample_times, template, label='Eccentric Signal', linestyle='--')
-#     # plt.xlabel('Time (s)')
-#     # plt.ylabel('Amplitude')
-#     # plt.title(f'Eccentric Signal + Noise')
-#     # plt.legend()
-#     # plt.show()
+    # plt.plot(data.sample_times, data, label='Eccentric Signal + Noise')
+    # plt.plot(template.sample_times, template, label='Eccentric Signal', linestyle='--')
+    # plt.xlabel('Time (s)')
+    # plt.ylabel('Amplitude')
+    # plt.title(f'Eccentric Signal + Noise')
+    # plt.legend()
+    # plt.show()
 
-#     return data, peak_snr
+    return data, peak_snr
