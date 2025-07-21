@@ -5,8 +5,8 @@ import gwmat
 import pycbc
 import pycbc.psd
 from gwmat import point_lens
-from pycbc.types import FrequencySeries
 from pycbc.detector.ground import Detector
+from pycbc.types import FrequencySeries, TimeSeries
 from pycbc.filter.matchedfilter import matched_filter
 from pycbc.waveform import get_td_waveform, taper_timeseries
 
@@ -200,7 +200,7 @@ def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens
 
     peak_snr = abs(snr).numpy().max()
 
-    print(f"SNR before scaling: {peak_snr_0:.2f} | SNR after scaling: {peak_snr:.2f} for sample {num} {gw_signal_type} | Distance: {distance:.2f}")
+    # print(f"SNR before scaling: {peak_snr_0:.2f} | SNR after scaling: {peak_snr:.2f} for sample {num} {gw_signal_type} | Distance: {distance:.2f}")
 
     return data, peak_snr, distance
 
@@ -311,7 +311,149 @@ def save_qtransform(ts, path):
     plt.close()
 
 
+def save_qtransform_with_checks(ts, signal_snr, params, mass1, mass2, distance_e, distance_l, distance_u, m_lens, y_lens, path):
+    """
+    Generate and save a Q-transform spectrogram of a gravitational wave signal,
+    with conditional checks for eccentric or lensed signals based on Bayes factor
+    computed from waveform match.
 
+    Parameters
+    ----------
+    ts : array-like or pycbc.types.TimeSeries
+        Time series data of the gravitational wave signal (strain).
+    
+    signal_snr : float
+        Signal-to-noise ratio of the injection used to compute log Bayes factor.
+
+    params : dict
+        Dictionary of waveform parameters, must include:
+            - 'spin1z': Dimensionless spin of mass1 along z-axis.
+            - 'spin2z': Dimensionless spin of mass2 along z-axis.
+            - 'eccentricity': Orbital eccentricity of the binary.
+            - 'coa_phase': Coalescence phase of the binary.
+
+    mass1 : float
+        Mass of the first compact object (in solar masses).
+
+    mass2 : float
+        Mass of the second compact object (in solar masses).
+
+    distance_e : float
+        Luminosity distance for the eccentric waveform (in Mpc).
+
+    distance_l : float
+        Luminosity distance for the lensed waveform (in Mpc).
+
+    distance_u : float
+        Luminosity distance for the unlensed, circular (reference) waveform (in Mpc).
+
+    m_lens : float
+        Mass of the gravitational lens (in solar masses), used only if "lensed" in `path`.
+
+    y_lens : float
+        Impact parameter (dimensionless) of the lensing event, used only if "lensed" in `path`.
+
+    path : str or pathlib.Path
+        Path to save the Q-transform spectrogram image. Must include "eccentric" or "lensed"
+        in the filename to trigger the corresponding Bayes factor match checks.
+
+    Returns
+    -------
+    None
+        Saves a PNG file of the Q-transform spectrogram if Bayes factor threshold is passed.
+        Otherwise, skips the sample and returns None.
+
+    Notes
+    -----
+    - For "eccentric" or "lensed" samples, the function compares the waveform against a 
+      circular, unlensed reference waveform using PyCBC match and computes the Bayes factor.
+    - If `ln_B < log(10)`, the signal is considered insufficiently distinct and skipped.
+    - The Q-transform is computed using GWPy and saved as a log-frequency spectrogram
+      with no axes and transparent background.
+    - Waveforms are generated using the `teobresums` approximant.
+    """
+    
+    if "eccentric" in str(path):
+        hp_, _ = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
+                                 lambda1=0, lambda2=0,
+                                 spin1z=params['spin1z'], spin2z=params['spin2z'],
+                                 distance=distance_e, delta_t=DELTA_T,
+                                 ecc=params['eccentricity'], coa_phase=params['coa_phase'], f_lower=F_LOWER)
+        
+        sp_, _ = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
+                                    lambda1=0, lambda2=0,
+                                    spin1z=params['spin1z'], spin2z=params['spin2z'],
+                                    distance=distance_u, delta_t=DELTA_T,
+                                    ecc=0.0, coa_phase=params['coa_phase'], f_lower=F_LOWER)
+        
+        # Ensure both waveforms have the same length and delta_t
+        tlen = max(len(hp_), len(sp_))
+        hp_.resize(tlen)
+        sp_.resize(tlen)
+        
+        # Force both waveforms to have the same delta_t by recreating sp_
+        # This ensures consistent frequency resolution for PSD matching
+        sp_ = pycbc.types.TimeSeries(sp_.data, delta_t=hp_.delta_t, epoch=hp_.start_time)
+
+        duration_ = hp_.duration
+        flow_ = 5
+        delta_f_ = 1 / duration_
+        flen_ = tlen // 2 + 1
+        psd = pycbc.psd.aLIGOZeroDetHighPower(flen_, delta_f_, flow_)
+
+        match = pycbc.filter.match(hp_, sp_, psd=psd, low_frequency_cutoff=5)[0]
+        ln_B = 0.5 * (1 - match ** 2) * signal_snr ** 2
+
+        if ln_B < np.log(10):
+            sample_number = str(path).split("_")[1].split(".")[0]
+            print(f"Skipping sample {sample_number}")
+            return None
+        
+    elif "lensed" in str(path):
+        hp_, _ = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
+                                 lambda1=0, lambda2=0,
+                                 spin1z=params['spin1z'], spin2z=params['spin2z'],
+                                 distance=distance_l, delta_t=DELTA_T,
+                                 ecc=params['eccentricity'], coa_phase=params['coa_phase'], f_lower=F_LOWER)
+        hp_, _, _ = compute_lensed_waveform(hp_, _, m_lens, y_lens)
+        
+        sp_, _ = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
+                                    lambda1=0, lambda2=0,
+                                    spin1z=params['spin1z'], spin2z=params['spin2z'],
+                                    distance=distance_u, delta_t=DELTA_T,
+                                    ecc=0.0, coa_phase=params['coa_phase'], f_lower=F_LOWER)
+        
+        # Ensure both waveforms have the same length and delta_t
+        tlen = max(len(hp_), len(sp_))
+        hp_.resize(tlen)
+        sp_.resize(tlen)
+        
+        # Force both waveforms to have the same delta_t by recreating sp_
+        # This ensures consistent frequency resolution for PSD matching
+        sp_ = pycbc.types.TimeSeries(sp_.data, delta_t=hp_.delta_t, epoch=hp_.start_time)
+
+        duration_ = hp_.duration
+        flow_ = 5
+        delta_f_ = 1 / duration_
+        flen_ = tlen // 2 + 1
+        psd = pycbc.psd.aLIGOZeroDetHighPower(flen_, delta_f_, flow_)
+
+        match = pycbc.filter.match(hp_, sp_, psd=psd, low_frequency_cutoff=5)[0]
+        ln_B = 0.5 * (1 - match ** 2) * signal_snr ** 2
+
+        if ln_B < np.log(10):
+            sample_number = str(path).split("_")[1].split(".")[0]
+            print(f"Skipping sample {sample_number}")
+            return None
+
+    ts = TimeSeries.from_pycbc(ts)
+
+    plt.figure(figsize=(12, 8))
+    plt.pcolormesh(ts.q_transform(logf=True, norm='mean', frange=(5, 512), whiten=True, qrange=(4, 64)))
+    plt.axis('off')
+    plt.yscale('log')
+    plt.savefig(path, transparent=True, bbox_inches='tight', pad_inches=0)
+    plt.close()
 
 
 
