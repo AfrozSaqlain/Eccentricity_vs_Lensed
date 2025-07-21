@@ -13,9 +13,6 @@ import bilby
 import pycbc
 from gwpy.timeseries import TimeSeries
 from pycbc.detector.ground import Detector
-from pycbc.noise import noise_from_psd
-from pycbc.psd import aLIGOZeroDetHighPower
-from pycbc.types import FrequencySeries
 from pycbc.waveform import get_td_waveform, taper_timeseries
 
 import gwmat
