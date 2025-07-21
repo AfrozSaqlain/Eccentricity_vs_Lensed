@@ -43,9 +43,9 @@ all = [
 ]
 
 [project.scripts]
-generate_waveform_gwtorch = "gwtorch.waveform_generation.gen_with_additional_functionalities:main"
+generate_waveform_gwtorch = "gwtorch.waveform_generation.gen:main"
 generate_evaluation_waveform_gwtorch = "gwtorch.waveform_generation.gw_signal_gen_on_ln_B_basis:main"
-generate_waveform_based_on_snr_gwtorch = "gwtorch.waveform_generation.gen:main"
+generate_waveform_based_distance_gwtorch = "gwtorch.waveform_generation.gen_with_additional_functionalities:main"
 cnn_train_gwtorch = "gwtorch.training.cnn:main"
 transformers_train_gwtorch = "gwtorch.training.transformer_with_ROC_and_File_Classification:main"
 
