@@ -273,7 +273,6 @@ def plot_roc_curves(fpr, tpr, roc_auc, class_names, title_suffix="", results_dir
     plt.xscale('log')
     plt.yscale('log')
     plt.xlim([eps, 1.0])
-    # plt.ylim([0.0, 1.05])
     plt.ylim([eps, 1.05])
     plt.xlabel('False Positive Rate (log scale)', fontsize=12)
     plt.ylabel('True Positive Rate', fontsize=12)
