@@ -22,7 +22,7 @@ from pathlib import Path
 from functools import partial
 from pycbc.types import FrequencySeries
 import importlib.resources as resources
-from gwtorch.modules.gw_utils import scale_signal
+from gwtorch.modules.gw_utils import scale_signal, add_noise
 
 
 def parse_args():
@@ -33,7 +33,19 @@ def parse_args():
     return parser.parse_args()
 
 
-def setup_paths(base_path):
+def setup_paths(base_path, models):
+
+    if models == 'Ecc_Qc':
+        base_path = base_path + '/Eccentric'
+    elif models == 'Qc_Ecc':
+        base_path = base_path + '/Quasi_Circular'
+    elif models == 'L_U':
+        base_path = base_path + '/Lensed'
+    elif models == 'U_L':
+        base_path = base_path + '/Unlensed'
+    else:
+        print("Incorrect Model Specification!!!")
+
     ln_below_10 = Path(base_path) / 'ln_below_10'
     ln_bw_10_and_30 = Path(base_path) / 'ln_bw_10_and_30'
     ln_above_30 = Path(base_path) / 'ln_above_30'
@@ -161,6 +173,28 @@ def project_signal_and_compute_ln_Bayes(hp, hc, sp, sc, parameters, num):
 
     return ln_B, noisy_signal, match, signal_snr
 
+def project_signal_and_compute_ln_Bayes_for_additioanl(hp, hc, sp, sc, parameters, num):
+    detector = Detector('H1')
+    signal = detector.project_wave(hp, hc, ra=parameters['ra'], dec=parameters['dec'], polarization=parameters['polarization'])
+    signal = taper_timeseries(signal, tapermethod="TAPER_STARTEND", return_lal=False)
+    noisy_signal, signal_snr = add_noise(signal, num)
+    noisy_signal = noisy_signal.crop(left=24, right=0)
+
+    tlen = max(len(hp), len(sp))
+    hp.resize(tlen)
+    sp.resize(tlen)
+
+    duration = hp.duration
+    flow = 5
+    delta_f = 1 / duration
+    flen = tlen // 2 + 1
+    psd = pycbc.psd.aLIGOZeroDetHighPower(flen, delta_f, flow)
+
+    match = pycbc.filter.match(hp, sp, psd=psd, low_frequency_cutoff=5)[0]
+    ln_B = 0.5 * (1 - match ** 2) * signal_snr ** 2
+
+    return ln_B, noisy_signal, match, signal_snr
+
 
 def generate_additional_waveforms(num, models, indicator, match, signal_snr, samples, ln_below_10, ln_bw_10_and_30, ln_above_30):
     def adjust_distance_and_generate(ln_B_required, expected_condition, save_path, lower_bound, upper_bound, match=match, signal_snr=signal_snr, models=models):
@@ -168,7 +202,7 @@ def generate_additional_waveforms(num, models, indicator, match, signal_snr, sam
         parameters = samples[num].copy()
         parameters['distance'] = parameters['distance'] * signal_snr / require_snr
         hp, hc, sp, sc = generate_waveform(parameters, models)
-        ln_B, noisy_signal, match, signal_snr = project_signal_and_compute_ln_Bayes(hp, hc, sp, sc, parameters, num)
+        ln_B, noisy_signal, match, signal_snr = project_signal_and_compute_ln_Bayes_for_additioanl(hp, hc, sp, sc, parameters, num)
         assert expected_condition(ln_B), f"ln_B should be between {lower_bound} and {upper_bound}, but was {ln_B}"
         save_qtransform_plot(noisy_signal, num, save_path, models)
 
@@ -211,7 +245,7 @@ def main():
     path_name = args.path_name
     models = args.models
 
-    ln_below_10, ln_bw_10_and_30, ln_above_30 = setup_paths(path_name)
+    ln_below_10, ln_bw_10_and_30, ln_above_30 = setup_paths(path_name, models)
 
     priors = define_priors(models)
     parameters_list = priors.sample(num_samples)

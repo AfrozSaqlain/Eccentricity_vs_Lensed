@@ -147,6 +147,25 @@ def scale_signal(signal_ts, num=None):
 
     return data, peak_snr
 
+def add_noise(signal_ts, num=None):
+
+    noise = generate_noise()
+
+    template, delta_t, start_time = inject_signal_with_peak_in_window(
+                                            signal_ts=signal_ts,
+                                            noise_ts=noise,
+                                            peak_window=(2.0, 2.2))
+    
+    data = pycbc.types.TimeSeries(np.asarray(template) + np.asarray(noise), delta_t=delta_t, epoch=start_time)
+    
+    template = pycbc.types.TimeSeries(template, delta_t=delta_t, epoch=start_time)
+
+    snr = matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=flow)
+
+    peak_snr = abs(snr).numpy().max()
+
+    return data, peak_snr
+
 def inject_signal_with_peak_in_window(signal_ts, noise_ts, peak_window=(2.0, 2.2)):
     """
     Zero-pads and aligns the signal so that its peak occurs within the last `peak_window` seconds of the noise.
