@@ -407,7 +407,7 @@ def save_qtransform_with_checks(ts, signal_snr, params, mass1, mass2, distance_e
 
         if ln_B < np.log(10):
             sample_number = str(path).split("_")[1].split(".")[0]
-            print(f"Skipping eccentric sample {sample_number} as $\ln B$ is {ln_B}")
+            # print(f"Skipping eccentric sample {sample_number} as $\ln B$ is {ln_B}")
             return False
         
     elif "lensed" in str(path):
@@ -444,7 +444,7 @@ def save_qtransform_with_checks(ts, signal_snr, params, mass1, mass2, distance_e
 
         if ln_B < np.log(10):
             sample_number = str(path).split("_")[1].split(".")[0]
-            print(rf"Skipping lensed sample {sample_number} as $\ln B$ is {ln_B}")
+            # print(rf"Skipping lensed sample {sample_number} as $\ln B$ is {ln_B}")
             return False
 
     ts = TimeSeries.from_pycbc(ts)

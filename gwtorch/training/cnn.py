@@ -18,6 +18,7 @@ from gwtorch.modules.general_utils import (
     plot_roc_curves,
     plot_confusion_matrix,
     plot_training_curves,
+    save_misclassified_files_to_dict
 )
 from gwtorch.modules.neural_net import CNN_Model
 
@@ -161,6 +162,7 @@ def main():
     plot_roc_curves(fpr, tpr, roc_auc, class_names, " (Test Set)", results_dir)
     plot_confusion_matrix(labels, predictions, class_names, " (Test Set)", results_dir)
     plot_training_curves(train_losses, val_losses, train_accuracies, val_accuracies, results_dir)
+    save_misclassified_files_to_dict(misclassified, results_dir / "misclassified_test.pkl")
 
     torch.save(model.state_dict(), args.model_path)
     print(f"Model saved to {args.model_path}")
