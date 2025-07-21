@@ -1,4 +1,4 @@
-# 🔭 GW-Torch Project Overview
+# 🔭 GWTorch Project Overview
 
 A machine learning toolkit to classify gravitational wave (GW) signals — eccentric, lensed, and non-eccentric — using CNN and Transformer models. This project involves generation, preprocessing, training, and evaluation of GW signals using Q-transform spectrograms.
 
