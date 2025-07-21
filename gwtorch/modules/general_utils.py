@@ -5,13 +5,14 @@
 
 import os
 import numpy as np
+import seaborn as sns
+from pathlib import Path
 import matplotlib.pyplot as plt
+
 import torch
 import torch.nn.functional as F
 from sklearn.metrics import roc_curve, auc, confusion_matrix
 from sklearn.preprocessing import LabelBinarizer
-import seaborn as sns
-from pathlib import Path
 
 def compute_roc_auc_with_misclassifications(model, data_loader, device, class_names=['Lensed', 'Eccentric', 'Unlensed']):
     """
