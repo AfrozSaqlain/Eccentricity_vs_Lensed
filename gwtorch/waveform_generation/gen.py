@@ -132,20 +132,30 @@ def save_csv(path, rows):
         writer.writeheader()
         writer.writerows(rows)
 
-# ---------------------- Main Script ---------------------- #
+# ---------------------- Main Script ---------------------- #s
 
 def main():
     parser = argparse.ArgumentParser(description="Generate Q-transform training dataset.")
     parser.add_argument('--num-samples', type=int, required=True)
-    parser.add_argument('--path-name', type=str, choices=['train', 'test', 'tmp'], required=True)
+    parser.add_argument('--path-name', type=str, choices=['train', 'test', 'tmp'], default=None,
+                        help="Optional. If not provided, data will be stored directly in './results'")
     args = parser.parse_args()
 
     num_samples = args.num_samples
 
-    output_path = Path(f"./data/{args.path_name}")
-    output_path.mkdir(parents=True, exist_ok=True)
-    results_dir = Path('./results')
-    results_dir.mkdir(exist_ok=True)
+    # Setup output path
+    if args.path_name is not None:
+        output_path = Path(f"./data/{args.path_name}")
+        output_path.mkdir(parents=True, exist_ok=True)
+        results_dir = Path('./results')
+        results_dir.mkdir(exist_ok=True)
+        save_prefix = f"{args.path_name}_"
+    else:
+        output_path = Path(f"./data/")
+        output_path.mkdir(parents=True, exist_ok=True)
+        results_dir = Path('./data/results')
+        results_dir.mkdir(parents=True, exist_ok=True)
+        save_prefix = ""
 
     samples = generate_prior(num_samples)
 
@@ -158,13 +168,14 @@ def main():
 
     valid_results = [res for res in results if res is not None]
 
-    save_csv(results_dir / f"{args.path_name}_data_parameters.csv", valid_results)
-    save_csv(results_dir / f"{args.path_name}_data_snr_lookup_table.csv",
+    save_csv(results_dir / f"{save_prefix}data_parameters.csv", valid_results)
+    save_csv(results_dir / f"{save_prefix}data_snr_lookup_table.csv",
              [{'sample': r['sample'], 'eccentric_snr': r['eccentric_snr'], 'lensed_snr': r['lensed_snr'],
                'unlensed_snr': r['unlensed_snr'], 'eccentric_distance': r['eccentric_distance'],
                'lensed_distance': r['lensed_distance'], 'unlensed_distance': r['unlensed_distance']} for r in valid_results])
-    
+
     print(f"Data generation complete! Generated {len(valid_results)} valid samples out of {num_samples} attempted.")
+
 
 if __name__ == '__main__':
     main()

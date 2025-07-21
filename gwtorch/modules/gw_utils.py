@@ -152,8 +152,6 @@ def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens
     
     template = pycbc.types.TimeSeries(template, delta_t=delta_t, epoch=start_time)
 
-    print(data.duration, noise.duration, template.duration)
-
     ########### Add seed to matched_filter ###########
     
     snr = pycbc.filter.matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=flow)
