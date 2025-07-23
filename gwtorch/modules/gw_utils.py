@@ -13,13 +13,12 @@ from pycbc.waveform import get_td_waveform, taper_timeseries
 
 # ------------ Predifined Constant ---------------
 
-flow = 5
+F_LOWER = 10
 delta_f = 1 / 32
 flen = int(4096 / (2 * delta_f)) + 1
-psd = pycbc.psd.aLIGOZeroDetHighPower(flen, delta_f, flow)
+psd = pycbc.psd.aLIGOZeroDetHighPower(flen, delta_f, F_LOWER)
 
 DELTA_T = 1.0 / 4096
-F_LOWER = 5.0
 DETECTOR_NAME = 'H1'
 detector = Detector(DETECTOR_NAME)
 REFERENCE_DISTANCE = 300
@@ -155,7 +154,7 @@ def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens
 
     ########### Add seed to matched_filter ###########
     
-    snr = pycbc.filter.matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=flow)
+    snr = pycbc.filter.matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=F_LOWER)
 
     peak_snr_0 = abs(snr).numpy().max()
 
@@ -197,7 +196,7 @@ def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens
     
     data = pycbc.types.TimeSeries(np.asarray(template) + np.asarray(noise), delta_t=delta_t, epoch=start_time)
     template = pycbc.types.TimeSeries(template, delta_t=delta_t, epoch=start_time)
-    snr = pycbc.filter.matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=flow)
+    snr = pycbc.filter.matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=F_LOWER)
 
     peak_snr = abs(snr).numpy().max()
 
@@ -220,7 +219,7 @@ def add_noise(signal_ts):
     
     template = pycbc.types.TimeSeries(template, delta_t=delta_t, epoch=start_time)
 
-    snr = matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=flow)
+    snr = matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=F_LOWER)
 
     peak_snr = abs(snr).numpy().max()
 
@@ -305,7 +304,7 @@ def save_qtransform(ts, path):
         The function saves the figure to disk and does not return anything.
     """
     plt.figure(figsize=(12, 8))
-    plt.pcolormesh(ts.q_transform(logf=True, norm='mean', frange=(5, 512), whiten=True, qrange=(4, 64)))
+    plt.pcolormesh(ts.q_transform(logf=True, norm='mean', frange=(10, 512), whiten=True, qrange=(4, 64)))
     plt.axis('off')
     plt.yscale('log')
     plt.savefig(path, transparent=True, bbox_inches='tight', pad_inches=0)
@@ -397,20 +396,19 @@ def save_qtransform_with_checks(ts, signal_snr, params, mass1, mass2, distance_e
         sp_ = pycbc.types.TimeSeries(sp_.data, delta_t=hp_.delta_t, epoch=hp_.start_time)
 
         duration_ = hp_.duration
-        flow_ = 5
         delta_f_ = 1 / duration_
         flen_ = tlen // 2 + 1
-        psd = pycbc.psd.aLIGOZeroDetHighPower(flen_, delta_f_, flow_)
+        psd = pycbc.psd.aLIGOZeroDetHighPower(flen_, delta_f_, F_LOWER)
 
-        match = pycbc.filter.match(hp_, sp_, psd=psd, low_frequency_cutoff=5)[0]
+        match = pycbc.filter.match(hp_, sp_, psd=psd, low_frequency_cutoff=F_LOWER)[0]
         ln_B = 0.5 * (1 - match ** 2) * signal_snr ** 2
 
         if ln_B < np.log(10):
-            sample_number = str(path).split("_")[1].split(".")[0]
+            # sample_number = str(path).split("_")[1].split(".")[0]
             # print(f"Skipping eccentric sample {sample_number} as $\ln B$ is {ln_B}")
             return False
         
-    elif "lensed" in str(path):
+    elif "lensed" in str(path) and "unlensed" not in str(path):
         hp_, _ = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
                                  lambda1=0, lambda2=0,
                                  spin1z=params['spin1z'], spin2z=params['spin2z'],
@@ -434,23 +432,22 @@ def save_qtransform_with_checks(ts, signal_snr, params, mass1, mass2, distance_e
         sp_ = pycbc.types.TimeSeries(sp_.data, delta_t=hp_.delta_t, epoch=hp_.start_time)
 
         duration_ = hp_.duration
-        flow_ = 5
         delta_f_ = 1 / duration_
         flen_ = tlen // 2 + 1
-        psd = pycbc.psd.aLIGOZeroDetHighPower(flen_, delta_f_, flow_)
+        psd = pycbc.psd.aLIGOZeroDetHighPower(flen_, delta_f_, F_LOWER)
 
-        match = pycbc.filter.match(hp_, sp_, psd=psd, low_frequency_cutoff=5)[0]
+        match = pycbc.filter.match(hp_, sp_, psd=psd, low_frequency_cutoff=F_LOWER)[0]
         ln_B = 0.5 * (1 - match ** 2) * signal_snr ** 2
 
         if ln_B < np.log(10):
-            sample_number = str(path).split("_")[1].split(".")[0]
+            # sample_number = str(path).split("_")[1].split(".")[0]
             # print(rf"Skipping lensed sample {sample_number} as $\ln B$ is {ln_B}")
             return False
 
     ts = TimeSeries.from_pycbc(ts)
 
     plt.figure(figsize=(12, 8))
-    plt.pcolormesh(ts.q_transform(logf=True, norm='mean', frange=(5, 512), whiten=True, qrange=(4, 64)))
+    plt.pcolormesh(ts.q_transform(logf=True, norm='mean', frange=(10, 512), whiten=True, qrange=(4, 64)))
     plt.axis('off')
     plt.yscale('log')
     plt.savefig(path, transparent=True, bbox_inches='tight', pad_inches=0)
@@ -492,7 +489,7 @@ def scale_signal(signal_ts, num=None):
     
     template = pycbc.types.TimeSeries(template, delta_t=delta_t, epoch=start_time)
 
-    snr = matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=flow)
+    snr = matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=F_LOWER)
 
     peak_snr = abs(snr).numpy().max()
 
@@ -504,7 +501,7 @@ def scale_signal(signal_ts, num=None):
         scale_factor = snr_desired / peak_snr
         template *= scale_factor
         data = pycbc.types.TimeSeries(np.asarray(template) + np.asarray(noise), delta_t=delta_t, epoch=start_time)
-        snr = matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=flow)
+        snr = matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=F_LOWER)
 
         peak_snr = abs(snr).numpy().max()
 

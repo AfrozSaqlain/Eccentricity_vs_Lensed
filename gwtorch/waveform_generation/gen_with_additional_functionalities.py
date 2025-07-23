@@ -8,6 +8,7 @@ import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
 from multiprocessing import Pool
+import glob
 
 import bilby
 import pycbc
@@ -53,7 +54,7 @@ def generate_prior(num_samples):
 # ---------------------- Main Worker ---------------------- #
 
 def generate_sample(args):
-    num, samples, output_path = args
+    num, samples, jump, output_path = args
     try:
         params = samples[num].copy()
         mass1, mass2 = bilby.gw.conversion.chirp_mass_and_mass_ratio_to_component_masses(
@@ -76,7 +77,6 @@ def generate_sample(args):
 
         sp_lensed, sc_lensed, t_delay = compute_lensed_waveform(sp, sc, m_lens, y_lens)
 
-        detector = Detector(DETECTOR_NAME)
         ecc = taper_timeseries(detector.project_wave(hp, hc, **{k: params[k] for k in ['ra', 'dec', 'polarization']}), tapermethod="TAPER_STARTEND", return_lal=False)
         unlensed = taper_timeseries(detector.project_wave(sp, sc, **{k: params[k] for k in ['ra', 'dec', 'polarization']}), tapermethod="TAPER_STARTEND", return_lal=False)
         lensed = taper_timeseries(detector.project_wave(sp_lensed, sc_lensed, **{k: params[k] for k in ['ra', 'dec', 'polarization']}), tapermethod="TAPER_STARTEND", return_lal=False)
@@ -92,9 +92,9 @@ def generate_sample(args):
         unls_noisy = unls_noisy.crop(left=24, right=0)
 
         count = {
-            'eccentric_saved': save_qtransform_with_checks(ecc_noisy, snr_e, params, mass1, mass2, distance_e, distance_l, distance_u, m_lens, y_lens, output_path / f"eccentric_{num}.png"),
-            'lensed_saved': save_qtransform_with_checks(lens_noisy, snr_l, params, mass1, mass2, distance_e, distance_l, distance_u, m_lens, y_lens, output_path / f"lensed_{num}.png"),
-            'unlensed_saved': save_qtransform_with_checks(unls_noisy, snr_u, params, mass1, mass2, distance_e, distance_l, distance_u, m_lens, y_lens, output_path / f"unlensed_{num}.png")
+            'eccentric_saved': save_qtransform_with_checks(ecc_noisy, snr_e, params, mass1, mass2, distance_e, distance_l, distance_u, m_lens, y_lens, output_path / f"eccentric_{num + jump['ecc_files']}.png"),
+            'lensed_saved': save_qtransform_with_checks(lens_noisy, snr_l, params, mass1, mass2, distance_e, distance_l, distance_u, m_lens, y_lens, output_path / f"lensed_{num + jump['lens_files']}.png"),
+            'unlensed_saved': save_qtransform_with_checks(unls_noisy, snr_u, params, mass1, mass2, distance_e, distance_l, distance_u, m_lens, y_lens, output_path / f"unlensed_{num + jump['unlens_files']}.png")
         }
 
         return {
@@ -125,13 +125,25 @@ def generate_sample(args):
         traceback.print_exc()
         return None
     
+# def save_csv(path, rows):
+#     """Write dictionary rows to CSV."""
+#     if not rows:
+#         return
+#     with open(path, 'w', newline='') as f:
+#         writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+#         writer.writeheader()
+#         writer.writerows(rows)
+
 def save_csv(path, rows):
-    """Write dictionary rows to CSV."""
+    """Append rows to CSV if it exists, otherwise create and write header."""
     if not rows:
         return
-    with open(path, 'w', newline='') as f:
+
+    file_exists = os.path.exists(path)
+    with open(path, 'a', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
-        writer.writeheader()
+        if not file_exists:
+            writer.writeheader()
         writer.writerows(rows)
 
 # ---------------------- Main Script ---------------------- #s
@@ -141,10 +153,26 @@ def main():
     parser.add_argument('--num-samples', type=int, required=True)
     parser.add_argument('--path-name', type=str, choices=['train', 'test', 'tmp'], default=None,
                         help="Optional. If not provided, data will be stored directly in './results'")
+    
     args = parser.parse_args()
 
     num_samples = args.num_samples
 
+    jump = {"ecc_files": 0, "lens_files": 0, "unlens_files": 0}
+    
+    if args.path_name:
+        directory = f"./data/{args.path_name}"
+        ecc_pattern = os.path.expanduser(directory + '/eccentric_*')
+        ecc_files = len([f for f in glob.glob(ecc_pattern) if os.path.isfile(f)])
+        
+        lens_pattern = os.path.expanduser(directory + '/lensed_*')
+        lens_files = len([f for f in glob.glob(lens_pattern) if os.path.isfile(f)])
+        
+        unlens_pattern = os.path.expanduser(directory + '/unlensed_*')
+        unlens_files = len([f for f in glob.glob(unlens_pattern) if os.path.isfile(f)])
+
+        jump = {"ecc_files": ecc_files, "lens_files": lens_files, "unlens_files": unlens_files}
+        
     # Setup output path
     if args.path_name is not None:
         output_path = Path(f"./data/{args.path_name}")
@@ -163,7 +191,7 @@ def main():
 
     print(f"Generating {len(samples)} samples...")
 
-    args_list = [(i, samples, output_path) for i in range(num_samples)]
+    args_list = [(i, samples, jump, output_path) for i in range(num_samples)]
 
     with Pool(os.cpu_count()) as pool:
         results = pool.map(generate_sample, args_list)
