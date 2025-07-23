@@ -7,21 +7,24 @@ A machine learning toolkit to classify gravitational wave (GW) signals — eccen
 <pre>
 .
 ├── gwtorch
+│   ├── inference
+│   │   └── cnn_eval.py
 │   ├── modules
+│   │   ├── constants.py
 │   │   ├── general_utils.py
 │   │   ├── gw_utils.py
 │   │   └── neural_net.py
-│   ├── inference
-│   │   └── cnn_eval.py
 │   ├── training
 │   │   ├── cnn.py
+│   │   ├── Meta_model.py
 │   │   ├── transformer.py
 │   │   ├── transformer_with_ROC_and_File_Classification.py
 │   │   └── transformer_with_ROC.py
 │   └── waveform_generation
 │       ├── gen.py
 │       ├── gen_with_additional_functionalities.py
-│       └── gw_signal_gen_on_ln_B_basis.py
+│       ├── gw_signal_gen_on_ln_B_basis.py
+│       └── Prior_Files
 ├── notebooks
 │   ├── analysis.ipynb
 │   ├── eval_based_on_ln_B_cnn.ipynb
@@ -35,6 +38,11 @@ A machine learning toolkit to classify gravitational wave (GW) signals — eccen
     │   ├── misclassified_test.pkl
     │   ├── misclassified_test.txt
     │   └── Plots
+    ├── Meta_model
+    │   ├── lens_model.pth
+    │   ├── morph_model.pth
+    │   ├── Plots
+    │   └── results
     ├── test_data_parameters.csv
     ├── train_data_parameters.csv
     └── transformer_results
@@ -43,6 +51,7 @@ A machine learning toolkit to classify gravitational wave (GW) signals — eccen
         ├── parameters_reference.csv
         ├── Plots
         └── snr_lookup_table.csv
+
 </pre>
 
 ## 📌 Key Files Description
