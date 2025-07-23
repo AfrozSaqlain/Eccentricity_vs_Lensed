@@ -17,7 +17,7 @@ from gwtorch.modules.constants import *
 
 delta_f = 1 / 32
 flen = int(4096 / (2 * delta_f)) + 1
-psd = pycbc.psd.CosmicExplorerP1600143(flen, delta_f, F_LOWER)
+psd = pycbc.psd.EinsteinTelescopeP1600143(flen, delta_f, F_LOWER)
 
 # ------------------------------------------------
 
