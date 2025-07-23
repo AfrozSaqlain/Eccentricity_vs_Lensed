@@ -1,20 +1,22 @@
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-import csv
+import gc
 import os
+import csv
+import glob
 import argparse
 import numpy as np
+from tqdm import tqdm
 from pathlib import Path
 from multiprocessing import Pool
-import glob
 
 import bilby
 from bilby.gw.prior import BBHPriorDict
 from pycbc.waveform import get_td_waveform, taper_timeseries
 
-from gwtorch.modules.gw_utils import inject_noise_with_target_SNR, compute_lensed_waveform, save_qtransform_with_checks
 from gwtorch.modules.constants import *
+from gwtorch.modules.gw_utils import inject_noise_with_target_SNR, compute_lensed_waveform, save_qtransform_with_checks
 
 import logging
 bilby_logger = logging.getLogger("bilby")
@@ -50,9 +52,8 @@ def generate_prior(num_samples):
 # ---------------------- Main Worker ---------------------- #
 
 def generate_sample(args):
-    num, samples, jump, output_path = args
+    num, params, jump, output_path = args
     try:
-        params = samples[num].copy()
         mass1, mass2 = bilby.gw.conversion.chirp_mass_and_mass_ratio_to_component_masses(
             params['chirp_mass'], params['mass_ratio'])
 
@@ -93,6 +94,10 @@ def generate_sample(args):
             'unlensed_saved': save_qtransform_with_checks(unlens_noisy, snr_u, params, mass1, mass2, distance_e, distance_l, distance_u, m_lens, y_lens, output_path / f"unlensed_{num + jump['unlens_files']}.png")
         }
 
+        del hp, hc, sp, sc, sp_lensed, sc_lensed
+        del ecc, unlensed, lensed, ecc_noisy, lens_noisy, unlens_noisy
+        gc.collect()
+
         return {
             'sample': num,
             'mass1': float(mass1), 'mass2': float(mass2),
@@ -120,15 +125,6 @@ def generate_sample(args):
         import traceback
         traceback.print_exc()
         return None
-    
-# def save_csv(path, rows):
-#     """Write dictionary rows to CSV."""
-#     if not rows:
-#         return
-#     with open(path, 'w', newline='') as f:
-#         writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
-#         writer.writeheader()
-#         writer.writerows(rows)
 
 def save_csv(path, rows):
     """Append rows to CSV if it exists, otherwise create and write header."""
@@ -149,6 +145,7 @@ def main():
     parser.add_argument('--num-samples', type=int, required=True)
     parser.add_argument('--path-name', type=str, choices=['train', 'test', 'tmp'], default=None,
                         help="Optional. If not provided, data will be stored directly in './results'")
+    parser.add_argument('--num-workers', type=int, default=max(1, os.cpu_count() - 2))
     
     args = parser.parse_args()
 
@@ -187,10 +184,10 @@ def main():
 
     print(f"Generating {len(samples)} samples...")
 
-    args_list = [(i, samples, jump, output_path) for i in range(num_samples)]
+    args_list = [(i, samples[i], jump, output_path) for i in range(num_samples)]
 
-    with Pool(os.cpu_count()) as pool:
-        results = pool.map(generate_sample, args_list)
+    with Pool(args.num_workers) as pool:
+        results = list(tqdm(pool.imap(generate_sample, args_list), total=num_samples))
 
     valid_results = [res for res in results if res is not None]
 
