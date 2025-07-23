@@ -24,7 +24,6 @@ bilby_logger.setLevel(logging.WARNING)
 
 def generate_prior(num_samples):
     """Define and sample priors for GW parameters."""
-    priors = bilby.core.prior.PriorDict()
     priors = BBHPriorDict()
 
     for key in ['a_1', 'a_2', 'tilt_1', 'tilt_2', 'theta_jn', 'phi_12', 'phi_jl', 'luminosity_distance', 'psi', 'phase']:
