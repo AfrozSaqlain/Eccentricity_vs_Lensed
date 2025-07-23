@@ -10,6 +10,7 @@ class CNN_Model(nn.Module):
         self.conv3 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1)
         self.fc1 = nn.Linear(128 * 28 * 28, 256)
         self.fc2 = nn.Linear(256, 3)
+        self.dropout = nn.Dropout(0.2)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
@@ -20,6 +21,7 @@ class CNN_Model(nn.Module):
         x = F.max_pool2d(x, 2)
         x = x.view(x.size(0), -1)
         x = F.relu(self.fc1(x))
+        x = self.dropout(x)
         x = self.fc2(x)
         return x
     

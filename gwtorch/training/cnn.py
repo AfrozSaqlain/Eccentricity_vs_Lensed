@@ -42,8 +42,8 @@ class GWDataset(Dataset):
 
     def __getitem__(self, idx):
         img_path = self.file_list[idx]
-        img = Image.open(img_path)
-        img = self.transform(img)[:3, :, :]
+        img = Image.open(img_path).convert("RGB")  # Ensures 3 channels
+        img = self.transform(img)
         label_str = img_path.split("/")[-1].split("_")[0]
         label = {"lensed": 0, "eccentric": 1, "unlensed": 2}.get(label_str, 0)
         file_number = img_path.split("/")[-1].split("_")[1]
@@ -70,7 +70,7 @@ def setup_data_loaders(train_dir, test_dir, batch_size):
     labels = [path.split('/')[-1].split('_')[0] for path in train_list]
     train_list, valid_list = train_test_split(train_list, test_size=0.2, stratify=labels, shuffle=True, random_state=RANDOM_SEED)
 
-    transform = transforms.Compose([transforms.Resize((224, 224)), transforms.ToTensor()])
+    transform = transforms.Compose([transforms.Resize((224, 224)), transforms.ToTensor(), transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)])
     train_data = GWDataset(train_list, transform)
     valid_data = GWDataset(valid_list, transform)
     test_data = GWDataset(test_list, transform)
@@ -155,14 +155,19 @@ def main():
     )
 
     print("Evaluating on test set...")
-    fpr, tpr, roc_auc, labels, predictions, _, misclassified = compute_roc_auc_with_misclassifications(
-        model=model, data_loader=test_loader, device=device
-    )
 
-    plot_roc_curves(fpr, tpr, roc_auc, class_names, " (Test Set)", results_dir)
-    plot_confusion_matrix(labels, predictions, class_names, " (Test Set)", results_dir)
+    val_fpr, val_tpr, val_roc_auc, val_labels, val_preds, _, val_misclassified = compute_roc_auc_with_misclassifications(model, valid_loader, device, class_names)
+    test_fpr, test_tpr, test_roc_auc, test_labels, test_preds, _, test_misclassified = compute_roc_auc_with_misclassifications(model, test_loader, device, class_names)
+
+    plot_roc_curves(val_fpr, val_tpr, val_roc_auc, class_names, " (Validation Set)", results_dir)
+    plot_confusion_matrix(val_labels, val_preds, class_names, " (Validation Set)", results_dir)
     plot_training_curves(train_losses, val_losses, train_accuracies, val_accuracies, results_dir)
-    save_misclassified_files_to_dict(misclassified, results_dir / "misclassified_test.pkl")
+    save_misclassified_files_to_dict(val_misclassified, results_dir / "misclassified_val.pkl")
+
+    plot_roc_curves(test_fpr, test_tpr, test_roc_auc, class_names, " (Test Set)", results_dir)
+    plot_confusion_matrix(test_labels, test_preds, class_names, " (Test Set)", results_dir)
+    plot_training_curves(train_losses, val_losses, train_accuracies, val_accuracies, results_dir)
+    save_misclassified_files_to_dict(test_misclassified, results_dir / "misclassified_test.pkl")
 
     torch.save(model.state_dict(), args.model_path)
     print(f"Model saved to {args.model_path}")

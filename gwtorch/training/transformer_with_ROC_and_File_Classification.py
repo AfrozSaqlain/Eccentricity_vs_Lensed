@@ -60,14 +60,14 @@ class GWDataset(Dataset):
 
     def __getitem__(self, idx):
         img_path = self.file_list[idx]
-        img = Image.open(img_path)
-        img_transformed = self.transform(img)[:3, :, :]
+        img = Image.open(img_path).convert("RGB")  # Ensures 3 channels
+        img = self.transform(img)
 
         label_str = img_path.split("/")[-1].split("_")[0]
         label = {'lensed': 0, 'eccentric': 1, 'unlensed': 2}[label_str]
         file_number = img_path.split("/")[-1].split("_")[1]
 
-        return img_transformed, label, file_number, img_path
+        return img, label, file_number, img_path
 
 def custom_collate_fn(batch):
     images, labels, file_numbers, img_paths = zip(*batch)
@@ -80,7 +80,7 @@ def load_data(seed, batch_size):
 
     train_list, valid_list = train_test_split(train_list, test_size=0.2, stratify=labels, shuffle=True, random_state=seed)
 
-    transform = transforms.Compose([transforms.Resize((224, 224)), transforms.ToTensor()])
+    transform = transforms.Compose([transforms.Resize((224, 224)), transforms.ToTensor(), transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)])
     train_data = GWDataset(train_list, transform)
     valid_data = GWDataset(valid_list, transform)
     test_data = GWDataset(test_list, transform)
