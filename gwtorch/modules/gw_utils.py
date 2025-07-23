@@ -7,7 +7,6 @@ import pycbc.psd
 from gwmat import point_lens
 from gwpy.timeseries import TimeSeries
 from pycbc.types import FrequencySeries
-from pycbc.detector.ground import Detector
 from pycbc.filter.matchedfilter import matched_filter
 from pycbc.waveform import get_td_waveform, taper_timeseries
 

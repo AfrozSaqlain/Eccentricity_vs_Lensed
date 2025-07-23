@@ -6,12 +6,10 @@ import os
 import argparse
 import numpy as np
 from pathlib import Path
-import matplotlib.pyplot as plt
 from multiprocessing import Pool
 import glob
 
 import bilby
-import pycbc
 from bilby.gw.prior import BBHPriorDict
 from pycbc.waveform import get_td_waveform, taper_timeseries
 
