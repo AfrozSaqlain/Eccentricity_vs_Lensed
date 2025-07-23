@@ -60,7 +60,9 @@ class GWDataset(Dataset):
 
     def __getitem__(self, idx):
         img_path = self.file_list[idx]
-        img = Image.open(img_path).convert("RGB")  # Ensures 3 channels
+        # img = Image.open(img_path)
+        # img_transformed = self.transform(img)[:3, :, :]
+        img = Image.open(img_path).convert("RGB")  
         img = self.transform(img)
 
         label_str = img_path.split("/")[-1].split("_")[0]
