@@ -393,13 +393,13 @@ def save_qtransform_with_checks(ts, signal_snr, params, mass1, mass2, distance_e
         duration_ = hp_.duration
         delta_f_ = 1 / duration_
         flen_ = tlen // 2 + 1
-        psd = pycbc.psd.aLIGOZeroDetHighPower(flen_, delta_f_, F_LOWER)
+        psd = pycbc.psd.EinsteinTelescopeP1600143(flen_, delta_f_, F_LOWER)
 
         match = pycbc.filter.match(hp_, sp_, psd=psd, low_frequency_cutoff=5)[0]
         ln_B = 0.5 * (1 - match ** 2) * signal_snr ** 2
 
         if ln_B < np.log(10):
-            sample_number = str(path).split("_")[1].split(".")[0]
+            # sample_number = str(path).split("_")[1].split(".")[0]
             # print(f"Skipping eccentric sample {sample_number} as $\ln B$ is {ln_B}")
             return False
         
@@ -408,14 +408,9 @@ def save_qtransform_with_checks(ts, signal_snr, params, mass1, mass2, distance_e
                                  lambda1=0, lambda2=0,
                                  spin1z=params['spin1z'], spin2z=params['spin2z'],
                                  distance=distance_l, delta_t=DELTA_T,
-                                 ecc=params['eccentricity'], coa_phase=params['coa_phase'], f_lower=F_LOWER)
-        hp_, _, _ = compute_lensed_waveform(hp_, _, m_lens, y_lens)
+                                 ecc=0, coa_phase=params['coa_phase'], f_lower=F_LOWER)
         
-        sp_, _ = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
-                                    lambda1=0, lambda2=0,
-                                    spin1z=params['spin1z'], spin2z=params['spin2z'],
-                                    distance=distance_u, delta_t=DELTA_T,
-                                    ecc=0.0, coa_phase=params['coa_phase'], f_lower=F_LOWER)
+        sp_, _, _ = compute_lensed_waveform(hp_, _, m_lens, y_lens)
         
         # Ensure both waveforms have the same length and delta_t
         tlen = max(len(hp_), len(sp_))
@@ -429,13 +424,13 @@ def save_qtransform_with_checks(ts, signal_snr, params, mass1, mass2, distance_e
         duration_ = hp_.duration
         delta_f_ = 1 / duration_
         flen_ = tlen // 2 + 1
-        psd = pycbc.psd.aLIGOZeroDetHighPower(flen_, delta_f_, F_LOWER)
+        psd = pycbc.psd.EinsteinTelescopeP1600143(flen_, delta_f_, F_LOWER)
 
         match = pycbc.filter.match(hp_, sp_, psd=psd, low_frequency_cutoff=5)[0]
         ln_B = 0.5 * (1 - match ** 2) * signal_snr ** 2
 
         if ln_B < np.log(10):
-            sample_number = str(path).split("_")[1].split(".")[0]
+            # sample_number = str(path).split("_")[1].split(".")[0]
             # print(rf"Skipping lensed sample {sample_number} as $\ln B$ is {ln_B}")
             return False
 
