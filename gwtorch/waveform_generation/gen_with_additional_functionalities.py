@@ -12,38 +12,37 @@ import glob
 
 import bilby
 import pycbc
-from pycbc.detector.ground import Detector
+from bilby.gw.prior import BBHPriorDict
 from pycbc.waveform import get_td_waveform, taper_timeseries
 
 from gwtorch.modules.gw_utils import inject_noise_with_target_SNR, compute_lensed_waveform, save_qtransform_with_checks
+from gwtorch.modules.constants import *
 
-# ---------------------- Constants ---------------------- #
-DELTA_T = 1.0 / 4096
-F_LOWER = 5.0
-DETECTOR_NAME = 'H1'
-detector = Detector(DETECTOR_NAME)
-REFERENCE_DISTANCE = 300
+import logging
+bilby_logger = logging.getLogger("bilby")
+bilby_logger.setLevel(logging.WARNING)
 
 # ---------------------- Utility Functions ---------------------- #
 
 def generate_prior(num_samples):
     """Define and sample priors for GW parameters."""
     priors = bilby.core.prior.PriorDict()
-    priors["mass1"] = bilby.core.prior.Constraint(name="mass1", minimum=10, maximum=100)
-    priors["mass2"] = bilby.core.prior.Constraint(name="mass2", minimum=10, maximum=100)
-    priors['mass_ratio'] = bilby.gw.prior.UniformInComponentsMassRatio(name='mass_ratio', minimum=0.1, maximum=1)
+    priors = BBHPriorDict()
+
+    for key in ['a_1', 'a_2', 'tilt_1', 'tilt_2', 'theta_jn', 'phi_12', 'phi_jl', 'luminosity_distance', 'psi', 'phase']:
+        priors.pop(key, None)
+
     priors['chirp_mass'] = bilby.gw.prior.UniformInComponentsChirpMass(name='chirp_mass', minimum=25, maximum=100)
+    priors['mass_ratio'] = bilby.gw.prior.UniformInComponentsMassRatio(name='mass_ratio', minimum=0.1, maximum=1)
     priors['spin1z'] = bilby.core.prior.Uniform(name='spin1z', minimum=0.0, maximum=0.9)
     priors['spin2z'] = bilby.core.prior.Uniform(name='spin2z', minimum=0.0, maximum=0.9)
-    priors['eccentricity'] = bilby.core.prior.Uniform(name='eccentricity', minimum=0.1, maximum=0.6)
+    priors['eccentricity'] = bilby.core.prior.Uniform(name='eccentricity', minimum=0.1, maximum=0.4)
     priors['coa_phase'] = bilby.core.prior.Uniform(name='coa_phase', minimum=0.0, maximum=2 * np.pi)
-    priors['dec'] = bilby.core.prior.Cosine(minimum=-np.pi/2, maximum=np.pi/2)
-    priors['ra'] = bilby.core.prior.Uniform(minimum=0., maximum=2*np.pi, boundary="periodic")
     priors['polarization'] = bilby.core.prior.Uniform(minimum=0., maximum=np.pi, boundary="periodic")
     priors['Log_Mlz'] = bilby.core.prior.Uniform(minimum=1, maximum=5)
     priors['yl'] = bilby.core.prior.PowerLaw(alpha=1, minimum=0.01, maximum=1.0)
     # priors['snr'] = bilby.core.prior.Uniform(minimum=10, maximum=100)
-    priors['snr'] = bilby.core.prior.PowerLaw(minimum=10, maximum=500, alpha=-4)
+    priors['snr'] = bilby.core.prior.PowerLaw(minimum=15, maximum=500, alpha=-4)
 
     parameters = priors.sample(num_samples)
     return [
@@ -85,16 +84,16 @@ def generate_sample(args):
 
         ecc_noisy, snr_e, distance_e = inject_noise_with_target_SNR(ecc, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='eccentric')
         lens_noisy, snr_l, distance_l = inject_noise_with_target_SNR(lensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='lensed')
-        unls_noisy, snr_u, distance_u = inject_noise_with_target_SNR(unlensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='quasi_circular')
+        unlens_noisy, snr_u, distance_u = inject_noise_with_target_SNR(unlensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='quasi_circular')
 
         ecc_noisy = ecc_noisy.crop(left=24, right=0)
         lens_noisy = lens_noisy.crop(left=24, right=0)
-        unls_noisy = unls_noisy.crop(left=24, right=0)
+        unlens_noisy = unlens_noisy.crop(left=24, right=0)
 
         count = {
             'eccentric_saved': save_qtransform_with_checks(ecc_noisy, snr_e, params, mass1, mass2, distance_e, distance_l, distance_u, m_lens, y_lens, output_path / f"eccentric_{num + jump['ecc_files']}.png"),
             'lensed_saved': save_qtransform_with_checks(lens_noisy, snr_l, params, mass1, mass2, distance_e, distance_l, distance_u, m_lens, y_lens, output_path / f"lensed_{num + jump['lens_files']}.png"),
-            'unlensed_saved': save_qtransform_with_checks(unls_noisy, snr_u, params, mass1, mass2, distance_e, distance_l, distance_u, m_lens, y_lens, output_path / f"unlensed_{num + jump['unlens_files']}.png")
+            'unlensed_saved': save_qtransform_with_checks(unlens_noisy, snr_u, params, mass1, mass2, distance_e, distance_l, distance_u, m_lens, y_lens, output_path / f"unlensed_{num + jump['unlens_files']}.png")
         }
 
         return {
