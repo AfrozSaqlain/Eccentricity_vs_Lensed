@@ -11,18 +11,13 @@ from pycbc.detector.ground import Detector
 from pycbc.filter.matchedfilter import matched_filter
 from pycbc.waveform import get_td_waveform, taper_timeseries
 
+from gwtorch.modules.constants import *
+
 # ------------ Predifined Constant ---------------
 
-flow = 5
 delta_f = 1 / 32
 flen = int(4096 / (2 * delta_f)) + 1
-psd = pycbc.psd.aLIGOZeroDetHighPower(flen, delta_f, flow)
-
-DELTA_T = 1.0 / 4096
-F_LOWER = 5.0
-DETECTOR_NAME = 'H1'
-detector = Detector(DETECTOR_NAME)
-REFERENCE_DISTANCE = 300
+psd = pycbc.psd.aLIGOZeroDetHighPower(flen, delta_f, F_LOWER)
 
 # ------------------------------------------------
 
@@ -90,8 +85,8 @@ def compute_lensed_waveform(sp, sc, m_lens, y_lens):
     Ffs = np.vectorize(lambda f: gwmat.cythonized_point_lens.Ff_effective(f, ml=m_lens, y=y_lens))(freqs)
     t_delay = point_lens.time_delay(ml=m_lens, y=y_lens)
 
-    sp_lens = FrequencySeries(np.conj(Ffs) * sp_freq.numpy(), delta_f=sp_freq.delta_f).cyclic_time_shift(-(0.1 + t_delay))
-    sc_lens = FrequencySeries(np.conj(Ffs) * sc_freq.numpy(), delta_f=sc_freq.delta_f).cyclic_time_shift(-(0.1 + t_delay))
+    sp_lens = FrequencySeries(np.conj(Ffs) * sp_freq.numpy(), delta_f=sp_freq.delta_f).cyclic_time_shift(-(t_delay - 0.1))
+    sc_lens = FrequencySeries(np.conj(Ffs) * sc_freq.numpy(), delta_f=sc_freq.delta_f).cyclic_time_shift(-(t_delay - 0.1))
 
     return sp_lens.to_timeseries(delta_t=sp_lens.delta_t), sc_lens.to_timeseries(delta_t=sc_lens.delta_t), t_delay
 
@@ -155,7 +150,7 @@ def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens
 
     ########### Add seed to matched_filter ###########
     
-    snr = pycbc.filter.matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=flow)
+    snr = pycbc.filter.matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=F_LOWER)
 
     peak_snr_0 = abs(snr).numpy().max()
 
@@ -197,7 +192,7 @@ def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens
     
     data = pycbc.types.TimeSeries(np.asarray(template) + np.asarray(noise), delta_t=delta_t, epoch=start_time)
     template = pycbc.types.TimeSeries(template, delta_t=delta_t, epoch=start_time)
-    snr = pycbc.filter.matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=flow)
+    snr = pycbc.filter.matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=F_LOWER)
 
     peak_snr = abs(snr).numpy().max()
 
@@ -220,7 +215,7 @@ def add_noise(signal_ts):
     
     template = pycbc.types.TimeSeries(template, delta_t=delta_t, epoch=start_time)
 
-    snr = matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=flow)
+    snr = matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=F_LOWER)
 
     peak_snr = abs(snr).numpy().max()
 
@@ -397,10 +392,9 @@ def save_qtransform_with_checks(ts, signal_snr, params, mass1, mass2, distance_e
         sp_ = pycbc.types.TimeSeries(sp_.data, delta_t=hp_.delta_t, epoch=hp_.start_time)
 
         duration_ = hp_.duration
-        flow_ = 5
         delta_f_ = 1 / duration_
         flen_ = tlen // 2 + 1
-        psd = pycbc.psd.aLIGOZeroDetHighPower(flen_, delta_f_, flow_)
+        psd = pycbc.psd.aLIGOZeroDetHighPower(flen_, delta_f_, F_LOWER)
 
         match = pycbc.filter.match(hp_, sp_, psd=psd, low_frequency_cutoff=5)[0]
         ln_B = 0.5 * (1 - match ** 2) * signal_snr ** 2
@@ -434,10 +428,9 @@ def save_qtransform_with_checks(ts, signal_snr, params, mass1, mass2, distance_e
         sp_ = pycbc.types.TimeSeries(sp_.data, delta_t=hp_.delta_t, epoch=hp_.start_time)
 
         duration_ = hp_.duration
-        flow_ = 5
         delta_f_ = 1 / duration_
         flen_ = tlen // 2 + 1
-        psd = pycbc.psd.aLIGOZeroDetHighPower(flen_, delta_f_, flow_)
+        psd = pycbc.psd.aLIGOZeroDetHighPower(flen_, delta_f_, F_LOWER)
 
         match = pycbc.filter.match(hp_, sp_, psd=psd, low_frequency_cutoff=5)[0]
         ln_B = 0.5 * (1 - match ** 2) * signal_snr ** 2
@@ -450,7 +443,7 @@ def save_qtransform_with_checks(ts, signal_snr, params, mass1, mass2, distance_e
     ts = TimeSeries.from_pycbc(ts)
 
     plt.figure(figsize=(12, 8))
-    plt.pcolormesh(ts.q_transform(logf=True, norm='mean', frange=(5, 512), whiten=True, qrange=(4, 64)))
+    plt.pcolormesh(ts.q_transform(logf=True, norm='mean', frange=(F_LOWER, 512), whiten=True, qrange=(4, 64)))
     plt.axis('off')
     plt.yscale('log')
     plt.savefig(path, transparent=True, bbox_inches='tight', pad_inches=0)
@@ -492,7 +485,7 @@ def scale_signal(signal_ts, num=None):
     
     template = pycbc.types.TimeSeries(template, delta_t=delta_t, epoch=start_time)
 
-    snr = matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=flow)
+    snr = matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=F_LOWER)
 
     peak_snr = abs(snr).numpy().max()
 
@@ -504,7 +497,7 @@ def scale_signal(signal_ts, num=None):
         scale_factor = snr_desired / peak_snr
         template *= scale_factor
         data = pycbc.types.TimeSeries(np.asarray(template) + np.asarray(noise), delta_t=delta_t, epoch=start_time)
-        snr = matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=flow)
+        snr = matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=F_LOWER)
 
         peak_snr = abs(snr).numpy().max()
 
