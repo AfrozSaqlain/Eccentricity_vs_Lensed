@@ -437,7 +437,7 @@ def save_qtransform_with_checks(ts, signal_snr, params, mass1, mass2, distance_e
     ts = TimeSeries.from_pycbc(ts)
 
     plt.figure(figsize=(12, 8))
-    plt.pcolormesh(ts.q_transform(logf=True, norm='mean', frange=(F_LOWER, 512), whiten=True, qrange=(4, 64)))
+    plt.pcolormesh(ts.q_transform(logf=True, norm='median', frange=(F_LOWER, 512), whiten=True, qrange=(4, 64)))
     plt.axis('off')
     plt.yscale('log')
     plt.savefig(path, transparent=True, bbox_inches='tight', pad_inches=0)
