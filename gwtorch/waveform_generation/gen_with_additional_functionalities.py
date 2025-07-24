@@ -3,10 +3,8 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 import gc
 import os
-import csv
 import glob
 import argparse
-import numpy as np
 from tqdm import tqdm
 from pathlib import Path
 from multiprocessing import Pool
