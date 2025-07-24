@@ -22,7 +22,8 @@ from pathlib import Path
 from functools import partial
 from pycbc.types import FrequencySeries
 import importlib.resources as resources
-from gwtorch.modules.gw_utils import scale_signal, add_noise
+from gwtorch.modules.gw_utils import scale_signal, add_noise, compute_lensed_waveform
+from gwtorch.modules.constants import *
 
 
 def parse_args():
@@ -88,21 +89,6 @@ def save_qtransform_plot(signal, num, path, models):
     plt.savefig(path / f'{file_name}_{num}.png', transparent=True, pad_inches=0, bbox_inches='tight')
     plt.close()
 
-def compute_lensed_waveform(sp, sc, m_lens, y_lens):
-    """Apply lensing amplification to the unlensed waveform."""
-    sp_freq = sp.to_frequencyseries(delta_f=sp.delta_f)
-    sc_freq = sc.to_frequencyseries(delta_f=sc.delta_f)
-    freqs = sp_freq.sample_frequencies
-
-    Ffs = np.vectorize(lambda f: gwmat.cythonized_point_lens.Ff_effective(f, ml=m_lens, y=y_lens))(freqs)
-    t_delay = point_lens.time_delay(ml=m_lens, y=y_lens)
-
-    sp_lens = FrequencySeries(np.conj(Ffs) * sp_freq.numpy(), delta_f=sp_freq.delta_f).cyclic_time_shift(-(0.1 + t_delay))
-    sc_lens = FrequencySeries(np.conj(Ffs) * sc_freq.numpy(), delta_f=sc_freq.delta_f).cyclic_time_shift(-(0.1 + t_delay))
-
-    return sp_lens.to_timeseries(delta_t=sp.delta_t), sc_lens.to_timeseries(delta_t=sc.delta_t), t_delay
-
-
 def generate_waveform(parameters, models):
     mass1, mass2 = bilby.gw.conversion.chirp_mass_and_mass_ratio_to_component_masses(
         parameters['chirp_mass'], parameters['mass_ratio']
@@ -152,7 +138,7 @@ def generate_waveform(parameters, models):
 
 
 def project_signal_and_compute_ln_Bayes(hp, hc, sp, sc, parameters, num):
-    detector = Detector('H1')
+
     signal = detector.project_wave(hp, hc, ra=parameters['ra'], dec=parameters['dec'], polarization=parameters['polarization'])
     signal = taper_timeseries(signal, tapermethod="TAPER_STARTEND", return_lal=False)
     noisy_signal, signal_snr = scale_signal(signal, num)
@@ -166,7 +152,7 @@ def project_signal_and_compute_ln_Bayes(hp, hc, sp, sc, parameters, num):
     flow = 5
     delta_f = 1 / duration
     flen = tlen // 2 + 1
-    psd = pycbc.psd.aLIGOZeroDetHighPower(flen, delta_f, flow)
+    psd = pycbc.psd.EinsteinTelescopeP1600143(flen, delta_f, flow)
 
     match = pycbc.filter.match(hp, sp, psd=psd, low_frequency_cutoff=5)[0]
     ln_B = 0.5 * (1 - match ** 2) * signal_snr ** 2
@@ -188,7 +174,7 @@ def project_signal_and_compute_ln_Bayes_for_additioanl(hp, hc, sp, sc, parameter
     flow = 5
     delta_f = 1 / duration
     flen = tlen // 2 + 1
-    psd = pycbc.psd.aLIGOZeroDetHighPower(flen, delta_f, flow)
+    psd = pycbc.psd.EinsteinTelescopeP1600143(flen, delta_f, flow)
 
     match = pycbc.filter.match(hp, sp, psd=psd, low_frequency_cutoff=5)[0]
     ln_B = 0.5 * (1 - match ** 2) * signal_snr ** 2

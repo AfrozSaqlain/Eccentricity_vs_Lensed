@@ -695,11 +695,11 @@ def save_qtransform_with_checks(ts, signal_snr, params, mass1, mass2, distance_e
 
 
 
-def scale_signal(signal_ts, num=None):
+def scale_signal(signal_ts, num=None, SEED=None):
 
-    SEED = np.random.uniform(20, 200)
+    noise = generate_noise(seed = int(SEED)) if SEED is not None else generate_noise()
 
-    noise = generate_noise(SEED)
+    noise = generate_noise(seed=SEED)
 
     template, delta_t, start_time = inject_signal_with_peak_in_window(
                                             signal_ts=signal_ts,
