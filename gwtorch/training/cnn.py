@@ -13,6 +13,7 @@ from torch.utils.data import WeightedRandomSampler
 
 from PIL import Image
 import numpy as np
+from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
 
 from gwtorch.modules.general_utils import (
@@ -175,7 +176,7 @@ def main():
         model, train_loader, valid_loader, loss_fn, optimizer, scheduler, args.epochs
     )
 
-    print("Evaluating on test set...")
+    print("Evaluating on validation and test set...")
 
     val_fpr, val_tpr, val_roc_auc, val_labels, val_preds, _, val_misclassified = compute_roc_auc_with_misclassifications(model, valid_loader, device, class_names)
     test_fpr, test_tpr, test_roc_auc, test_labels, test_preds, _, test_misclassified = compute_roc_auc_with_misclassifications(model, test_loader, device, class_names)
@@ -189,6 +190,22 @@ def main():
     plot_confusion_matrix(test_labels, test_preds, class_names, " (Test Set)", results_dir)
     plot_training_curves(train_losses, val_losses, train_accuracies, val_accuracies, results_dir)
     save_misclassified_files_to_dict(test_misclassified, results_dir / "misclassified_test.pkl")
+
+    print("Validation Classification Report:")
+    val_report = classification_report(val_labels, val_preds, target_names=class_names)
+    print(val_report)
+    val_report_path = results_dir / "val_classification_report.txt"
+    with open(val_report_path, "w") as f:
+        f.write("Validation Classification Report:\n")
+        f.write(val_report)
+
+    print("\nTest Classification Report:")
+    test_report = classification_report(test_labels, test_preds, target_names=class_names)
+    print(test_report)
+    test_report_path = results_dir / "test_classification_report.txt"
+    with open(test_report_path, "w") as f:
+        f.write("Test Classification Report:\n")
+        f.write(test_report)
 
     torch.save(model.state_dict(), args.model_path)
     print(f"Model saved to {args.model_path}")

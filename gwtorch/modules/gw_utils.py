@@ -22,6 +22,71 @@ psd = pycbc.psd.EinsteinTelescopeP1600143(flen, delta_f, F_LOWER)
 
 # ------------------------------------------------
 
+def generate_prior(num_samples, snr_type = "powerlaw"):
+    """
+    Generate a list of sampled prior parameter dictionaries for binary black hole (BBH) gravitational wave signals.
+
+    This function defines prior distributions for various BBH parameters including component spins, 
+    masses, eccentricity, lensing parameters, and signal-to-noise ratio (SNR). It samples from 
+    these distributions to generate synthetic population samples, which are useful for simulations, 
+    training machine learning models, or population studies.
+
+    Parameters
+    ----------
+    num_samples : int
+        The number of prior samples to generate.
+    
+    snr_type : str, optional
+        Type of SNR prior to use. Options are:
+        - "PowerLaw" (default): Samples SNR from a power-law distribution with α = -4 in [15, 500].
+        - "Uniform: Samples SNR from a uniform distribution in [10, 100].
+
+    Returns
+    -------
+    list of dict
+        A list containing `num_samples` dictionaries, each representing a sample of GW parameters 
+        drawn from the defined priors. Each dictionary includes:
+            - chirp_mass
+            - mass_ratio
+            - spin1z, spin2z
+            - eccentricity
+            - coa_phase
+            - polarization
+            - Log_Mlz (log lens mass)
+            - yl (scaled impact parameter)
+            - snr
+
+    Notes
+    -----
+    - Some default parameters from `BBHPriorDict` such as spins (a_1, a_2), orientation angles, 
+      distance, and phase are explicitly removed.
+    - The prior on `chirp_mass` and `mass_ratio` uses component-based uniform priors provided by Bilby.
+    """
+    priors = BBHPriorDict()
+
+    for key in ['a_1', 'a_2', 'tilt_1', 'tilt_2', 'theta_jn', 'phi_12', 'phi_jl', 'luminosity_distance', 'psi', 'phase']:
+        priors.pop(key, None)
+
+    priors['chirp_mass'] = bilby.gw.prior.UniformInComponentsChirpMass(name='chirp_mass', minimum=25, maximum=100)
+    priors['mass_ratio'] = bilby.gw.prior.UniformInComponentsMassRatio(name='mass_ratio', minimum=0.1, maximum=1)
+    priors['spin1z'] = bilby.core.prior.Uniform(name='spin1z', minimum=0.0, maximum=0.9)
+    priors['spin2z'] = bilby.core.prior.Uniform(name='spin2z', minimum=0.0, maximum=0.9)
+    priors['eccentricity'] = bilby.core.prior.Uniform(name='eccentricity', minimum=0.1, maximum=0.6)
+    priors['coa_phase'] = bilby.core.prior.Uniform(name='coa_phase', minimum=0.0, maximum=2 * np.pi)
+    priors['polarization'] = bilby.core.prior.Uniform(minimum=0., maximum=np.pi, boundary="periodic")
+    priors['Log_Mlz'] = bilby.core.prior.Uniform(minimum=3, maximum=5)
+    priors['yl'] = bilby.core.prior.PowerLaw(alpha=1, minimum=0.01, maximum=1.0)
+    if snr_type == "powerlaw":
+        priors['snr'] = bilby.core.prior.PowerLaw(minimum=15, maximum=500, alpha=-4)
+    else:
+        priors['snr'] = bilby.core.prior.Uniform(minimum=10, maximum=100)
+
+    parameters = priors.sample(num_samples)
+    return [
+        {key: parameters[key][i] for key in parameters}
+        for i in range(num_samples)
+    ]
+
 def generate_waveform(num ,params, peak_window=(2.0, 2.2), display=False):
     """
     Generate eccentric, unlensed, and lensed gravitational waveforms with injected noise.
@@ -158,71 +223,6 @@ def generate_waveform(num ,params, peak_window=(2.0, 2.2), display=False):
         import traceback
         traceback.print_exc()
         return None
-
-def generate_prior(num_samples, snr_type = "powerlaw"):
-    """
-    Generate a list of sampled prior parameter dictionaries for binary black hole (BBH) gravitational wave signals.
-
-    This function defines prior distributions for various BBH parameters including component spins, 
-    masses, eccentricity, lensing parameters, and signal-to-noise ratio (SNR). It samples from 
-    these distributions to generate synthetic population samples, which are useful for simulations, 
-    training machine learning models, or population studies.
-
-    Parameters
-    ----------
-    num_samples : int
-        The number of prior samples to generate.
-    
-    snr_type : str, optional
-        Type of SNR prior to use. Options are:
-        - "PowerLaw" (default): Samples SNR from a power-law distribution with α = -4 in [15, 500].
-        - "Uniform: Samples SNR from a uniform distribution in [10, 100].
-
-    Returns
-    -------
-    list of dict
-        A list containing `num_samples` dictionaries, each representing a sample of GW parameters 
-        drawn from the defined priors. Each dictionary includes:
-            - chirp_mass
-            - mass_ratio
-            - spin1z, spin2z
-            - eccentricity
-            - coa_phase
-            - polarization
-            - Log_Mlz (log lens mass)
-            - yl (scaled impact parameter)
-            - snr
-
-    Notes
-    -----
-    - Some default parameters from `BBHPriorDict` such as spins (a_1, a_2), orientation angles, 
-      distance, and phase are explicitly removed.
-    - The prior on `chirp_mass` and `mass_ratio` uses component-based uniform priors provided by Bilby.
-    """
-    priors = BBHPriorDict()
-
-    for key in ['a_1', 'a_2', 'tilt_1', 'tilt_2', 'theta_jn', 'phi_12', 'phi_jl', 'luminosity_distance', 'psi', 'phase']:
-        priors.pop(key, None)
-
-    priors['chirp_mass'] = bilby.gw.prior.UniformInComponentsChirpMass(name='chirp_mass', minimum=25, maximum=100)
-    priors['mass_ratio'] = bilby.gw.prior.UniformInComponentsMassRatio(name='mass_ratio', minimum=0.1, maximum=1)
-    priors['spin1z'] = bilby.core.prior.Uniform(name='spin1z', minimum=0.0, maximum=0.9)
-    priors['spin2z'] = bilby.core.prior.Uniform(name='spin2z', minimum=0.0, maximum=0.9)
-    priors['eccentricity'] = bilby.core.prior.Uniform(name='eccentricity', minimum=0.1, maximum=0.6)
-    priors['coa_phase'] = bilby.core.prior.Uniform(name='coa_phase', minimum=0.0, maximum=2 * np.pi)
-    priors['polarization'] = bilby.core.prior.Uniform(minimum=0., maximum=np.pi, boundary="periodic")
-    priors['Log_Mlz'] = bilby.core.prior.Uniform(minimum=1, maximum=5)
-    priors['yl'] = bilby.core.prior.PowerLaw(alpha=1, minimum=0.01, maximum=1.0)
-    if snr_type == "powerlaw":
-        priors['snr'] = bilby.core.prior.PowerLaw(minimum=15, maximum=500, alpha=-4)
-    else:
-        priors['snr'] = bilby.core.prior.Uniform(minimum=10, maximum=100)
-
-    parameters = priors.sample(num_samples)
-    return [
-        {key: parameters[key][i] for key in parameters}
-        for i in range(num_samples)
-    ]
 
 def generate_noise(time_duration=32, seed=None):
     """
