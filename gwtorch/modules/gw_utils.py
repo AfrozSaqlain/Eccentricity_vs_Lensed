@@ -285,7 +285,8 @@ def compute_lensed_waveform(sp, sc, m_lens, y_lens):
     sc_freq = sc.to_frequencyseries(delta_f=sc.delta_f)
     freqs = sp_freq.sample_frequencies
 
-    Ffs = np.vectorize(lambda f: gwmat.cythonized_point_lens.Ff_effective(f, ml=m_lens, y=y_lens))(freqs)
+    # Ffs = np.vectorize(lambda f: gwmat.cythonized_point_lens.Ff_effective(f, ml=m_lens, y=y_lens))(freqs)
+    Ffs = [gwmat.cythonized_point_lens.Ff_effective(f, ml=m_lens, y=y_lens) for f in freqs]
     t_delay = point_lens.time_delay(ml=m_lens, y=y_lens)
 
     sp_lens = FrequencySeries(np.conj(Ffs) * sp_freq.numpy(), delta_f=sp_freq.delta_f).cyclic_time_shift(-(t_delay - 0.1))
@@ -293,7 +294,7 @@ def compute_lensed_waveform(sp, sc, m_lens, y_lens):
 
     return sp_lens.to_timeseries(delta_t=sp_lens.delta_t), sc_lens.to_timeseries(delta_t=sc_lens.delta_t), t_delay
 
-def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens, snr_desired, num, gw_signal_type='eccentric', peak_window=(2.0, 2.2)):
+def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens, snr_desired, num, gw_signal_type='eccentric', peak_window=(2.0, 2.2), SEED = None):
     """
     Inject a gravitational wave signal into Gaussian noise and scale it to achieve a desired SNR.
 
@@ -339,10 +340,8 @@ def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens
     distance : float
         The luminosity distance (in Mpc) used to scale the waveform to the target SNR.
     """
-
-    SEED = np.random.uniform(20, 200)
     
-    noise = generate_noise(seed = int(SEED))
+    noise = generate_noise(seed = int(SEED)) if SEED is not None else generate_noise()
 
     template, delta_t, start_time = inject_signal_with_peak_in_window(
                                             signal_ts=gw_signal,
@@ -405,11 +404,9 @@ def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens
 
     return data, peak_snr, distance, template
 
-def add_noise(signal_ts):
+def add_noise(signal_ts, SEED = None):
 
-    SEED = np.random.uniform(20, 200)
-
-    noise = generate_noise(seed = int(SEED))
+    noise = generate_noise(seed = int(SEED)) if SEED is not None else generate_noise()
 
     template, delta_t, start_time = inject_signal_with_peak_in_window(
                                             signal_ts=signal_ts,

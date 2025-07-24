@@ -5,6 +5,7 @@ import gc
 import os
 import glob
 import argparse
+import numpy as np
 from tqdm import tqdm
 from pathlib import Path
 from multiprocessing import Pool
@@ -47,10 +48,12 @@ def generate_sample(args):
         lensed = taper_timeseries(detector.project_wave(sp_lensed, sc_lensed, **{k: params[k] for k in ['ra', 'dec', 'polarization']}), tapermethod="TAPER_STARTEND", return_lal=False)
 
         target_snr = params.pop('snr')
-
-        ecc_noisy, snr_e, distance_e, _ = inject_noise_with_target_SNR(ecc, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='eccentric', peak_window=peak_window)
-        lens_noisy, snr_l, distance_l, _ = inject_noise_with_target_SNR(lensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='lensed', peak_window=peak_window)
-        unlens_noisy, snr_u, distance_u, _ = inject_noise_with_target_SNR(unlensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='quasi_circular', peak_window=peak_window)
+        
+        # SEED = np.random.uniform(20, 200)
+        
+        ecc_noisy, snr_e, distance_e, _ = inject_noise_with_target_SNR(ecc, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='eccentric', peak_window=peak_window)#, SEED=SEED)
+        lens_noisy, snr_l, distance_l, _ = inject_noise_with_target_SNR(lensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='lensed', peak_window=peak_window)#, SEED=SEED)
+        unlens_noisy, snr_u, distance_u, _ = inject_noise_with_target_SNR(unlensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='quasi_circular', peak_window=peak_window)#, SEED=SEED)
 
         ecc_noisy = ecc_noisy.crop(left=24, right=0)
         lens_noisy = lens_noisy.crop(left=24, right=0)

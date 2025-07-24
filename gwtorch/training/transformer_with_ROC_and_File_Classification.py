@@ -3,13 +3,15 @@ import os
 import random
 import glob
 from pathlib import Path
+from collections import Counter
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torchvision import transforms
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader, Dataset
-from torchvision import transforms
+from torch.utils.data import WeightedRandomSampler
 
 from PIL import Image
 from sklearn.model_selection import train_test_split
@@ -80,18 +82,45 @@ def load_data(seed, batch_size):
     test_list = glob.glob('./data/test/*.png')
     labels = [path.split('/')[-1].split('_')[0] for path in train_list]
 
-    train_list, valid_list = train_test_split(train_list, test_size=0.2, stratify=labels, shuffle=True, random_state=seed)
+    train_list, valid_list = train_test_split(
+        train_list, test_size=0.2, stratify=labels, shuffle=True, random_state=seed
+    )
 
-    transform = transforms.Compose([transforms.Resize((224, 224)), transforms.ToTensor(), transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)])
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)
+    ])
+
     train_data = GWDataset(train_list, transform)
     valid_data = GWDataset(valid_list, transform)
-    test_data = GWDataset(test_list, transform)
+    test_data  = GWDataset(test_list,  transform)
 
-    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
-    valid_loader = DataLoader(valid_data, batch_size=batch_size, shuffle=False, num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
-    test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False, num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+    # Compute class weights for training data
+    label_to_idx = {"lensed": 0, "eccentric": 1, "unlensed": 2}
+    train_labels = [path.split('/')[-1].split('_')[0] for path in train_list]
+    label_counts = Counter(train_labels)
+    class_counts = [label_counts['lensed'], label_counts['eccentric'], label_counts['unlensed']]
+    class_weights = 1. / torch.tensor(class_counts, dtype=torch.float)
+    class_weights = class_weights / class_weights.sum()
 
-    return train_loader, valid_loader, test_loader
+
+    # Assign sample weights for sampler
+    sample_weights = [class_weights[label_to_idx[label]] for label in train_labels]
+    sampler = WeightedRandomSampler(sample_weights, num_samples=len(sample_weights), replacement=True)
+
+    # Use sampler ONLY for train_loader
+    train_loader = DataLoader(train_data, batch_size=batch_size, sampler=sampler,
+                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+
+    # Use regular shuffling or no shuffling for val/test
+    valid_loader = DataLoader(valid_data, batch_size=batch_size, shuffle=False,
+                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+
+    test_loader  = DataLoader(test_data,  batch_size=batch_size, shuffle=False,
+                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+
+    return train_loader, valid_loader, test_loader, class_weights
 
 def get_model(name, device):
     if name == 'CvT':
@@ -100,16 +129,17 @@ def get_model(name, device):
                    s2_emb_kernel=3, s2_emb_stride=2, s2_proj_kernel=3, s2_kv_proj_stride=2, s2_heads=3,
                    s2_depth=2, s2_mlp_mult=4, s3_emb_dim=384, s3_emb_kernel=3, s3_emb_stride=2,
                    s3_proj_kernel=3, s3_kv_proj_stride=2, s3_heads=4, s3_depth=10, s3_mlp_mult=4,
-                   dropout=0.3).to(device)
+                   dropout=0.2).to(device)
     else:
         transformer = Linformer(dim=128, seq_len=50, depth=12, heads=8, k=64, dropout=0.2)
         return ViT(dim=128, image_size=224, patch_size=32, num_classes=3,
                    transformer=transformer, channels=3).to(device)
 
-def train_model(model, train_loader, valid_loader, device, epochs, lr, gamma):
+def train_model(model, train_loader, valid_loader, class_weights, device, epochs, lr, gamma):
     optimizer = optim.Adam(model.parameters(), lr=lr)
-    scheduler = StepLR(optimizer, step_size=1, gamma=gamma)
-    criterion = nn.CrossEntropyLoss()
+    scheduler = StepLR(optimizer, step_size=5, gamma=gamma)
+    weights = class_weights.detach().clone().to(device)
+    criterion = nn.CrossEntropyLoss(weight=weights)
 
     train_losses, val_losses, train_accs, val_accs = [], [], [], []
 
@@ -150,7 +180,7 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, gamma):
     return train_losses, val_losses, train_accs, val_accs
 
 def evaluate_and_plot(model, valid_loader, test_loader, device):
-    class_names = ['Lensed', 'Eccentric', 'Unlensed']
+    class_names = ['Lensed', 'Eccentric', ' Quasi-Circular Unlensed']
     results_dir = Path('./results/transformer_results')
 
     val_fpr, val_tpr, val_roc_auc, val_labels, val_preds, _, val_misclassified = compute_roc_auc_with_misclassifications(model, valid_loader, device, class_names)
@@ -180,7 +210,7 @@ def main():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     print(f"Using device: {device}")
-    train_loader, valid_loader, test_loader = load_data(args.seed, args.batch_size)
+    train_loader, valid_loader, test_loader, class_weights = load_data(args.seed, args.batch_size)
     model = get_model(args.model, device)
 
     if os.path.exists('./models/model_alpha.pth'):
@@ -189,7 +219,7 @@ def main():
     else:
         print("No pretrained model found. Training from scratch...")
 
-    train_losses, val_losses, train_accs, val_accs = train_model(model, train_loader, valid_loader, device, args.epochs, args.lr, args.gamma)
+    train_losses, val_losses, train_accs, val_accs = train_model(model, train_loader, valid_loader, class_weights, device, args.epochs, args.lr, args.gamma)
     val_misclassified, test_misclassified = evaluate_and_plot(model, valid_loader, test_loader, device)
     plot_training_curves(train_losses, val_losses, train_accs, val_accs, Path('./results/transformer_results'))
 

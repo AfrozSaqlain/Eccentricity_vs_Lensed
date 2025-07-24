@@ -1,13 +1,15 @@
 import os
 import sys
 import glob
-from pathlib import Path
 import argparse
+from pathlib import Path
+from collections import Counter
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
+from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import WeightedRandomSampler
 
 from PIL import Image
 import numpy as np
@@ -75,11 +77,29 @@ def setup_data_loaders(train_dir, test_dir, batch_size):
     valid_data = GWDataset(valid_list, transform)
     test_data = GWDataset(test_list, transform)
 
-    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
-    valid_loader = DataLoader(valid_data, batch_size=batch_size, shuffle=True, num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
-    test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False, num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+    # Compute class weights for training data
+    label_to_idx = {"lensed": 0, "eccentric": 1, "unlensed": 2}
+    train_labels = [path.split('/')[-1].split('_')[0] for path in train_list]
+    label_counts = Counter(train_labels)
+    class_counts = [label_counts['lensed'], label_counts['eccentric'], label_counts['unlensed']]
+    class_weights = 1. / torch.tensor(class_counts, dtype=torch.float)
+    class_weights = class_weights / class_weights.sum()
 
-    return train_loader, valid_loader, test_loader
+    # Assign sample weights for sampler
+    sample_weights = [class_weights[label_to_idx[label]] for label in train_labels]
+    sampler = WeightedRandomSampler(sample_weights, num_samples=len(sample_weights), replacement=True)
+
+    train_loader = DataLoader(train_data, batch_size=batch_size, sampler=sampler,
+                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+
+    # Use regular shuffling or no shuffling for val/test
+    valid_loader = DataLoader(valid_data, batch_size=batch_size, shuffle=False,
+                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+
+    test_loader  = DataLoader(test_data,  batch_size=batch_size, shuffle=False,
+                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+
+    return train_loader, valid_loader, test_loader, class_weights
 
 def train_model(model, train_loader, valid_loader, loss_fn, optimizer, scheduler, epochs):
     train_losses, val_losses = [], []
@@ -136,7 +156,7 @@ def main():
 
     print(f"Using device: {device}")
 
-    train_loader, valid_loader, test_loader = setup_data_loaders('./data/train', './data/test', args.batch_size)
+    train_loader, valid_loader, test_loader, class_weights = setup_data_loaders('./data/train', './data/test', args.batch_size)
 
     model = CNN_Model().to(device)
     
@@ -146,7 +166,8 @@ def main():
     else:
         print(f"No pre-trained model found. Training from scratch.")
 
-    loss_fn = nn.CrossEntropyLoss()
+    weights = class_weights.detach().clone().to(device)
+    loss_fn = nn.CrossEntropyLoss(weight=weights)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=args.gamma)
 
