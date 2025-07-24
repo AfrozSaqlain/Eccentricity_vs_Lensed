@@ -4,6 +4,7 @@
 # ==============================================================================
 
 import os
+import csv
 import numpy as np
 import seaborn as sns
 from pathlib import Path
@@ -13,6 +14,59 @@ import torch
 import torch.nn.functional as F
 from sklearn.metrics import roc_curve, auc, confusion_matrix
 from sklearn.preprocessing import LabelBinarizer
+import os
+import csv
+
+def save_csv(path, rows):
+    """
+    Save a list of dictionaries to a CSV file, appending if the file exists.
+    If appending, adjust 'sample' field values to continue from the last maximum.
+
+    Parameters
+    ----------
+    path : str or Path
+        Path to the CSV file to write to.
+
+    rows : list of dict
+        A list of dictionaries where each dictionary represents a row to write to the CSV file.
+        Each dictionary must contain a 'sample' key with an integer value.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    - If the CSV file exists, the function reads the last 'sample' value and offsets all new
+      'sample' values to avoid duplication.
+    - Assumes that the 'sample' key exists and is an integer.
+    """
+    if not rows:
+        return
+
+    file_exists = os.path.exists(path)
+    sample_offset = 0
+
+    if file_exists:
+        with open(path, 'r', newline='') as f:
+            reader = csv.DictReader(f)
+            try:
+                existing_samples = [int(row['sample']) for row in reader if 'sample' in row and row['sample'].isdigit()]
+                if existing_samples:
+                    sample_offset = max(existing_samples) + 1
+            except KeyError:
+                pass  # 'sample' column not found
+
+    # Update sample index in new rows
+    for i, row in enumerate(rows):
+        row['sample'] = i + sample_offset
+
+    with open(path, 'a', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        if not file_exists:
+            writer.writeheader()
+        writer.writerows(rows)
+
 
 def compute_roc_auc_with_misclassifications(model, data_loader, device, class_names=['Lensed', 'Eccentric', 'Unlensed']):
     """

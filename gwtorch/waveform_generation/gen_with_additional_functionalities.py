@@ -16,38 +16,12 @@ from bilby.gw.prior import BBHPriorDict
 from pycbc.waveform import get_td_waveform, taper_timeseries
 
 from gwtorch.modules.constants import *
-from gwtorch.modules.gw_utils import inject_noise_with_target_SNR, compute_lensed_waveform, save_qtransform_with_checks
+from gwtorch.modules.gw_utils import inject_noise_with_target_SNR, compute_lensed_waveform, save_qtransform_with_checks, generate_prior
+from gwtorch.modules.general_utils import save_csv
 
 import logging
 bilby_logger = logging.getLogger("bilby")
 bilby_logger.setLevel(logging.WARNING)
-
-# ---------------------- Utility Functions ---------------------- #
-
-def generate_prior(num_samples):
-    """Define and sample priors for GW parameters."""
-    priors = BBHPriorDict()
-
-    for key in ['a_1', 'a_2', 'tilt_1', 'tilt_2', 'theta_jn', 'phi_12', 'phi_jl', 'luminosity_distance', 'psi', 'phase']:
-        priors.pop(key, None)
-
-    priors['chirp_mass'] = bilby.gw.prior.UniformInComponentsChirpMass(name='chirp_mass', minimum=25, maximum=100)
-    priors['mass_ratio'] = bilby.gw.prior.UniformInComponentsMassRatio(name='mass_ratio', minimum=0.1, maximum=1)
-    priors['spin1z'] = bilby.core.prior.Uniform(name='spin1z', minimum=0.0, maximum=0.9)
-    priors['spin2z'] = bilby.core.prior.Uniform(name='spin2z', minimum=0.0, maximum=0.9)
-    priors['eccentricity'] = bilby.core.prior.Uniform(name='eccentricity', minimum=0.1, maximum=0.6)
-    priors['coa_phase'] = bilby.core.prior.Uniform(name='coa_phase', minimum=0.0, maximum=2 * np.pi)
-    priors['polarization'] = bilby.core.prior.Uniform(minimum=0., maximum=np.pi, boundary="periodic")
-    priors['Log_Mlz'] = bilby.core.prior.Uniform(minimum=1, maximum=5)
-    priors['yl'] = bilby.core.prior.PowerLaw(alpha=1, minimum=0.01, maximum=1.0)
-    # priors['snr'] = bilby.core.prior.Uniform(minimum=10, maximum=100)
-    priors['snr'] = bilby.core.prior.PowerLaw(minimum=15, maximum=500, alpha=-4)
-
-    parameters = priors.sample(num_samples)
-    return [
-        {key: parameters[key][i] for key in parameters}
-        for i in range(num_samples)
-    ]
 
 # ---------------------- Main Worker ---------------------- #
 
@@ -126,18 +100,6 @@ def generate_sample(args):
         traceback.print_exc()
         return None
 
-def save_csv(path, rows):
-    """Append rows to CSV if it exists, otherwise create and write header."""
-    if not rows:
-        return
-
-    file_exists = os.path.exists(path)
-    with open(path, 'a', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
-        if not file_exists:
-            writer.writeheader()
-        writer.writerows(rows)
-
 # ---------------------- Main Script ---------------------- #s
 
 def main():
@@ -146,10 +108,13 @@ def main():
     parser.add_argument('--path-name', type=str, choices=['train', 'test', 'tmp'], default=None,
                         help="Optional. If not provided, data will be stored directly in './results'")
     parser.add_argument('--num-workers', type=int, default=max(1, os.cpu_count() - 2))
+    parser.add_argument('--snr-prior', type=str, choices=['uniform', 'powerlaw'], default='powerlaw',
+                        help='Defines the prior distribution for sampling in SNR. Default is PowerLaw.')
     
     args = parser.parse_args()
 
     num_samples = args.num_samples
+    snr_prior = args.snr_prior
 
     jump = {"ecc_files": 0, "lens_files": 0, "unlens_files": 0}
     
@@ -165,8 +130,7 @@ def main():
         unlens_files = len([f for f in glob.glob(unlens_pattern) if os.path.isfile(f)])
 
         jump = {"ecc_files": ecc_files, "lens_files": lens_files, "unlens_files": unlens_files}
-        
-    # Setup output path
+
     if args.path_name is not None:
         output_path = Path(f"./data/{args.path_name}")
         output_path.mkdir(parents=True, exist_ok=True)
@@ -180,7 +144,7 @@ def main():
         results_dir.mkdir(parents=True, exist_ok=True)
         save_prefix = ""
 
-    samples = generate_prior(num_samples)
+    samples = generate_prior(num_samples=num_samples, snr_type=snr_prior)
 
     print(f"Generating {len(samples)} samples...")
 
