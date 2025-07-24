@@ -10,7 +10,6 @@ from pathlib import Path
 from multiprocessing import Pool
 
 import bilby
-from bilby.gw.prior import BBHPriorDict
 from pycbc.waveform import get_td_waveform, taper_timeseries
 
 from gwtorch.modules.constants import *
