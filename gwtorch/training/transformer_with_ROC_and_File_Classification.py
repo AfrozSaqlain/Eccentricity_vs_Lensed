@@ -196,9 +196,20 @@ def evaluate_and_plot(model, valid_loader, test_loader, device):
     plot_confusion_matrix(test_labels, test_preds, class_names, " (Test Set)", results_dir)
 
     print("Validation Classification Report:")
-    print(classification_report(val_labels, val_preds, target_names=class_names))
+    val_report = classification_report(val_labels, val_preds, target_names=class_names)
+    print(val_report)
+    val_report_path = results_dir / "val_classification_report.txt"
+    with open(val_report_path, "w") as f:
+        f.write("Validation Classification Report:\n")
+        f.write(val_report)
+
     print("\nTest Classification Report:")
-    print(classification_report(test_labels, test_preds, target_names=class_names))
+    test_report = classification_report(test_labels, test_preds, target_names=class_names)
+    print(test_report)
+    test_report_path = results_dir / "test_classification_report.txt"
+    with open(test_report_path, "w") as f:
+        f.write("Test Classification Report:\n")
+        f.write(test_report)
 
     return val_misclassified, test_misclassified
 

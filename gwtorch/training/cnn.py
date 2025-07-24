@@ -32,7 +32,7 @@ EPOCHS = 20
 LR = 3e-4
 GAMMA = 0.7
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-class_names = ["Lensed", "Eccentric", "Unlensed"]
+class_names = ["Lensed", "Eccentric", "Quasi-Circular Unlensed"]
 
 # ----------------- Dataset Class -----------------
 class GWDataset(Dataset):
@@ -193,7 +193,6 @@ def main():
 
     plot_roc_curves(test_fpr, test_tpr, test_roc_auc, class_names, " (Test Set)", results_dir)
     plot_confusion_matrix(test_labels, test_preds, class_names, " (Test Set)", results_dir)
-    plot_training_curves(train_losses, val_losses, train_accuracies, val_accuracies, results_dir)
     save_misclassified_files_to_dict(test_misclassified, results_dir / "misclassified_test.pkl")
 
     print("Validation Classification Report:")
