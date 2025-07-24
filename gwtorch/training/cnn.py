@@ -73,7 +73,12 @@ def setup_data_loaders(train_dir, test_dir, batch_size):
     labels = [path.split('/')[-1].split('_')[0] for path in train_list]
     train_list, valid_list = train_test_split(train_list, test_size=0.2, stratify=labels, shuffle=True, random_state=RANDOM_SEED)
 
-    transform = transforms.Compose([transforms.Resize((224, 224)), transforms.ToTensor(), transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)])
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        # transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)
+    ])
+    
     train_data = GWDataset(train_list, transform)
     valid_data = GWDataset(valid_list, transform)
     test_data = GWDataset(test_list, transform)

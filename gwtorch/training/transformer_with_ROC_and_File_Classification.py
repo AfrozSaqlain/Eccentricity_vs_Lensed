@@ -10,8 +10,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torchvision import transforms
 from torch.optim.lr_scheduler import StepLR
-from torch.utils.data import DataLoader, Dataset
-from torch.utils.data import WeightedRandomSampler
+from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
 
 from PIL import Image
 from sklearn.model_selection import train_test_split
@@ -89,7 +88,7 @@ def load_data(seed, batch_size):
     transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)
+        # transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)
     ])
 
     train_data = GWDataset(train_list, transform)
