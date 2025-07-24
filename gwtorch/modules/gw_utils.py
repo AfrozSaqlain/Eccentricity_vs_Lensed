@@ -22,6 +22,113 @@ psd = pycbc.psd.EinsteinTelescopeP1600143(flen, delta_f, F_LOWER)
 
 # ------------------------------------------------
 
+def generate_waveform(num ,params):
+    """
+    Generate eccentric, unlensed, and lensed gravitational waveforms with injected noise.
+
+    This function constructs three types of gravitational waveforms using the `TEOBResumS` approximant:
+    1. An eccentric waveform (`ecc_noisy`),
+    2. A quasi-circular (unlensed) waveform (`unlens_noisy`),
+    3. A lensed version of the quasi-circular waveform (`lens_noisy`),
+    each projected onto a detector frame, tapered, and injected into Gaussian noise to achieve a 
+    target signal-to-noise ratio (SNR).
+
+    Parameters
+    ----------
+    num : int
+        Sample index used for logging and file-specific identification.
+    
+    params : dict
+        Dictionary of source and lens parameters. Expected keys include:
+        - 'chirp_mass': Chirp mass of the binary system (in solar masses).
+        - 'mass_ratio': Mass ratio (m2/m1), where 0 < q <= 1.
+        - 'spin1z', 'spin2z': Dimensionless aligned spin components of the two bodies.
+        - 'eccentricity': Initial eccentricity of the binary.
+        - 'coa_phase': Coalescence phase (in radians).
+        - 'polarization': Polarization angle (in radians).
+        - 'ra', 'dec': Right ascension and declination of the source (in radians).
+        - 'Log_Mlz': Log10 of the lens mass in solar masses.
+        - 'yl': Dimensionless lensing impact parameter (source-lens alignment).
+        - 'snr': Target signal-to-noise ratio for all waveform types (float).
+
+    Returns
+    -------
+    tuple or None
+        Returns a tuple of three `TimeSeries` objects:
+        - ecc_noisy : Eccentric waveform injected into noise.
+        - lens_noisy : Lensed quasi-circular waveform injected into noise.
+        - unlens_noisy : Unlensed quasi-circular waveform injected into noise.
+
+        Returns `None` if an error occurs during waveform generation or projection.
+
+    Notes
+    -----
+    - Waveforms are generated using the `get_td_waveform` function from `lalsimulation` via PyCBC.
+    - All waveforms are projected onto the detector using `detector.project_wave(...)`.
+    - Tapering is applied at both ends to reduce spectral leakage.
+    - `inject_noise_with_target_SNR` scales each waveform to match the specified SNR.
+    - The returned waveforms are cropped from the left to remove early-time artifacts (24 samples).
+    - The input dictionary is mutated by popping the 'snr' key internally.
+
+    Exceptions
+    ----------
+    If any step fails (e.g., waveform generation, projection, or noise injection), the function prints
+    an error message including the sample number and returns `None`.
+    """
+    try:
+        mass1, mass2 = bilby.gw.conversion.chirp_mass_and_mass_ratio_to_component_masses(
+            params['chirp_mass'], params['mass_ratio'])
+
+        m_lens = 10 ** params["Log_Mlz"]
+        y_lens = params["yl"]
+
+        hp, hc = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
+                                 lambda1=0, lambda2=0,
+                                 spin1z=params['spin1z'], spin2z=params['spin2z'],
+                                 distance=REFERENCE_DISTANCE, delta_t=DELTA_T,
+                                 ecc=params['eccentricity'], coa_phase=params['coa_phase'], f_lower=F_LOWER)
+
+        sp, sc = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
+                                 lambda1=0, lambda2=0,
+                                 spin1z=params['spin1z'], spin2z=params['spin2z'],
+                                 distance=REFERENCE_DISTANCE, delta_t=DELTA_T,
+                                 ecc=0.0, coa_phase=params['coa_phase'], f_lower=F_LOWER)
+
+        sp_lensed, sc_lensed, t_delay = compute_lensed_waveform(sp, sc, m_lens, y_lens)
+
+        ecc = taper_timeseries(detector.project_wave(hp, hc, **{k: params[k] for k in ['ra', 'dec', 'polarization']}), tapermethod="TAPER_STARTEND", return_lal=False)
+        unlensed = taper_timeseries(detector.project_wave(sp, sc, **{k: params[k] for k in ['ra', 'dec', 'polarization']}), tapermethod="TAPER_STARTEND", return_lal=False)
+        lensed = taper_timeseries(detector.project_wave(sp_lensed, sc_lensed, **{k: params[k] for k in ['ra', 'dec', 'polarization']}), tapermethod="TAPER_STARTEND", return_lal=False)
+
+        target_snr = params.pop('snr')
+
+        ecc_noisy, snr_e, distance_e = inject_noise_with_target_SNR(ecc, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='eccentric')
+        lens_noisy, snr_l, distance_l = inject_noise_with_target_SNR(lensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='lensed')
+        unlens_noisy, snr_u, distance_u = inject_noise_with_target_SNR(unlensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='quasi_circular')
+
+        ecc_noisy = ecc_noisy.crop(left=24, right=0)
+        lens_noisy = lens_noisy.crop(left=24, right=0)
+        unlens_noisy = unlens_noisy.crop(left=24, right=0)
+
+        lens_noisy.start_time = ecc_noisy.start_time
+        unlens_noisy.start_time = ecc_noisy.start_time
+
+        plt.plot(ecc_noisy.sample_times, ecc_noisy, label="Eccentric")
+        plt.plot(lens_noisy.sample_times, lens_noisy, label="Lensed")
+        plt.plot(unlens_noisy.sample_times, unlens_noisy, label="Unlensed")
+        plt.xlabel('Times [s]')
+        plt.ylabel("Strain")
+        plt.legend()
+        plt.show()
+
+        return ecc_noisy, lens_noisy, unlens_noisy
+        
+    except Exception as e:
+        print(f"[Sample {num}] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
 def generate_prior(num_samples, snr_type = "powerlaw"):
     """
     Generate a list of sampled prior parameter dictionaries for binary black hole (BBH) gravitational wave signals.
