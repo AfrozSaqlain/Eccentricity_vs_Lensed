@@ -22,7 +22,7 @@ psd = pycbc.psd.EinsteinTelescopeP1600143(flen, delta_f, F_LOWER)
 
 # ------------------------------------------------
 
-def generate_waveform(num ,params, peak_window=(2.0, 2.2)):
+def generate_waveform(num ,params, peak_window=(2.0, 2.2), display=False):
     """
     Generate eccentric, unlensed, and lensed gravitational waveforms with injected noise.
 
@@ -51,8 +51,11 @@ def generate_waveform(num ,params, peak_window=(2.0, 2.2)):
         - 'yl': Dimensionless lensing impact parameter (source-lens alignment).
         - 'snr': Target signal-to-noise ratio for all waveform types (float).
 
-        peak_window : tuple (float, float)
+    peak_window : tuple (float, float)
         Time window (in seconds) before the end of the noise where the signal peak should be injected.
+
+    display " str, optional
+        Whether to display the TimeSeries data or not. Default is False.
 
     Returns
     -------
@@ -119,32 +122,34 @@ def generate_waveform(num ,params, peak_window=(2.0, 2.2)):
         # lens_noisy.start_time = ecc_noisy.start_time
         # unlens_noisy.start_time = ecc_noisy.start_time
 
-        fig, axs = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
+        if display:
 
-        axs[0].plot(ecc_noisy.sample_times, ecc_noisy, label="Eccentric (noisy)", linestyle='-', color='C0')
-        axs[0].plot(ecc_padded.sample_times, ecc_padded, label="Eccentric (padded)", linestyle='-', color='C1')
-        axs[0].set_ylabel("Strain")
-        axs[0].set_title("Eccentric Waveform")
-        axs[0].legend()
-        axs[0].grid(True)
+            fig, axs = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
 
-        axs[1].plot(lens_noisy.sample_times, lens_noisy, label="Lensed (noisy)", linestyle='-', color='C2')
-        axs[1].plot(lens_padded.sample_times, lens_padded, label="Lensed (padded)", linestyle='-', color='C3')
-        axs[1].set_ylabel("Strain")
-        axs[1].set_title("Lensed Waveform")
-        axs[1].legend()
-        axs[1].grid(True)
+            axs[0].plot(ecc_noisy.sample_times, ecc_noisy, label="Eccentric (noisy)", linestyle='-', color='C0')
+            axs[0].plot(ecc_padded.sample_times, ecc_padded, label="Eccentric (padded)", linestyle='-', color='C1')
+            axs[0].set_ylabel("Strain")
+            axs[0].set_title("Eccentric Waveform")
+            axs[0].legend()
+            axs[0].grid(True)
 
-        axs[2].plot(unlens_noisy.sample_times, unlens_noisy, label="Unlensed (noisy)", linestyle='-', color='C4')
-        axs[2].plot(unlens_padded.sample_times, unlens_padded, label="Unlensed (padded)", linestyle='-', color='C5')
-        axs[2].set_xlabel("Time [s]")
-        axs[2].set_ylabel("Strain")
-        axs[2].set_title("Unlensed Waveform")
-        axs[2].legend()
-        axs[2].grid(True)
+            axs[1].plot(lens_noisy.sample_times, lens_noisy, label="Lensed (noisy)", linestyle='-', color='C2')
+            axs[1].plot(lens_padded.sample_times, lens_padded, label="Lensed (padded)", linestyle='-', color='C3')
+            axs[1].set_ylabel("Strain")
+            axs[1].set_title("Lensed Waveform")
+            axs[1].legend()
+            axs[1].grid(True)
 
-        plt.tight_layout()
-        plt.show()
+            axs[2].plot(unlens_noisy.sample_times, unlens_noisy, label="Unlensed (noisy)", linestyle='-', color='C4')
+            axs[2].plot(unlens_padded.sample_times, unlens_padded, label="Unlensed (padded)", linestyle='-', color='C5')
+            axs[2].set_xlabel("Time [s]")
+            axs[2].set_ylabel("Strain")
+            axs[2].set_title("Unlensed Waveform")
+            axs[2].legend()
+            axs[2].grid(True)
+
+            plt.tight_layout()
+            plt.show()
 
         return ecc_noisy, lens_noisy, unlens_noisy
         
@@ -505,6 +510,34 @@ def save_qtransform(ts, path):
     plt.yscale('log')
     plt.savefig(path, transparent=True, bbox_inches='tight', pad_inches=0)
     plt.close()
+
+
+def display_qtransform(ts):
+    """
+    Compute and save the Q-transform spectrogram of a time series.
+
+    This function computes the Q-transform of the given PyCBC time series object and displays 
+    the resulting spectrogram as an image. The Q-transform provides a time-frequency 
+    representation of the signal and is useful for visualizing transient features such as 
+    gravitational wave signals.
+
+    Parameters
+    ----------
+    ts : pycbc.types.TimeSeries
+        The input time series to analyze, typically containing gravitational wave strain data.
+
+    Returns
+    -------
+    None
+        The function displays the figure does not return anything.
+    """
+    ts = TimeSeries.from_pycbc(ts)
+
+    plt.figure(figsize=(12, 8), frameon=False)
+    plt.pcolormesh(ts.q_transform(logf=True, norm='mean', frange=(5, 512), whiten=True, qrange=(4, 64)))
+    plt.axis('off')
+    plt.yscale('log')
+    plt.show()
 
 
 def save_qtransform_with_checks(ts, signal_snr, params, mass1, mass2, distance_e, distance_l, distance_u, m_lens, y_lens, path):

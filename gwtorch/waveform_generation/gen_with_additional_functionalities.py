@@ -16,10 +16,6 @@ from gwtorch.modules.constants import *
 from gwtorch.modules.gw_utils import inject_noise_with_target_SNR, compute_lensed_waveform, save_qtransform_with_checks, generate_prior
 from gwtorch.modules.general_utils import save_csv
 
-import logging
-bilby_logger = logging.getLogger("bilby")
-bilby_logger.setLevel(logging.WARNING)
-
 # ---------------------- Main Worker ---------------------- #
 
 def generate_sample(args):
