@@ -369,7 +369,8 @@ def plot_confusion_matrix(y_true, y_pred, class_names, title_suffix="", results_
     plt.xlabel('Predicted Label', fontsize=12)
     plt.ylabel('True Label', fontsize=12)
     plt.tight_layout()
-    plt.savefig(results_dir / f'Plots/Confusion_Matrix_{title}.png', dpi=300, bbox_inches='tight')
+    if results_dir is not None:
+        plt.savefig(results_dir / f'Plots/Confusion_Matrix_{title}.png', dpi=300, bbox_inches='tight')
     plt.show()
 
     # return plt.gcf()
