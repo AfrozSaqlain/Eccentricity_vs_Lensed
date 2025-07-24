@@ -22,7 +22,7 @@ psd = pycbc.psd.EinsteinTelescopeP1600143(flen, delta_f, F_LOWER)
 
 # ------------------------------------------------
 
-def generate_waveform(num ,params):
+def generate_waveform(num ,params, peak_window=(2.0, 2.2)):
     """
     Generate eccentric, unlensed, and lensed gravitational waveforms with injected noise.
 
@@ -50,6 +50,9 @@ def generate_waveform(num ,params):
         - 'Log_Mlz': Log10 of the lens mass in solar masses.
         - 'yl': Dimensionless lensing impact parameter (source-lens alignment).
         - 'snr': Target signal-to-noise ratio for all waveform types (float).
+
+        peak_window : tuple (float, float)
+        Time window (in seconds) before the end of the noise where the signal peak should be injected.
 
     Returns
     -------
@@ -100,25 +103,47 @@ def generate_waveform(num ,params):
         unlensed = taper_timeseries(detector.project_wave(sp, sc, **{k: params[k] for k in ['ra', 'dec', 'polarization']}), tapermethod="TAPER_STARTEND", return_lal=False)
         lensed = taper_timeseries(detector.project_wave(sp_lensed, sc_lensed, **{k: params[k] for k in ['ra', 'dec', 'polarization']}), tapermethod="TAPER_STARTEND", return_lal=False)
 
-        target_snr = params.pop('snr')
+        target_snr = params['snr']
 
-        ecc_noisy, snr_e, distance_e = inject_noise_with_target_SNR(ecc, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='eccentric')
-        lens_noisy, snr_l, distance_l = inject_noise_with_target_SNR(lensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='lensed')
-        unlens_noisy, snr_u, distance_u = inject_noise_with_target_SNR(unlensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='quasi_circular')
+        ecc_noisy, snr_e, distance_e, ecc_padded = inject_noise_with_target_SNR(ecc, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='eccentric', peak_window=peak_window)
+        lens_noisy, snr_l, distance_l, lens_padded = inject_noise_with_target_SNR(lensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='lensed', peak_window=peak_window)
+        unlens_noisy, snr_u, distance_u, unlens_padded = inject_noise_with_target_SNR(unlensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='quasi_circular', peak_window=peak_window)
 
-        ecc_noisy = ecc_noisy.crop(left=24, right=0)
-        lens_noisy = lens_noisy.crop(left=24, right=0)
-        unlens_noisy = unlens_noisy.crop(left=24, right=0)
+        # ecc_noisy = ecc_noisy.crop(left=24, right=0)
+        # lens_noisy = lens_noisy.crop(left=24, right=0)
+        # unlens_noisy = unlens_noisy.crop(left=24, right=0)
 
-        lens_noisy.start_time = ecc_noisy.start_time
-        unlens_noisy.start_time = ecc_noisy.start_time
+        # ecc_padded.start_time = unlens_padded.start_time
+        # lens_padded.start_time = unlens_padded.start_time
+        # ecc_noisy.start_time = unlens_padded.start_time
+        # lens_noisy.start_time = ecc_noisy.start_time
+        # unlens_noisy.start_time = ecc_noisy.start_time
 
-        plt.plot(ecc_noisy.sample_times, ecc_noisy, label="Eccentric")
-        plt.plot(lens_noisy.sample_times, lens_noisy, label="Lensed")
-        plt.plot(unlens_noisy.sample_times, unlens_noisy, label="Unlensed")
-        plt.xlabel('Times [s]')
-        plt.ylabel("Strain")
-        plt.legend()
+        fig, axs = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
+
+        axs[0].plot(ecc_noisy.sample_times, ecc_noisy, label="Eccentric (noisy)", linestyle='-', color='C0')
+        axs[0].plot(ecc_padded.sample_times, ecc_padded, label="Eccentric (padded)", linestyle='-', color='C1')
+        axs[0].set_ylabel("Strain")
+        axs[0].set_title("Eccentric Waveform")
+        axs[0].legend()
+        axs[0].grid(True)
+
+        axs[1].plot(lens_noisy.sample_times, lens_noisy, label="Lensed (noisy)", linestyle='-', color='C2')
+        axs[1].plot(lens_padded.sample_times, lens_padded, label="Lensed (padded)", linestyle='-', color='C3')
+        axs[1].set_ylabel("Strain")
+        axs[1].set_title("Lensed Waveform")
+        axs[1].legend()
+        axs[1].grid(True)
+
+        axs[2].plot(unlens_noisy.sample_times, unlens_noisy, label="Unlensed (noisy)", linestyle='-', color='C4')
+        axs[2].plot(unlens_padded.sample_times, unlens_padded, label="Unlensed (padded)", linestyle='-', color='C5')
+        axs[2].set_xlabel("Time [s]")
+        axs[2].set_ylabel("Strain")
+        axs[2].set_title("Unlensed Waveform")
+        axs[2].legend()
+        axs[2].grid(True)
+
+        plt.tight_layout()
         plt.show()
 
         return ecc_noisy, lens_noisy, unlens_noisy
@@ -263,7 +288,7 @@ def compute_lensed_waveform(sp, sc, m_lens, y_lens):
 
     return sp_lens.to_timeseries(delta_t=sp_lens.delta_t), sc_lens.to_timeseries(delta_t=sc_lens.delta_t), t_delay
 
-def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens, snr_desired, num, gw_signal_type='eccentric'):
+def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens, snr_desired, num, gw_signal_type='eccentric', peak_window=(2.0, 2.2)):
     """
     Inject a gravitational wave signal into Gaussian noise and scale it to achieve a desired SNR.
 
@@ -297,6 +322,8 @@ def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens
         - 'eccentric' (default): Eccentric waveform using input parameters.
         - 'quasi_circular': Circular waveform with zero eccentricity.
         - 'lensed': Point-mass lensed waveform.
+    peak_window : tuple (float, float)
+        Time window (in seconds) before the end of the noise where the signal peak should be injected.
 
     Returns
     -------
@@ -315,7 +342,7 @@ def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens
     template, delta_t, start_time = inject_signal_with_peak_in_window(
                                             signal_ts=gw_signal,
                                             noise_ts=noise,
-                                            peak_window=(2.0, 2.2))
+                                            peak_window=peak_window)
     
     data = pycbc.types.TimeSeries(np.asarray(template) + np.asarray(noise), delta_t=delta_t, epoch=start_time)
     
@@ -361,7 +388,7 @@ def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens
     template, delta_t, start_time = inject_signal_with_peak_in_window(
                                             signal_ts=gw_signal,
                                             noise_ts=noise,
-                                            peak_window=(2.0, 2.2))
+                                            peak_window=peak_window)
     
     data = pycbc.types.TimeSeries(np.asarray(template) + np.asarray(noise), delta_t=delta_t, epoch=start_time)
     template = pycbc.types.TimeSeries(template, delta_t=delta_t, epoch=start_time)
@@ -371,7 +398,7 @@ def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens
 
     # print(f"SNR before scaling: {peak_snr_0:.2f} | SNR after scaling: {peak_snr:.2f} for sample {num} {gw_signal_type} | Distance: {distance:.2f}")
 
-    return data, peak_snr, distance
+    return data, peak_snr, distance, template
 
 def add_noise(signal_ts):
 

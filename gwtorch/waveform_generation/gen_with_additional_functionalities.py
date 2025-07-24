@@ -25,6 +25,7 @@ bilby_logger.setLevel(logging.WARNING)
 def generate_sample(args):
     num, params, jump, output_path = args
     try:
+        peak_window = (2.0, 2.2)
         mass1, mass2 = bilby.gw.conversion.chirp_mass_and_mass_ratio_to_component_masses(
             params['chirp_mass'], params['mass_ratio'])
 
@@ -51,9 +52,9 @@ def generate_sample(args):
 
         target_snr = params.pop('snr')
 
-        ecc_noisy, snr_e, distance_e = inject_noise_with_target_SNR(ecc, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='eccentric')
-        lens_noisy, snr_l, distance_l = inject_noise_with_target_SNR(lensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='lensed')
-        unlens_noisy, snr_u, distance_u = inject_noise_with_target_SNR(unlensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='quasi_circular')
+        ecc_noisy, snr_e, distance_e, _ = inject_noise_with_target_SNR(ecc, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='eccentric', peak_window=peak_window)
+        lens_noisy, snr_l, distance_l, _ = inject_noise_with_target_SNR(lensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='lensed', peak_window=peak_window)
+        unlens_noisy, snr_u, distance_u, _ = inject_noise_with_target_SNR(unlensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='quasi_circular', peak_window=peak_window)
 
         ecc_noisy = ecc_noisy.crop(left=24, right=0)
         lens_noisy = lens_noisy.crop(left=24, right=0)
