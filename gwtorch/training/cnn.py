@@ -59,11 +59,11 @@ def custom_collate_fn(batch):
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train CNN model for GW classification")
-    parser.add_argument('--batch_size', type=int, default=BATCH_SIZE)
+    parser.add_argument('--batch-size', type=int, default=BATCH_SIZE)
     parser.add_argument('--epochs', type=int, default=EPOCHS)
     parser.add_argument('--lr', type=float, default=LR)
     parser.add_argument('--gamma', type=float, default=GAMMA)
-    parser.add_argument('--model_path', type=str, default='./models/cnn_model0.pth')
+    parser.add_argument('--model-path', type=str, default='./models/cnn_model0.pth')
     return parser.parse_args()
 
 def setup_data_loaders(train_dir, test_dir, batch_size):

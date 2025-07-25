@@ -44,11 +44,12 @@ def setup_directories():
 def parse_args():
     parser = argparse.ArgumentParser(description="Train Transformer for GW classification")
     parser.add_argument('--model', type=str, default='ViT', choices=['CvT', 'ViT'], help='Model to train')
-    parser.add_argument('--batch_size', type=int, default=512)
+    parser.add_argument('--batch-size', type=int, default=512)
     parser.add_argument('--epochs', type=int, default=20)
     parser.add_argument('--lr', type=float, default=3e-5)
     parser.add_argument('--gamma', type=float, default=0.7)
     parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--model-path', type=str, default='./models/model_alpha.pth')
     return parser.parse_args()
 
 class GWDataset(Dataset):
@@ -175,7 +176,6 @@ def train_model(model, train_loader, valid_loader, class_weights, device, epochs
 
         print(f"Epoch {epoch+1}: Train Loss={train_losses[-1]:.4f}, Acc={train_accs[-1]:.4f}; Val Loss={val_losses[-1]:.4f}, Acc={val_accs[-1]:.4f}")
 
-    torch.save(model.state_dict(), './models/model_alpha.pth')
     return train_losses, val_losses, train_accs, val_accs
 
 def evaluate_and_plot(model, valid_loader, test_loader, device):
@@ -236,6 +236,9 @@ def main():
     print("\nTraining complete. Summary:")
     print(f"Validation misclassifications: {len(val_misclassified)}")
     print(f"Test misclassifications: {len(test_misclassified)}")
+
+    torch.save(model.state_dict(), args.model_path)
+    print(f"Model saved to {args.model_path}")
 
 if __name__ == "__main__":
     main()

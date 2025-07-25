@@ -60,9 +60,9 @@ def generate_sample(args):
         unlens_noisy = unlens_noisy.crop(left=24, right=0)
 
         count = {
-            'eccentric_saved': save_qtransform_with_checks(ecc_noisy, snr_e, params, mass1, mass2, distance_e, distance_l, distance_u, m_lens, y_lens, output_path / f"eccentric_{num + jump['ecc_files']}.png"),
-            'lensed_saved': save_qtransform_with_checks(lens_noisy, snr_l, params, mass1, mass2, distance_e, distance_l, distance_u, m_lens, y_lens, output_path / f"lensed_{num + jump['lens_files']}.png"),
-            'unlensed_saved': save_qtransform_with_checks(unlens_noisy, snr_u, params, mass1, mass2, distance_e, distance_l, distance_u, m_lens, y_lens, output_path / f"unlensed_{num + jump['unlens_files']}.png")
+            'eccentric_saved': save_qtransform_with_checks(ecc_noisy, snr_e, params, mass1, mass2, distance_e, distance_l, m_lens, y_lens, output_path / f"eccentric_{num + jump['ecc_files']}.png"),
+            'lensed_saved': save_qtransform_with_checks(lens_noisy, snr_l, params, mass1, mass2, distance_e, distance_l, m_lens, y_lens, output_path / f"lensed_{num + jump['lens_files']}.png"),
+            'unlensed_saved': save_qtransform_with_checks(unlens_noisy, snr_u, params, mass1, mass2, distance_e, distance_l, m_lens, y_lens, output_path / f"unlensed_{num + jump['unlens_files']}.png")
         }
 
         del hp, hc, sp, sc, sp_lensed, sc_lensed
@@ -103,7 +103,7 @@ def main():
     parser = argparse.ArgumentParser(description="Generate Q-transform training dataset.")
     parser.add_argument('--num-samples', type=int, required=True)
     parser.add_argument('--path-name', type=str, choices=['train', 'test', 'tmp'], default=None,
-                        help="Optional. If not provided, data will be stored directly in './results'")
+                        help="Optional. If not provided, data will be stored directly in './data'")
     parser.add_argument('--num-workers', type=int, default=max(1, os.cpu_count() - 2))
     parser.add_argument('--snr-prior', type=str, choices=['uniform', 'powerlaw'], default='powerlaw',
                         help='Defines the prior distribution for sampling in SNR. Default is PowerLaw.')
@@ -117,7 +117,8 @@ def main():
     
     if args.path_name:
         directory = f"./data/{args.path_name}"
-        ecc_pattern = os.path.expanduser(directory + '/eccentric_*')
+        
+        ecc_pattern = os.path.join(directory, 'eccentric_*.png')
         ecc_files = len([f for f in glob.glob(ecc_pattern) if os.path.isfile(f)])
         
         lens_pattern = os.path.expanduser(directory + '/lensed_*')

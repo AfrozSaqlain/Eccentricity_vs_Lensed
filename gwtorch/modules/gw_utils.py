@@ -537,7 +537,7 @@ def display_qtransform(ts):
     plt.show()
 
 
-def save_qtransform_with_checks(ts, signal_snr, params, mass1, mass2, distance_e, distance_l, distance_u, m_lens, y_lens, path):
+def save_qtransform_with_checks(ts, signal_snr, params, mass1, mass2, distance_e, distance_l, m_lens, y_lens, path):
     """
     Generate and save a Q-transform spectrogram of a gravitational wave signal,
     with conditional checks for eccentric or lensed signals based on Bayes factor
@@ -609,7 +609,7 @@ def save_qtransform_with_checks(ts, signal_snr, params, mass1, mass2, distance_e
         sp_, _ = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
                                     lambda1=0, lambda2=0,
                                     spin1z=params['spin1z'], spin2z=params['spin2z'],
-                                    distance=distance_u, delta_t=DELTA_T,
+                                    distance=distance_e, delta_t=DELTA_T,
                                     ecc=0.0, coa_phase=params['coa_phase'], f_lower=F_LOWER)
         
         # Ensure both waveforms have the same length and delta_t
