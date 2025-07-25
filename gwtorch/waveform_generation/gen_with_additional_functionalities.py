@@ -21,8 +21,8 @@ from gwtorch.modules.general_utils import save_csv
 
 def generate_sample(args):
     num, params, jump, output_path = args
+    peak_window = (2.0, 2.2)
     try:
-        peak_window = (2.0, 2.2)
         mass1, mass2 = bilby.gw.conversion.chirp_mass_and_mass_ratio_to_component_masses(
             params['chirp_mass'], params['mass_ratio'])
 
