@@ -96,7 +96,6 @@ def load_data(seed, batch_size):
     valid_data = GWDataset(valid_list, transform)
     test_data  = GWDataset(test_list,  transform)
 
-    # Compute class weights for training data
     label_to_idx = {"lensed": 0, "eccentric": 1, "unlensed": 2}
     train_labels = [path.split('/')[-1].split('_')[0] for path in train_list]
     label_counts = Counter(train_labels)
@@ -104,16 +103,12 @@ def load_data(seed, batch_size):
     class_weights = 1. / torch.tensor(class_counts, dtype=torch.float)
     class_weights = class_weights / class_weights.sum()
 
-
-    # Assign sample weights for sampler
     sample_weights = [class_weights[label_to_idx[label]] for label in train_labels]
     sampler = WeightedRandomSampler(sample_weights, num_samples=len(sample_weights), replacement=True)
 
-    # Use sampler ONLY for train_loader
     train_loader = DataLoader(train_data, batch_size=batch_size, sampler=sampler,
                               num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
 
-    # Use regular shuffling or no shuffling for val/test
     valid_loader = DataLoader(valid_data, batch_size=batch_size, shuffle=False,
                               num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
 
@@ -129,9 +124,9 @@ def get_model(name, device):
                    s2_emb_kernel=3, s2_emb_stride=2, s2_proj_kernel=3, s2_kv_proj_stride=2, s2_heads=3,
                    s2_depth=2, s2_mlp_mult=4, s3_emb_dim=384, s3_emb_kernel=3, s3_emb_stride=2,
                    s3_proj_kernel=3, s3_kv_proj_stride=2, s3_heads=4, s3_depth=10, s3_mlp_mult=4,
-                   dropout=0.2).to(device)
+                   dropout=0.4).to(device)
     else:
-        transformer = Linformer(dim=128, seq_len=50, depth=12, heads=8, k=64, dropout=0.2)
+        transformer = Linformer(dim=128, seq_len=50, depth=12, heads=8, k=64, dropout=0.4)
         return ViT(dim=128, image_size=224, patch_size=32, num_classes=3,
                    transformer=transformer, channels=3).to(device)
 
