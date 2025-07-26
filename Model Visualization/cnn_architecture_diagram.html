@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CNN Architecture</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 40px;
+            font-family: 'Times New Roman', serif;
+            background: white;
+            color: #000;
+            line-height: 1.4;
+        }
+        
+        .figure-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border: 1px solid #ddd;
+            padding: 30px;
+        }
+        
+        .figure-title {
+            text-align: center;
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #000;
+        }
+        
+        .figure-caption {
+            text-align: justify;
+            font-size: 11px;
+            margin-bottom: 25px;
+            color: #333;
+            line-height: 1.5;
+        }
+        
+        .architecture-flow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+            overflow-x: auto;
+            padding: 20px 0;
+        }
+        
+        .layer-block {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 120px;
+        }
+        
+        .input-block {
+            width: 80px;
+            height: 80px;
+            border: 2px solid #000;
+            background: #f8f8f8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            text-align: center;
+            position: relative;
+        }
+        
+        .input-block::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                repeating-linear-gradient(0deg, transparent, transparent 9px, #ddd 10px),
+                repeating-linear-gradient(90deg, transparent, transparent 9px, #ddd 10px);
+            pointer-events: none;
+        }
+        
+        .conv-block {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 1px solid #000;
+            background: #f9f9f9;
+            padding: 10px;
+            min-height: 120px;
+            justify-content: center;
+        }
+        
+        .conv-layer {
+            width: 90px;
+            height: 60px;
+            border: 1px solid #333;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 5px;
+        }
+        
+        .conv-title {
+            font-size: 10px;
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+        
+        .conv-params {
+            font-size: 8px;
+            color: #666;
+            text-align: center;
+            line-height: 1.2;
+        }
+        
+        .activation-layer {
+            width: 70px;
+            height: 25px;
+            border: 1px solid #666;
+            background: #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            font-weight: bold;
+            margin: 2px 0;
+        }
+        
+        .pooling-layer {
+            width: 70px;
+            height: 25px;
+            border: 1px solid #666;
+            background: #d0d0d0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            font-weight: bold;
+            margin: 2px 0;
+        }
+        
+        .feature-map {
+            font-size: 8px;
+            color: #333;
+            text-align: center;
+            margin-top: 5px;
+            font-weight: bold;
+        }
+        
+        .flatten-block {
+            width: 80px;
+            height: 100px;
+            border: 2px solid #000;
+            background: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        
+        .flatten-title {
+            font-size: 10px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .flatten-dims {
+            font-size: 8px;
+            color: #666;
+        }
+        
+        .fc-block {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 1px solid #000;
+            background: #f9f9f9;
+            padding: 10px;
+            min-height: 100px;
+            justify-content: center;
+        }
+        
+        .fc-layer {
+            width: 80px;
+            height: 50px;
+            border: 1px solid #333;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 5px;
+        }
+        
+        .fc-title {
+            font-size: 10px;
+            font-weight: bold;
+        }
+        
+        .fc-params {
+            font-size: 8px;
+            color: #666;
+            text-align: center;
+        }
+        
+        .dropout-layer {
+            width: 70px;
+            height: 20px;
+            border: 1px solid #666;
+            background: #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+            font-weight: bold;
+            margin: 2px 0;
+        }
+        
+        .output-block {
+            width: 80px;
+            height: 60px;
+            border: 2px solid #000;
+            background: #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        .arrow {
+            font-size: 18px;
+            color: #000;
+            font-weight: bold;
+        }
+        
+        .layer-label {
+            font-size: 9px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            text-align: center;
+            color: #000;
+        }
+        
+        .dimensions-table {
+            margin-top: 25px;
+            border-collapse: collapse;
+            width: 100%;
+            font-size: 10px;
+        }
+        
+        .dimensions-table th,
+        .dimensions-table td {
+            border: 1px solid #000;
+            padding: 6px 8px;
+            text-align: center;
+        }
+        
+        .dimensions-table th {
+            background: #e0e0e0;
+            font-weight: bold;
+        }
+        
+        .parameter-count {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #666;
+            background: #f9f9f9;
+            font-size: 10px;
+        }
+        
+        .param-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .param-breakdown {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+        }
+        
+        .param-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 0;
+            border-bottom: 1px dotted #ccc;
+        }
+        
+        .receptive-field {
+            margin-top: 15px;
+            padding: 10px;
+            border: 1px solid #666;
+            background: #f0f0f0;
+            font-size: 9px;
+            text-align: center;
+        }
+        
+        .rf-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="figure-container">
+        <div class="figure-title">
+            Figure 3: Convolutional Neural Network Architecture
+        </div>
+        
+        <div class="figure-caption">
+            <strong>Architecture of the proposed CNN model for 3-class classification.</strong> 
+            The network consists of three convolutional blocks, each containing a 3×3 convolution layer followed by ReLU activation and 2×2 max pooling. 
+            The feature maps progressively increase in depth (32→64→128 channels) while spatial dimensions are reduced through pooling operations. 
+            After flattening, two fully connected layers perform classification with dropout (p=0.5) for regularization. 
+            The input image size is assumed to be 224×224×3, resulting in 28×28×128 feature maps before flattening.
+        </div>
+        
+        <div class="architecture-flow">
+            <!-- Input -->
+            <div class="layer-block">
+                <div class="layer-label">Input</div>
+                <div class="input-block">
+                    <div style="z-index: 1; background: white; padding: 2px;">
+                        224×224×3
+                    </div>
+                </div>
+                <div class="feature-map">RGB Image</div>
+            </div>
+            
+            <div class="arrow">→</div>
+            
+            <!-- Conv Block 1 -->
+            <div class="layer-block">
+                <div class="layer-label">Conv Block 1</div>
+                <div class="conv-block">
+                    <div class="conv-layer">
+                        <div class="conv-title">Conv2d</div>
+                        <div class="conv-params">
+                            3→32 channels<br>
+                            kernel: 3×3<br>
+                            stride: 1, pad: 1
+                        </div>
+                    </div>
+                    <div class="activation-layer">ReLU</div>
+                    <div class="pooling-layer">MaxPool2d</div>
+                </div>
+                <div class="feature-map">112×112×32</div>
+            </div>
+            
+            <div class="arrow">→</div>
+            
+            <!-- Conv Block 2 -->
+            <div class="layer-block">
+                <div class="layer-label">Conv Block 2</div>
+                <div class="conv-block">
+                    <div class="conv-layer">
+                        <div class="conv-title">Conv2d</div>
+                        <div class="conv-params">
+                            32→64 channels<br>
+                            kernel: 3×3<br>
+                            stride: 1, pad: 1
+                        </div>
+                    </div>
+                    <div class="activation-layer">ReLU</div>
+                    <div class="pooling-layer">MaxPool2d</div>
+                </div>
+                <div class="feature-map">56×56×64</div>
+            </div>
+            
+            <div class="arrow">→</div>
+            
+            <!-- Conv Block 3 -->
+            <div class="layer-block">
+                <div class="layer-label">Conv Block 3</div>
+                <div class="conv-block">
+                    <div class="conv-layer">
+                        <div class="conv-title">Conv2d</div>
+                        <div class="conv-params">
+                            64→128 channels<br>
+                            kernel: 3×3<br>
+                            stride: 1, pad: 1
+                        </div>
+                    </div>
+                    <div class="activation-layer">ReLU</div>
+                    <div class="pooling-layer">MaxPool2d</div>
+                </div>
+                <div class="feature-map">28×28×128</div>
+            </div>
+            
+            <div class="arrow">→</div>
+            
+            <!-- Flatten -->
+            <div class="layer-block">
+                <div class="layer-label">Flatten</div>
+                <div class="flatten-block">
+                    <div class="flatten-title">View</div>
+                    <div class="flatten-dims">
+                        28×28×128<br>
+                        ↓<br>
+                        100,352
+                    </div>
+                </div>
+                <div class="feature-map">1D Vector</div>
+            </div>
+            
+            <div class="arrow">→</div>
+            
+            <!-- FC Block 1 -->
+            <div class="layer-block">
+                <div class="layer-label">FC Block 1</div>
+                <div class="fc-block">
+                    <div class="fc-layer">
+                        <div class="fc-title">Linear</div>
+                        <div class="fc-params">
+                            100,352→256
+                        </div>
+                    </div>
+                    <div class="activation-layer">ReLU</div>
+                    <div class="dropout-layer">Dropout (0.5)</div>
+                </div>
+                <div class="feature-map">256 features</div>
+            </div>
+            
+            <div class="arrow">→</div>
+            
+            <!-- FC Block 2 -->
+            <div class="layer-block">
+                <div class="layer-label">Output</div>
+                <div class="fc-block">
+                    <div class="fc-layer">
+                        <div class="fc-title">Linear</div>
+                        <div class="fc-params">
+                            256→3
+                        </div>
+                    </div>
+                </div>
+                <div class="feature-map">3 classes</div>
+            </div>
+        </div>
+        
+        <!-- Detailed Layer Information Table -->
+        <table class="dimensions-table">
+            <thead>
+                <tr>
+                    <th>Layer</th>
+                    <th>Type</th>
+                    <th>Input Size</th>
+                    <th>Output Size</th>
+                    <th>Kernel/Filter</th>
+                    <th>Stride</th>
+                    <th>Padding</th>
+                    <th>Parameters</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Input</strong></td>
+                    <td>-</td>
+                    <td>224×224×3</td>
+                    <td>224×224×3</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>0</td>
+                </tr>
+                <tr>
+                    <td><strong>Conv1</strong></td>
+                    <td>Conv2d</td>
+                    <td>224×224×3</td>
+                    <td>224×224×32</td>
+                    <td>3×3</td>
+                    <td>1</td>
+                    <td>1</td>
+                    <td>896</td>
+                </tr>
+                <tr>
+                    <td><strong>ReLU1</strong></td>
+                    <td>Activation</td>
+                    <td>224×224×32</td>
+                    <td>224×224×32</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>0</td>
+                </tr>
+                <tr>
+                    <td><strong>MaxPool1</strong></td>
+                    <td>Pooling</td>
+                    <td>224×224×32</td>
+                    <td>112×112×32</td>
+                    <td>2×2</td>
+                    <td>2</td>
+                    <td>0</td>
+                    <td>0</td>
+                </tr>
+                <tr>
+                    <td><strong>Conv2</strong></td>
+                    <td>Conv2d</td>
+                    <td>112×112×32</td>
+                    <td>112×112×64</td>
+                    <td>3×3</td>
+                    <td>1</td>
+                    <td>1</td>
+                    <td>18,496</td>
+                </tr>
+                <tr>
+                    <td><strong>ReLU2</strong></td>
+                    <td>Activation</td>
+                    <td>112×112×64</td>
+                    <td>112×112×64</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>0</td>
+                </tr>
+                <tr>
+                    <td><strong>MaxPool2</strong></td>
+                    <td>Pooling</td>
+                    <td>112×112×64</td>
+                    <td>56×56×64</td>
+                    <td>2×2</td>
+                    <td>2</td>
+                    <td>0</td>
+                    <td>0</td>
+                </tr>
+                <tr>
+                    <td><strong>Conv3</strong></td>
+                    <td>Conv2d</td>
+                    <td>56×56×64</td>
+                    <td>56×56×128</td>
+                    <td>3×3</td>
+                    <td>1</td>
+                    <td>1</td>
+                    <td>73,856</td>
+                </tr>
+                <tr>
+                    <td><strong>ReLU3</strong></td>
+                    <td>Activation</td>
+                    <td>56×56×128</td>
+                    <td>56×56×128</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>0</td>
+                </tr>
+                <tr>
+                    <td><strong>MaxPool3</strong></td>
+                    <td>Pooling</td>
+                    <td>56×56×128</td>
+                    <td>28×28×128</td>
+                    <td>2×2</td>
+                    <td>2</td>
+                    <td>0</td>
+                    <td>0</td>
+                </tr>
+                <tr>
+                    <td><strong>Flatten</strong></td>
+                    <td>View</td>
+                    <td>28×28×128</td>
+                    <td>100,352</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>0</td>
+                </tr>
+                <tr>
+                    <td><strong>FC1</strong></td>
+                    <td>Linear</td>
+                    <td>100,352</td>
+                    <td>256</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>25,690,368</td>
+                </tr>
+                <tr>
+                    <td><strong>ReLU4</strong></td>
+                    <td>Activation</td>
+                    <td>256</td>
+                    <td>256</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>0</td>
+                </tr>
+                <tr>
+                    <td><strong>Dropout</strong></td>
+                    <td>Regularization</td>
+                    <td>256</td>
+                    <td>256</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>0</td>
+                </tr>
+                <tr>
+                    <td><strong>FC2</strong></td>
+                    <td>Linear</td>
+                    <td>256</td>
+                    <td>3</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>771</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <!-- Parameter Count Summary -->
+        <div class="parameter-count">
+            <div class="param-title">Model Parameter Summary</div>
+            <div class="param-breakdown">
+                <div class="param-item">
+                    <span>Conv1 (3→32):</span>
+                    <span>896 parameters</span>
+                </div>
+                <div class="param-item">
+                    <span>Conv2 (32→64):</span>
+                    <span>18,496 parameters</span>
+                </div>
+                <div class="param-item">
+                    <span>Conv3 (64→128):</span>
+                    <span>73,856 parameters</span>
+                </div>
+                <div class="param-item">
+                    <span>FC1 (100,352→256):</span>
+                    <span>25,690,368 parameters</span>
+                </div>
+                <div class="param-item">
+                    <span>FC2 (256→3):</span>
+                    <span>771 parameters</span>
+                </div>
+                <div class="param-item" style="border-top: 2px solid #000; font-weight: bold;">
+                    <span>Total Parameters:</span>
+                    <span>25,784,387</span>
+                </div>
+            </div>
+            
+            <div class="receptive-field">
+                <div class="rf-title">Receptive Field Analysis</div>
+                After Conv1: 3×3 | After Conv2: 7×7 | After Conv3: 15×15<br>
+                <small>Each output pixel in the final feature map corresponds to a 15×15 region in the input image</small>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
