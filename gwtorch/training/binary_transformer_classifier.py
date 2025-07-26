@@ -1,0 +1,262 @@
+import argparse
+import os
+import random
+import glob
+from pathlib import Path
+from collections import Counter
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torchvision import transforms
+from torch.optim.lr_scheduler import StepLR
+from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
+
+from PIL import Image
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+
+from linformer import Linformer
+from vit_pytorch.efficient import ViT
+from vit_pytorch.cvt import CvT
+
+from gwtorch.modules.general_utils import (
+    compute_roc_auc_with_misclassifications,
+    plot_roc_curves,
+    plot_confusion_matrix,
+    print_misclassified_files,
+    save_misclassified_files_to_txt,
+    plot_training_curves,
+)
+
+def seed_everything(seed):
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+
+def setup_directories():
+    os.makedirs('./models', exist_ok=True)
+    os.makedirs('./results/transformer_results/Plots', exist_ok=True)
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Train Transformer for binary GW classification (eccentric vs lensed)")
+    parser.add_argument('--model', type=str, default='ViT', choices=['CvT', 'ViT'], help='Model to train')
+    parser.add_argument('--batch-size', type=int, default=512)
+    parser.add_argument('--epochs', type=int, default=20)
+    parser.add_argument('--lr', type=float, default=3e-5)
+    parser.add_argument('--gamma', type=float, default=0.7)
+    parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--model-path', type=str, default='./models/model_binary.pth')
+    return parser.parse_args()
+
+class GWDataset(Dataset):
+    def __init__(self, file_list, transform=None):
+        self.file_list = file_list
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.file_list)
+
+    def __getitem__(self, idx):
+        img_path = self.file_list[idx]
+        img = Image.open(img_path).convert("RGB")  
+        img = self.transform(img)
+
+        label_str = img_path.split("/")[-1].split("_")[0]
+        # Binary classification: eccentric=0, lensed=1
+        label = {'eccentric': 0, 'lensed': 1}[label_str]
+        file_number = img_path.split("/")[-1].split("_")[1]
+
+        return img, label, file_number, img_path
+
+def custom_collate_fn(batch):
+    images, labels, file_numbers, img_paths = zip(*batch)
+    return torch.stack(images), torch.tensor(labels), file_numbers, img_paths
+
+def load_data(seed, batch_size):
+    # Load only eccentric and lensed images
+    train_list = []
+    test_list = []
+    
+    # Filter for only eccentric and lensed images
+    all_train = glob.glob('./data/train/*.png')
+    all_test = glob.glob('./data/test/*.png')
+    
+    for path in all_train:
+        label = path.split('/')[-1].split('_')[0]
+        if label in ['eccentric', 'lensed']:
+            train_list.append(path)
+    
+    for path in all_test:
+        label = path.split('/')[-1].split('_')[0]
+        if label in ['eccentric', 'lensed']:
+            test_list.append(path)
+    
+    labels = [path.split('/')[-1].split('_')[0] for path in train_list]
+
+    train_list, valid_list = train_test_split(
+        train_list, test_size=0.2, stratify=labels, shuffle=True, random_state=seed
+    )
+
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+    ])
+
+    train_data = GWDataset(train_list, transform)
+    valid_data = GWDataset(valid_list, transform)
+    test_data  = GWDataset(test_list,  transform)
+
+    # Binary classification weights
+    label_to_idx = {"eccentric": 0, "lensed": 1}
+    train_labels = [path.split('/')[-1].split('_')[0] for path in train_list]
+    label_counts = Counter(train_labels)
+    class_counts = [label_counts['eccentric'], label_counts['lensed']]
+    class_weights = 1. / torch.tensor(class_counts, dtype=torch.float)
+    class_weights = class_weights / class_weights.sum()
+
+    sample_weights = [class_weights[label_to_idx[label]] for label in train_labels]
+    sampler = WeightedRandomSampler(sample_weights, num_samples=len(sample_weights), replacement=True)
+
+    train_loader = DataLoader(train_data, batch_size=batch_size, sampler=sampler,
+                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+
+    valid_loader = DataLoader(valid_data, batch_size=batch_size, shuffle=False,
+                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+
+    test_loader  = DataLoader(test_data,  batch_size=batch_size, shuffle=False,
+                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+
+    print(f"Training samples - Eccentric: {label_counts['eccentric']}, Lensed: {label_counts['lensed']}")
+    print(f"Total training samples: {len(train_list)}")
+    print(f"Validation samples: {len(valid_list)}")
+    print(f"Test samples: {len(test_list)}")
+
+    return train_loader, valid_loader, test_loader, class_weights
+
+def get_model(name, device):
+    if name == 'CvT':
+        return CvT(num_classes=2, s1_emb_dim=64, s1_emb_kernel=7, s1_emb_stride=4, s1_proj_kernel=3,
+                   s1_kv_proj_stride=2, s1_heads=1, s1_depth=1, s1_mlp_mult=4, s2_emb_dim=192,
+                   s2_emb_kernel=3, s2_emb_stride=2, s2_proj_kernel=3, s2_kv_proj_stride=2, s2_heads=3,
+                   s2_depth=2, s2_mlp_mult=4, s3_emb_dim=384, s3_emb_kernel=3, s3_emb_stride=2,
+                   s3_proj_kernel=3, s3_kv_proj_stride=2, s3_heads=4, s3_depth=10, s3_mlp_mult=4,
+                   dropout=0.4).to(device)
+    else:
+        transformer = Linformer(dim=128, seq_len=50, depth=12, heads=8, k=64, dropout=0.4)
+        return ViT(dim=128, image_size=224, patch_size=32, num_classes=2,
+                   transformer=transformer, channels=3).to(device)
+
+def train_model(model, train_loader, valid_loader, class_weights, device, epochs, lr, gamma):
+    optimizer = optim.Adam(model.parameters(), lr=lr)
+    scheduler = StepLR(optimizer, step_size=5, gamma=gamma)
+    weights = class_weights.detach().clone().to(device)
+    criterion = nn.CrossEntropyLoss(weight=weights)
+
+    train_losses, val_losses, train_accs, val_accs = [], [], [], []
+
+    for epoch in range(epochs):
+        model.train()
+        running_loss, running_acc = 0, 0
+        for data, labels, *_ in train_loader:
+            data, labels = data.to(device), labels.to(device)
+            optimizer.zero_grad()
+            output = model(data)
+            loss = criterion(output, labels)
+            loss.backward()
+            optimizer.step()
+            acc = (output.argmax(1) == labels).float().mean()
+            running_loss += loss.item()
+            running_acc += acc.item()
+
+        train_losses.append(running_loss / len(train_loader))
+        train_accs.append(running_acc / len(train_loader))
+
+        model.eval()
+        val_loss, val_acc = 0, 0
+        with torch.no_grad():
+            for data, labels, *_ in valid_loader:
+                data, labels = data.to(device), labels.to(device)
+                output = model(data)
+                loss = criterion(output, labels)
+                acc = (output.argmax(1) == labels).float().mean()
+                val_loss += loss.item()
+                val_acc += acc.item()
+
+        val_losses.append(val_loss / len(valid_loader))
+        val_accs.append(val_acc / len(valid_loader))
+
+        print(f"Epoch {epoch+1}: Train Loss={train_losses[-1]:.4f}, Acc={train_accs[-1]:.4f}; Val Loss={val_losses[-1]:.4f}, Acc={val_accs[-1]:.4f}")
+        scheduler.step()
+
+    return train_losses, val_losses, train_accs, val_accs
+
+def evaluate_and_plot(model, valid_loader, test_loader, device):
+    class_names = ['Eccentric', 'Lensed']
+    results_dir = Path('./results/transformer_results')
+
+    val_fpr, val_tpr, val_roc_auc, val_labels, val_preds, _, val_misclassified = compute_roc_auc_with_misclassifications(model, valid_loader, device, class_names)
+    test_fpr, test_tpr, test_roc_auc, test_labels, test_preds, _, test_misclassified = compute_roc_auc_with_misclassifications(model, test_loader, device, class_names)
+
+    print_misclassified_files(val_misclassified, "Validation Set")
+    print_misclassified_files(test_misclassified, "Test Set")
+    save_misclassified_files_to_txt(val_misclassified, "Validation", results_dir / "misclassified_validation_binary.txt")
+    save_misclassified_files_to_txt(test_misclassified, "Test", results_dir / "misclassified_test_binary.txt")
+
+    plot_roc_curves(val_fpr, val_tpr, val_roc_auc, class_names, " (Validation Set - Binary)", results_dir)
+    plot_roc_curves(test_fpr, test_tpr, test_roc_auc, class_names, " (Test Set - Binary)", results_dir)
+    plot_confusion_matrix(val_labels, val_preds, class_names, " (Validation Set - Binary)", results_dir)
+    plot_confusion_matrix(test_labels, test_preds, class_names, " (Test Set - Binary)", results_dir)
+
+    print("Validation Classification Report (Binary):")
+    val_report = classification_report(val_labels, val_preds, target_names=class_names)
+    print(val_report)
+    val_report_path = results_dir / "val_classification_report_binary.txt"
+    with open(val_report_path, "w") as f:
+        f.write("Validation Classification Report (Binary - Eccentric vs Lensed):\n")
+        f.write(val_report)
+
+    print("\nTest Classification Report (Binary):")
+    test_report = classification_report(test_labels, test_preds, target_names=class_names)
+    print(test_report)
+    test_report_path = results_dir / "test_classification_report_binary.txt"
+    with open(test_report_path, "w") as f:
+        f.write("Test Classification Report (Binary - Eccentric vs Lensed):\n")
+        f.write(test_report)
+
+    return val_misclassified, test_misclassified
+
+def main():
+    args = parse_args()
+    setup_directories()
+    seed_everything(args.seed)
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    print(f"Using device: {device}")
+    print("Training binary classifier: Eccentric vs Lensed")
+    
+    train_loader, valid_loader, test_loader, class_weights = load_data(args.seed, args.batch_size)
+    model = get_model(args.model, device)
+
+    if os.path.exists(args.model_path):
+        print("Pretrained binary model found. Loading...")
+        model.load_state_dict(torch.load(args.model_path))
+    else:
+        print("No pretrained binary model found. Training from scratch...")
+
+    train_losses, val_losses, train_accs, val_accs = train_model(model, train_loader, valid_loader, class_weights, device, args.epochs, args.lr, args.gamma)
+    val_misclassified, test_misclassified = evaluate_and_plot(model, valid_loader, test_loader, device)
+    plot_training_curves(train_losses, val_losses, train_accs, val_accs, Path('./results/transformer_results'))
+
+    print("\nBinary Training complete. Summary:")
+    print(f"Validation misclassifications: {len(val_misclassified)}")
+    print(f"Test misclassifications: {len(test_misclassified)}")
+
+    torch.save(model.state_dict(), args.model_path)
+    print(f"Binary model saved to {args.model_path}")
+
+if __name__ == "__main__":
+    main()

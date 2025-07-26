@@ -27,7 +27,7 @@ from gwtorch.modules.neural_net import CNN_Model
 
 # ----------------- Constants -----------------
 RANDOM_SEED = 42
-BATCH_SIZE = 128
+BATCH_SIZE = 512
 EPOCHS = 20
 LR = 3e-4
 GAMMA = 0.7
