@@ -35,7 +35,6 @@ def generate_sample(args):
 
         count = {
             'eccentric_saved': save_qtransform_with_checks(waveform_dict, params, output_path / f"eccentric_{num + jump['ecc_files']}.png"),
-
             'lensed_saved': save_qtransform_with_checks(waveform_dict, params, output_path / f"lensed_{num + jump['lens_files']}.png"),
             'unlensed_saved': save_qtransform_with_checks(waveform_dict, params, output_path / f"unlensed_{num + jump['unlens_files']}.png")
         }
