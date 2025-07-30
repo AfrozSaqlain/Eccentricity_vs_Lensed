@@ -219,8 +219,8 @@ def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_dete
             plt.show()
 
         ecc_dict = {'ecc_signal': ecc_noisy, 'snr_e': snr_e, 'distance_e': distance_e}
-        lens_dict = {'lens_signal': lens_noisy, 'snr_l': snr_l, 'distance_l': distance_l}
-        unlens_dict = {'unlens_signal': unlens_noisy, 'snr_u': snr_u, 'distance_u': distance_u}
+        lens_dict = {'lensed_signal': lens_noisy, 'snr_l': snr_l, 'distance_l': distance_l}
+        unlens_dict = {'unlensed_signal': unlens_noisy, 'snr_u': snr_u, 'distance_u': distance_u}
 
         del hp, hc, sp, sc, sp_lensed, sc_lensed
         del ecc, unlensed, lensed, ecc_noisy, lens_noisy, unlens_noisy
@@ -763,7 +763,7 @@ def save_qtransform_with_checks(waveform_dict, params, path):
 
     # normalise each slice and export as RGB
     normed = [Normalize()(q) for q in stacked_q]
-    rgb_img = np.stack(normed, axis=-1)  # (time, freq, 3)
+    rgb_img = np.stack(normed, axis=0).transpose(2, 1, 0)
 
     plt.figure(figsize=(12, 8))
     plt.imshow(rgb_img, aspect='auto', origin='lower')
