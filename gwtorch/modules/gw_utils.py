@@ -12,6 +12,7 @@ from pycbc.types import FrequencySeries
 from bilby.gw.prior import BBHPriorDict
 from pycbc.filter.matchedfilter import matched_filter
 from pycbc.waveform import get_td_waveform, taper_timeseries
+from matplotlib.colors import Normalize
 
 from gwtorch.modules.constants import *
 
@@ -546,211 +547,228 @@ def display_qtransform(ts):
     plt.show()
 
 
-def save_qtransform_with_checks(ts, signal_snr, params, mass1, mass2, distance_e, distance_l, m_lens, y_lens, path):
+# def save_qtransform_with_checks(waveform_dict, params, path):
+#     if "eccentric" in str(path):
+#         stacked_q = []
+#         for key in waveform_dict:
+#             mass1 = waveform_dict[key]['mass1']
+#             mass2 = waveform_dict[key]['mass2']
+#             m_lens = waveform_dict[key]['m_lens']
+#             y_lens = waveform_dict[key]['y_lens']
+
+#             distance_e = waveform_dict[key]['eccentric']['distance_e']
+#             signal_snr = waveform_dict[key]['eccentric']['snr_e']
+#             ts = waveform_dict[key]['eccentric']['ecc_signal']
+
+#             # Regenerate same signal with eccentricity and non-eccentricity for lnB check
+#             hp_, _ = get_td_waveform(
+#                 approximant='teobresums', mass1=mass1, mass2=mass2,
+#                 lambda1=0, lambda2=0,
+#                 spin1z=params['spin1z'], spin2z=params['spin2z'],
+#                 distance=distance_e, delta_t=DELTA_T,
+#                 ecc=params['eccentricity'], coa_phase=params['coa_phase'], f_lower=F_LOWER
+#             )
+
+#             sp_, _ = get_td_waveform(
+#                 approximant='teobresums', mass1=mass1, mass2=mass2,
+#                 lambda1=0, lambda2=0,
+#                 spin1z=params['spin1z'], spin2z=params['spin2z'],
+#                 distance=distance_e, delta_t=DELTA_T,
+#                 ecc=0.0, coa_phase=params['coa_phase'], f_lower=F_LOWER
+#             )
+
+#             tlen = max(len(hp_), len(sp_))
+#             hp_.resize(tlen)
+#             sp_.resize(tlen)
+#             sp_ = pycbc.types.TimeSeries(sp_.data, delta_t=hp_.delta_t, epoch=hp_.start_time)
+
+#             duration_ = hp_.duration
+#             delta_f_ = 1 / duration_
+#             flen_ = tlen // 2 + 1
+#             psd = pycbc.psd.EinsteinTelescopeP1600143(flen_, delta_f_, F_LOWER)
+
+#             m = match(hp_, sp_, psd=psd, low_frequency_cutoff=5)[0]
+#             ln_B = 0.5 * (1 - m**2) * signal_snr**2
+
+#             if ln_B >= np.log(10):
+#                 ts = TimeSeries.from_pycbc(ts)
+#                 q = ts.q_transform(logf=True, norm='median', frange=(F_LOWER, 512), whiten=True, qrange=(4, 64))
+#                 q_data = np.abs(q.data)
+#                 stacked_q.append(q_data)
+
+#         if len(stacked_q) != 3:
+#             print(f"Only {len(stacked_q)} detectors passed the ln_B threshold. Not saving plot.")
+#             return False
+
+#         # Normalize each to [0,1] and stack into 3-channel (RGB-like)
+#         normed = [Normalize()(q) for q in stacked_q]
+#         rgb_image = np.stack(normed, axis=-1)  # Shape: (time, freq, 3)
+
+#         plt.figure(figsize=(12, 8))
+#         plt.imshow(rgb_image, aspect='auto', origin='lower')
+#         plt.axis('off')
+#         plt.savefig(path, bbox_inches='tight', pad_inches=0)
+#         plt.close()
+
+#         return True
+
+        
+#     elif "lensed" in str(path) and "unlensed" not in str(path):
+#         hp_, _ = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
+#                                  lambda1=0, lambda2=0,
+#                                  spin1z=params['spin1z'], spin2z=params['spin2z'],
+#                                  distance=distance_l, delta_t=DELTA_T,
+#                                  ecc=0, coa_phase=params['coa_phase'], f_lower=F_LOWER)
+        
+#         sp_, _, _ = compute_lensed_waveform(hp_, _, m_lens, y_lens)
+        
+#         # Ensure both waveforms have the same length and delta_t
+#         tlen = max(len(hp_), len(sp_))
+#         hp_.resize(tlen)
+#         sp_.resize(tlen)
+        
+#         # Force both waveforms to have the same delta_t by recreating sp_
+#         # This ensures consistent frequency resolution for PSD matching
+#         sp_ = pycbc.types.TimeSeries(sp_.data, delta_t=hp_.delta_t, epoch=hp_.start_time)
+
+#         duration_ = hp_.duration
+#         delta_f_ = 1 / duration_
+#         flen_ = tlen // 2 + 1
+#         psd = pycbc.psd.EinsteinTelescopeP1600143(flen_, delta_f_, F_LOWER)
+
+#         match = pycbc.filter.match(hp_, sp_, psd=psd, low_frequency_cutoff=5)[0]
+#         ln_B = 0.5 * (1 - match ** 2) * signal_snr ** 2
+
+#         if ln_B < np.log(10):
+#             # sample_number = str(path).split("_")[1].split(".")[0]
+#             # print(rf"Skipping lensed sample {sample_number} as $\ln B$ is {ln_B}")
+#             return False
+
+#     ts = TimeSeries.from_pycbc(ts)
+
+#     plt.figure(figsize=(12, 8))
+#     plt.pcolormesh(ts.q_transform(logf=True, norm='median', frange=(F_LOWER, 512), whiten=True, qrange=(4, 64)))
+#     plt.axis('off')
+#     plt.yscale('log')
+#     plt.savefig(path, transparent=True, bbox_inches='tight', pad_inches=0)
+#     plt.close()
+
+#     return True
+
+
+
+
+
+
+def _get_category_parts(path_str):
+    """Return ('eccentric' | 'lensed' | 'unlensed', True/False)"""
+    if "eccentric" in path_str:
+        return "eccentric"
+    if "lensed"    in path_str and "unlensed" not in path_str:
+        return "lensed"
+    return "unlensed"
+
+def save_qtransform_with_checks(waveform_dict, params, path):
     """
-    Generate and save a Q-transform spectrogram of a gravitational wave signal,
-    with conditional checks for eccentric or lensed signals based on Bayes factor
-    computed from waveform match.
-
-    Parameters
-    ----------
-    ts : array-like or pycbc.types.TimeSeries
-        Time series data of the gravitational wave signal (strain).
-    
-    signal_snr : float
-        Signal-to-noise ratio of the injection used to compute log Bayes factor.
-
-    params : dict
-        Dictionary of waveform parameters, must include:
-            - 'spin1z': Dimensionless spin of mass1 along z-axis.
-            - 'spin2z': Dimensionless spin of mass2 along z-axis.
-            - 'eccentricity': Orbital eccentricity of the binary.
-            - 'coa_phase': Coalescence phase of the binary.
-
-    mass1 : float
-        Mass of the first compact object (in solar masses).
-
-    mass2 : float
-        Mass of the second compact object (in solar masses).
-
-    distance_e : float
-        Luminosity distance for the eccentric waveform (in Mpc).
-
-    distance_l : float
-        Luminosity distance for the lensed waveform (in Mpc).
-
-    distance_u : float
-        Luminosity distance for the unlensed, circular (reference) waveform (in Mpc).
-
-    m_lens : float
-        Mass of the gravitational lens (in solar masses), used only if "lensed" in `path`.
-
-    y_lens : float
-        Impact parameter (dimensionless) of the lensing event, used only if "lensed" in `path`.
-
-    path : str or pathlib.Path
-        Path to save the Q-transform spectrogram image. Must include "eccentric" or "lensed"
-        in the filename to trigger the corresponding Bayes factor match checks.
-
-    Returns
-    -------
-    None
-        Saves a PNG file of the Q-transform spectrogram if Bayes factor threshold is passed.
-        Otherwise, skips the sample and returns None.
-
-    Notes
-    -----
-    - For "eccentric" or "lensed" samples, the function compares the waveform against a 
-      circular, unlensed reference waveform using PyCBC match and computes the Bayes factor.
-    - If `ln_B < log(10)`, the signal is considered insufficiently distinct and skipped.
-    - The Q-transform is computed using GWPy and saved as a log-frequency spectrogram
-      with no axes and transparent background.
-    - Waveforms are generated using the `teobresums` approximant.
+    Saves an RGB‑stacked Q‑transform image:
+      R = detector‑0 spectrogram
+      G = detector‑1 spectrogram
+      B = detector‑2 spectrogram
+    Category is inferred from the filename: eccentric / lensed / unlensed.
+    Returns True on success, False otherwise.
     """
-    
-    if "eccentric" in str(path):
-        hp_, _ = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
-                                 lambda1=0, lambda2=0,
-                                 spin1z=params['spin1z'], spin2z=params['spin2z'],
-                                 distance=distance_e, delta_t=DELTA_T,
-                                 ecc=params['eccentricity'], coa_phase=params['coa_phase'], f_lower=F_LOWER)
-        
-        sp_, _ = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
-                                    lambda1=0, lambda2=0,
-                                    spin1z=params['spin1z'], spin2z=params['spin2z'],
-                                    distance=distance_e, delta_t=DELTA_T,
-                                    ecc=0.0, coa_phase=params['coa_phase'], f_lower=F_LOWER)
-        
-        # Ensure both waveforms have the same length and delta_t
-        tlen = max(len(hp_), len(sp_))
-        hp_.resize(tlen)
-        sp_.resize(tlen)
-        
-        # Force both waveforms to have the same delta_t by recreating sp_
-        # This ensures consistent frequency resolution for PSD matching
-        sp_ = pycbc.types.TimeSeries(sp_.data, delta_t=hp_.delta_t, epoch=hp_.start_time)
+    category = _get_category_parts(str(path))
+    stacked_q = []
 
-        duration_ = hp_.duration
-        delta_f_ = 1 / duration_
-        flen_ = tlen // 2 + 1
-        psd = pycbc.psd.EinsteinTelescopeP1600143(flen_, delta_f_, F_LOWER)
+    # --- iterate over detectors ------------------------------------------------
+    for key in waveform_dict:
+        wf = waveform_dict[key]
 
-        match = pycbc.filter.match(hp_, sp_, psd=psd, low_frequency_cutoff=5)[0]
-        ln_B = 0.5 * (1 - match ** 2) * signal_snr ** 2
+        mass1, mass2  = wf['mass1'],  wf['mass2']
+        m_lens, y_lens = wf['m_lens'], wf['y_lens']
 
-        if ln_B < np.log(10):
-            # sample_number = str(path).split("_")[1].split(".")[0]
-            # print(f"Skipping eccentric sample {sample_number} as $\ln B$ is {ln_B}")
-            return False
-        
-    elif "lensed" in str(path) and "unlensed" not in str(path):
-        hp_, _ = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
-                                 lambda1=0, lambda2=0,
-                                 spin1z=params['spin1z'], spin2z=params['spin2z'],
-                                 distance=distance_l, delta_t=DELTA_T,
-                                 ecc=0, coa_phase=params['coa_phase'], f_lower=F_LOWER)
-        
-        sp_, _, _ = compute_lensed_waveform(hp_, _, m_lens, y_lens)
-        
-        # Ensure both waveforms have the same length and delta_t
-        tlen = max(len(hp_), len(sp_))
-        hp_.resize(tlen)
-        sp_.resize(tlen)
-        
-        # Force both waveforms to have the same delta_t by recreating sp_
-        # This ensures consistent frequency resolution for PSD matching
-        sp_ = pycbc.types.TimeSeries(sp_.data, delta_t=hp_.delta_t, epoch=hp_.start_time)
+        # pick fields that differ by category
+        if category == "eccentric":
+            distance   = wf['eccentric']['distance_e']
+            signal_snr = wf['eccentric']['snr_e']
+            ts_raw     = wf['eccentric']['ecc_signal']
+        elif category == "lensed":
+            distance   = wf['lensed']['distance_l']
+            signal_snr = wf['lensed']['snr_l']
+            ts_raw     = wf['lensed']['lensed_signal']
+        else:  # unlensed
+            distance   = wf['unlensed']['distance_u']
+            signal_snr = wf['unlensed']['snr_u']
+            ts_raw     = wf['unlensed']['unlensed_signal']
 
-        duration_ = hp_.duration
-        delta_f_ = 1 / duration_
-        flen_ = tlen // 2 + 1
-        psd = pycbc.psd.EinsteinTelescopeP1600143(flen_, delta_f_, F_LOWER)
+        # --- Bayes factor / match test where applicable ------------------------
+        compute_q = True  # default for unlensed case
+        if category in ("eccentric", "lensed"):
+            # reference (un‑lensed, zero‑ecc) waveform
+            hp_, _ = get_td_waveform(
+                approximant='teobresums',
+                mass1=mass1, mass2=mass2,
+                lambda1=0, lambda2=0,
+                spin1z=params['spin1z'], spin2z=params['spin2z'],
+                distance=distance, delta_t=DELTA_T,
+                ecc = 0 if category=="lensed" else params['eccentricity'],
+                coa_phase=params['coa_phase'], f_lower=F_LOWER
+            )
 
-        match = pycbc.filter.match(hp_, sp_, psd=psd, low_frequency_cutoff=5)[0]
-        ln_B = 0.5 * (1 - match ** 2) * signal_snr ** 2
+            # comparison waveform
+            if category == "eccentric":
+                sp_, _ = get_td_waveform(
+                    approximant='teobresums',
+                    mass1=mass1, mass2=mass2,
+                    lambda1=0, lambda2=0,
+                    spin1z=params['spin1z'], spin2z=params['spin2z'],
+                    distance=distance, delta_t=DELTA_T,
+                    ecc   = 0.0,  # non‑eccentric reference
+                    coa_phase=params['coa_phase'], f_lower=F_LOWER
+                )
+            else:  # lensed
+                # user‑supplied helper must exist; interface unchanged
+                sp_, _, _ = compute_lensed_waveform(hp_, _, m_lens, y_lens)
 
-        if ln_B < np.log(10):
-            # sample_number = str(path).split("_")[1].split(".")[0]
-            # print(rf"Skipping lensed sample {sample_number} as $\ln B$ is {ln_B}")
-            return False
+            # standardise length / dt
+            tlen = max(len(hp_), len(sp_))
+            hp_.resize(tlen)
+            sp_.resize(tlen)
+            sp_ = pycbc.types.TimeSeries(sp_.data,
+                                         delta_t=hp_.delta_t,
+                                         epoch=hp_.start_time)
 
-    ts = TimeSeries.from_pycbc(ts)
+            # PSD & ln B
+            duration = hp_.duration
+            flen     = tlen // 2 + 1
+            psd      = pycbc.psd.EinsteinTelescopeP1600143(
+                           flen, 1/duration, F_LOWER
+                       )
+            m = pycbc.filter.match(hp_, sp_, psd=psd, low_frequency_cutoff=5)[0]
+            ln_B = 0.5 * (1 - m**2) * signal_snr**2
+            compute_q = ln_B >= np.log(10)
+
+        # --- Q‑transform & stack ------------------------------------------------
+        if compute_q:
+            ts = TimeSeries.from_pycbc(ts_raw)
+            q  = ts.q_transform(logf=True, norm='median',
+                                frange=(F_LOWER, 512),
+                                whiten=True, qrange=(4, 64))
+            stacked_q.append(np.abs(q.data))
+
+    # need exactly 3 detectors
+    if len(stacked_q) != 3:
+        print(f"{category}: only {len(stacked_q)} detectors passed – skipping save.")
+        return False
+
+    # normalise each slice and export as RGB
+    normed = [Normalize()(q) for q in stacked_q]
+    rgb_img = np.stack(normed, axis=-1)  # (time, freq, 3)
 
     plt.figure(figsize=(12, 8))
-    plt.pcolormesh(ts.q_transform(logf=True, norm='median', frange=(F_LOWER, 512), whiten=True, qrange=(4, 64)))
+    plt.imshow(rgb_img, aspect='auto', origin='lower')
     plt.axis('off')
-    plt.yscale('log')
-    plt.savefig(path, transparent=True, bbox_inches='tight', pad_inches=0)
+    plt.savefig(path, bbox_inches='tight', pad_inches=0)
     plt.close()
-
     return True
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def scale_signal(signal_ts, num=None, SEED=None):
-
-    noise = generate_noise(seed = int(SEED)) if SEED is not None else generate_noise()
-
-    noise = generate_noise(seed=SEED)
-
-    template, delta_t, start_time = inject_signal_with_peak_in_window(
-                                            signal_ts=signal_ts,
-                                            noise_ts=noise,
-                                            peak_window=(2.0, 2.2))
-    
-    data = pycbc.types.TimeSeries(np.asarray(template) + np.asarray(noise), delta_t=delta_t, epoch=start_time)
-    
-    template = pycbc.types.TimeSeries(template, delta_t=delta_t, epoch=start_time)
-
-    snr = matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=F_LOWER)
-
-    peak_snr = abs(snr).numpy().max()
-
-    # print(f"SNR before scaling: {peak_snr}")
-
-    if peak_snr < 10:
-        snr_desired = np.random.uniform(10, 20)
-        # print(f"Scaling signal to achieve SNR of {snr_desired:.2f} for sample {num}")
-        scale_factor = snr_desired / peak_snr
-        template *= scale_factor
-        data = pycbc.types.TimeSeries(np.asarray(template) + np.asarray(noise), delta_t=delta_t, epoch=start_time)
-        snr = matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=F_LOWER)
-
-        peak_snr = abs(snr).numpy().max()
-
-        # print(f"SNR after scaling: {peak_snr}")
-
-
-    # plt.plot(snr.sample_times, abs(snr), label='SNR')
-    # plt.xlabel('Time (s)')
-    # plt.ylabel('SNR')
-    # plt.title(f'SNR Timeseries')
-    # plt.legend()
-    # plt.show()
-
-    # plt.plot(data.sample_times, data, label='Eccentric Signal + Noise')
-    # plt.plot(template.sample_times, template, label='Eccentric Signal', linestyle='--')
-    # plt.xlabel('Time (s)')
-    # plt.ylabel('Amplitude')
-    # plt.title(f'Eccentric Signal + Noise')
-    # plt.legend()
-    # plt.show()
-
-    return data, peak_snr

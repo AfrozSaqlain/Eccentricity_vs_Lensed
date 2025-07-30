@@ -34,9 +34,10 @@ def generate_sample(args):
             }
 
         count = {
-            'eccentric_saved': save_qtransform_with_checks(ecc_dict["ecc_signal"], ecc_dict["snr_e"], params, mass1, mass2, ecc_dict["distance_e"], lens_dict["distance_l"], m_lens, y_lens, output_path / f"eccentric_{num + jump['ecc_files']}.png"),
-            'lensed_saved': save_qtransform_with_checks(lens_dict['lens_signal'], lens_dict['snr_l'], params, mass1, mass2, ecc_dict["distance_e"], lens_dict["distance_l"], m_lens, y_lens, output_path / f"lensed_{num + jump['lens_files']}.png"),
-            'unlensed_saved': save_qtransform_with_checks(unlens_dict['unlens_signal'], unlens_dict['snr_u'], params, mass1, mass2, ecc_dict["distance_e"], lens_dict["distance_l"], m_lens, y_lens, output_path / f"unlensed_{num + jump['unlens_files']}.png")
+            'eccentric_saved': save_qtransform_with_checks(waveform_dict, params, output_path / f"eccentric_{num + jump['ecc_files']}.png"),
+
+            'lensed_saved': save_qtransform_with_checks(waveform_dict, params, output_path / f"lensed_{num + jump['lens_files']}.png"),
+            'unlensed_saved': save_qtransform_with_checks(waveform_dict, params, output_path / f"unlensed_{num + jump['unlens_files']}.png")
         }
 
         return {
