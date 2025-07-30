@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+import gc
 import gwmat
 import pycbc
 import bilby
@@ -87,7 +88,7 @@ def generate_prior(num_samples, snr_type = "powerlaw"):
         for i in range(num_samples)
     ]
 
-def generate_waveform(num ,params, peak_window=(2.0, 2.2), display=False):
+def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_detector, display=False):
     """
     Generate eccentric, unlensed, and lensed gravitational waveforms with injected noise.
 
@@ -173,13 +174,13 @@ def generate_waveform(num ,params, peak_window=(2.0, 2.2), display=False):
 
         target_snr = params['snr']
 
-        ecc_noisy, snr_e, distance_e, ecc_padded = inject_noise_with_target_SNR(ecc, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='eccentric', peak_window=peak_window)
-        lens_noisy, snr_l, distance_l, lens_padded = inject_noise_with_target_SNR(lensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='lensed', peak_window=peak_window)
-        unlens_noisy, snr_u, distance_u, unlens_padded = inject_noise_with_target_SNR(unlensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='quasi_circular', peak_window=peak_window)
+        ecc_noisy, snr_e, distance_e, ecc_padded = inject_noise_with_target_SNR(ecc, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='eccentric', peak_window=peak_window, detector=detector)
+        lens_noisy, snr_l, distance_l, lens_padded = inject_noise_with_target_SNR(lensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='lensed', peak_window=peak_window, detector=detector)
+        unlens_noisy, snr_u, distance_u, unlens_padded = inject_noise_with_target_SNR(unlensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='quasi_circular', peak_window=peak_window, detector=detector)
 
-        # ecc_noisy = ecc_noisy.crop(left=24, right=0)
-        # lens_noisy = lens_noisy.crop(left=24, right=0)
-        # unlens_noisy = unlens_noisy.crop(left=24, right=0)
+        ecc_noisy = ecc_noisy.crop(left=24, right=0)
+        lens_noisy = lens_noisy.crop(left=24, right=0)
+        unlens_noisy = unlens_noisy.crop(left=24, right=0)
 
         # ecc_padded.start_time = unlens_padded.start_time
         # lens_padded.start_time = unlens_padded.start_time
@@ -216,7 +217,15 @@ def generate_waveform(num ,params, peak_window=(2.0, 2.2), display=False):
             plt.tight_layout()
             plt.show()
 
-        return ecc_noisy, lens_noisy, unlens_noisy
+        ecc_dict = {'ecc_signal': ecc_noisy, 'snr_e': snr_e, 'distance_e': distance_e}
+        lens_dict = {'lens_signal': lens_noisy, 'snr_l': snr_l, 'distance_l': distance_l}
+        unlens_dict = {'unlens_signal': unlens_noisy, 'snr_u': snr_u, 'distance_u': distance_u}
+
+        del hp, hc, sp, sc, sp_lensed, sc_lensed
+        del ecc, unlensed, lensed, ecc_noisy, lens_noisy, unlens_noisy
+        gc.collect()
+
+        return ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens
         
     except Exception as e:
         print(f"[Sample {num}] Error: {e}")
@@ -294,7 +303,7 @@ def compute_lensed_waveform(sp, sc, m_lens, y_lens):
 
     return sp_lens.to_timeseries(delta_t=sp_lens.delta_t), sc_lens.to_timeseries(delta_t=sc_lens.delta_t), t_delay
 
-def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens, snr_desired, num, gw_signal_type='eccentric', peak_window=(2.0, 2.2), SEED = None):
+def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens, snr_desired, num, gw_signal_type='eccentric', peak_window=(2.0, 2.2), detector=default_detector, SEED = None):
     """
     Inject a gravitational wave signal into Gaussian noise and scale it to achieve a desired SNR.
 
