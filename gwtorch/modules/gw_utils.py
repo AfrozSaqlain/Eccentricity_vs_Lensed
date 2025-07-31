@@ -738,7 +738,7 @@ def save_qtransform_with_checks(waveform_dict, params, path):
                                          delta_t=hp_.delta_t,
                                          epoch=hp_.start_time)
 
-            # PSD & ln B
+            # PSD & ln B
             duration = hp_.duration
             flen     = tlen // 2 + 1
             psd      = pycbc.psd.EinsteinTelescopeP1600143(
@@ -761,8 +761,17 @@ def save_qtransform_with_checks(waveform_dict, params, path):
         print(f"{category}: only {len(stacked_q)} detectors passed – skipping save.")
         return False
 
-    # normalise each slice and export as RGB
-    normed = [Normalize()(q) for q in stacked_q]
+    # Find the maximum shape across all detectors
+    max_shape = (
+        max(q.shape[0] for q in stacked_q),
+        max(q.shape[1] for q in stacked_q)
+    )
+    
+    # Pad all arrays to the same shape, then normalize
+    padded_q = [pad_to_shape(q, max_shape) for q in stacked_q]
+    normed = [Normalize()(q) for q in padded_q]
+    
+    # Now stack should work since all arrays have the same shape
     rgb_img = np.stack(normed, axis=0).transpose(2, 1, 0)
 
     plt.figure(figsize=(12, 8))
@@ -772,3 +781,9 @@ def save_qtransform_with_checks(waveform_dict, params, path):
     plt.close()
     return True
 
+def pad_to_shape(arr, target_shape):
+    pad_y = target_shape[0] - arr.shape[0]
+    pad_x = target_shape[1] - arr.shape[1]
+    pad_y1, pad_y2 = pad_y // 2, pad_y - pad_y // 2
+    pad_x1, pad_x2 = pad_x // 2, pad_x - pad_x // 2
+    return np.pad(arr, ((pad_y1, pad_y2), (pad_x1, pad_x2)), mode='constant')
