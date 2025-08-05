@@ -49,7 +49,7 @@ def parse_args():
     parser.add_argument('--lr', type=float, default=3e-5)
     parser.add_argument('--gamma', type=float, default=0.7)
     parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--model-path', type=str, default='./models/model_alpha.pth')
+    parser.add_argument('--model-path', type=str, default='model_alpha.pth', help="Model will be saved in models directory with extention as .pth")
     return parser.parse_args()
 
 class GWDataset(Dataset):
@@ -218,9 +218,9 @@ def main():
     train_loader, valid_loader, test_loader, class_weights = load_data(args.seed, args.batch_size)
     model = get_model(args.model, device)
 
-    if os.path.exists('./models/model_alpha.pth'):
+    if os.path.exists(f'./models/{args.model_path}'):
         print("Pretrained model found. Loading...")
-        model.load_state_dict(torch.load('./models/model_alpha.pth'))
+        model.load_state_dict(torch.load(f'./models/{args.model_path}'))
     else:
         print("No pretrained model found. Training from scratch...")
 
