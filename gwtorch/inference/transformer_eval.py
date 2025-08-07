@@ -1,0 +1,183 @@
+import argparse
+import os
+import random
+import glob
+from pathlib import Path
+from collections import Counter
+
+import torch
+from torchvision import transforms
+from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
+
+from PIL import Image
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+
+from linformer import Linformer
+from vit_pytorch.efficient import ViT
+from vit_pytorch.cvt import CvT
+
+from gwtorch.modules.general_utils import (
+    compute_roc_auc_with_misclassifications,
+    plot_roc_curves,
+    plot_confusion_matrix,
+    print_misclassified_files,
+    save_misclassified_files_to_txt,
+)
+
+def seed_everything(seed):
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+
+def setup_directories():
+    os.makedirs('./results/transformer_results/Plots', exist_ok=True)
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Train Transformer for GW classification")
+    parser.add_argument('--model', type=str, default='ViT', choices=['CvT', 'ViT'], help='Model to train')
+    parser.add_argument('--batch-size', type=int, default=512)
+    parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--model-path', type=str, default='model_alpha.pth', help="Model will be saved in models directory with extention as .pth")
+    return parser.parse_args()
+
+
+class GWDataset(Dataset):
+    def __init__(self, file_list, transform=None):
+        self.file_list = file_list
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.file_list)
+
+    def __getitem__(self, idx):
+        img_path = self.file_list[idx]
+        # img = Image.open(img_path)
+        # img_transformed = self.transform(img)[:3, :, :]
+        img = Image.open(img_path)#.convert("RGB")  
+        img = self.transform(img)
+
+        label_str = img_path.split("/")[-1].split("_")[0]
+        label = {'lensed': 0, 'eccentric': 1, 'unlensed': 2}[label_str]
+        file_number = img_path.split("/")[-1].split("_")[1]
+
+        return img, label, file_number, img_path
+
+def custom_collate_fn(batch):
+    images, labels, file_numbers, img_paths = zip(*batch)
+    return torch.stack(images), torch.tensor(labels), file_numbers, img_paths
+
+def load_data(seed, batch_size):
+    train_list = glob.glob('./data/train/*.png')
+    test_list = glob.glob('./data/test/*.png')
+    labels = [path.split('/')[-1].split('_')[0] for path in train_list]
+
+    train_list, valid_list = train_test_split(
+        train_list, test_size=0.2, stratify=labels, shuffle=True, random_state=seed
+    )
+
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+    ])
+
+    valid_data = GWDataset(valid_list, transform)
+    test_data  = GWDataset(test_list,  transform)
+
+    label_to_idx = {"lensed": 0, "eccentric": 1, "unlensed": 2}
+    train_labels = [path.split('/')[-1].split('_')[0] for path in train_list]
+    label_counts = Counter(train_labels)
+    class_counts = [label_counts['lensed'], label_counts['eccentric'], label_counts['unlensed']]
+    class_weights = 1. / torch.tensor(class_counts, dtype=torch.float)
+    class_weights = class_weights / class_weights.sum()
+
+    sample_weights = [class_weights[label_to_idx[label]] for label in train_labels]
+    sampler = WeightedRandomSampler(sample_weights, num_samples=len(sample_weights), replacement=True)
+
+    valid_loader = DataLoader(valid_data, batch_size=batch_size, shuffle=False,
+                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+
+    test_loader  = DataLoader(test_data,  batch_size=batch_size, shuffle=False,
+                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+
+    return valid_loader, test_loader, class_weights
+
+def get_model(name, device):
+    if name == 'CvT':
+        return CvT(num_classes=3, s1_emb_dim=64, s1_emb_kernel=7, s1_emb_stride=4, s1_proj_kernel=3,
+                   s1_kv_proj_stride=2, s1_heads=1, s1_depth=1, s1_mlp_mult=4, s2_emb_dim=192,
+                   s2_emb_kernel=3, s2_emb_stride=2, s2_proj_kernel=3, s2_kv_proj_stride=2, s2_heads=3,
+                   s2_depth=2, s2_mlp_mult=4, s3_emb_dim=384, s3_emb_kernel=3, s3_emb_stride=2,
+                   s3_proj_kernel=3, s3_kv_proj_stride=2, s3_heads=4, s3_depth=10, s3_mlp_mult=4,
+                   dropout=0.4).to(device)
+    else:
+        transformer = Linformer(dim=128, seq_len=50, depth=12, heads=8, k=64, dropout=0.4)
+        return ViT(dim=128, image_size=224, patch_size=32, num_classes=3,
+                   transformer=transformer, channels=3).to(device)
+    
+
+def evaluate_and_plot(model, valid_loader, test_loader, device):
+    class_names = ['Lensed', 'Eccentric', ' Quasi-Circular Unlensed']
+    results_dir = Path('./results/transformer_results')
+
+    val_fpr, val_tpr, val_roc_auc, val_labels, val_preds, _, val_misclassified = compute_roc_auc_with_misclassifications(model, valid_loader, device, class_names)
+    test_fpr, test_tpr, test_roc_auc, test_labels, test_preds, _, test_misclassified = compute_roc_auc_with_misclassifications(model, test_loader, device, class_names)
+
+    print_misclassified_files(val_misclassified, "Validation Set")
+    print_misclassified_files(test_misclassified, "Test Set")
+    save_misclassified_files_to_txt(val_misclassified, "Validation", results_dir / "misclassified_validation.txt")
+    save_misclassified_files_to_txt(test_misclassified, "Test", results_dir / "misclassified_test.txt")
+
+    plot_roc_curves(val_fpr, val_tpr, val_roc_auc, class_names, " (Validation Set)", results_dir)
+    plot_roc_curves(test_fpr, test_tpr, test_roc_auc, class_names, " (Test Set)", results_dir)
+    plot_confusion_matrix(val_labels, val_preds, class_names, " (Validation Set)", results_dir)
+    plot_confusion_matrix(test_labels, test_preds, class_names, " (Test Set)", results_dir)
+
+    print("Validation Classification Report:")
+    val_report = classification_report(val_labels, val_preds, target_names=class_names)
+    print(val_report)
+    val_report_path = results_dir / "val_classification_report.txt"
+    with open(val_report_path, "w") as f:
+        f.write("Validation Classification Report:\n")
+        f.write(val_report)
+
+    print("\nTest Classification Report:")
+    test_report = classification_report(test_labels, test_preds, target_names=class_names)
+    print(test_report)
+    test_report_path = results_dir / "test_classification_report.txt"
+    with open(test_report_path, "w") as f:
+        f.write("Test Classification Report:\n")
+        f.write(test_report)
+
+    return val_misclassified, test_misclassified
+
+def main():
+    args = parse_args()
+    setup_directories()
+    seed_everything(args.seed)
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    print(f"Using device: {device}")
+    valid_loader, test_loader, _ = load_data(args.seed, args.batch_size)
+    model = get_model(args.model, device)
+
+    if os.path.exists(f'./models/{args.model_path}'):
+        print("Pretrained model found. Loading...")
+        model.load_state_dict(torch.load(f'./models/{args.model_path}'))
+    else:
+        print("No pretrained model found. Training from scratch...")
+
+    val_misclassified, test_misclassified = evaluate_and_plot(model, valid_loader, test_loader, device)
+
+    print("\nTraining complete. Summary:")
+    print(f"Validation misclassifications: {len(val_misclassified)}")
+    print(f"Test misclassifications: {len(test_misclassified)}")
+
+    torch.save(model.state_dict(), args.model_path)
+    print(f"Model saved to {args.model_path}")
+
+if __name__ == "__main__":
+    main()

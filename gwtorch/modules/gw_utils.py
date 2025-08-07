@@ -20,7 +20,9 @@ from gwtorch.modules.constants import *
 
 delta_f = 1 / 32
 flen = int(4096 / (2 * delta_f)) + 1
-psd = pycbc.psd.EinsteinTelescopeP1600143(flen, delta_f, F_LOWER)
+einstein_psd = pycbc.psd.EinsteinTelescopeP1600143(flen, delta_f, F_LOWER)
+aligo_psd = pycbc.psd.aLIGOZeroDetHighPower(flen, delta_f, F_LOWER)
+cosmic_psd = pycbc.psd.CosmicExplorerP1600143(flen, delta_f, F_LOWER)
 
 # ------------------------------------------------
 
@@ -234,7 +236,7 @@ def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_dete
         traceback.print_exc()
         return None
 
-def generate_noise(time_duration=32, seed=None):
+def generate_noise(time_duration=32, PSD_TYPE='aLIGO', seed=None):
     """
     Generate a Gaussian noise realization using the O4 PSD.
 
@@ -257,7 +259,13 @@ def generate_noise(time_duration=32, seed=None):
     """
     delta_t = 1.0 / 4096
     tsamples = int(time_duration / delta_t)
-    noise = pycbc.noise.noise_from_psd(tsamples, delta_t, psd, seed=seed)
+
+    if PSD_TYPE == 'aLIGO':
+        noise = pycbc.noise.noise_from_psd(tsamples, delta_t, aligo_psd, seed=seed)
+    elif PSD_TYPE == 'ET':
+        noise = pycbc.noise.noise_from_psd(tsamples, delta_t, einstein_psd, seed=seed)
+    elif PSD_TYPE == 'CE':
+        noise = pycbc.noise.noise_from_psd(tsamples, delta_t, cosmic_psd, seed=seed)
 
     return noise
 
@@ -303,6 +311,22 @@ def compute_lensed_waveform(sp, sc, m_lens, y_lens):
     sc_lens = FrequencySeries(np.conj(Ffs) * sc_freq.numpy(), delta_f=sc_freq.delta_f).cyclic_time_shift(-(t_delay - 0.1))
 
     return sp_lens.to_timeseries(delta_t=sp_lens.delta_t), sc_lens.to_timeseries(delta_t=sc_lens.delta_t), t_delay
+
+def get_psd_type(detector=default_detector):
+    """
+    Get the type of PSD used in the module.
+
+    Returns
+    -------
+    str
+        The type of PSD used, which is 'aLIGO' by default.
+    """
+    if detector.name == 'E1' or detector.name == 'E2' or detector.name == 'E3':
+        return 'ET', einstein_psd
+    elif detector.name == 'C1':
+        return 'CE', cosmic_psd
+    elif detector.name == 'L1' or detector.name == 'H1' or detector.name == 'V1' or detector.name == 'A1':
+        return 'aLIGO', aligo_psd
 
 def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens, snr_desired, num, gw_signal_type='eccentric', peak_window=(2.0, 2.2), detector=default_detector, SEED = None):
     """
@@ -350,8 +374,9 @@ def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens
     distance : float
         The luminosity distance (in Mpc) used to scale the waveform to the target SNR.
     """
-    
-    noise = generate_noise(seed = int(SEED)) if SEED is not None else generate_noise()
+    PSD_TYPE, psd = get_psd_type(detector)
+
+    noise = generate_noise(PSD_TYPE=PSD_TYPE, seed = int(SEED)) if SEED is not None else generate_noise(PSD_TYPE=PSD_TYPE)
 
     template, delta_t, start_time = inject_signal_with_peak_in_window(
                                             signal_ts=gw_signal,
@@ -414,9 +439,11 @@ def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens
 
     return data, peak_snr, distance, template
 
-def add_noise(signal_ts, SEED = None):
+def add_noise(signal_ts, detector=default_detector, SEED = None):
 
-    noise = generate_noise(seed = int(SEED)) if SEED is not None else generate_noise()
+    PSD_TYPE = get_psd_type(detector)
+
+    noise = generate_noise(PSD_TYPE=PSD_TYPE, seed = int(SEED)) if SEED is not None else generate_noise(PSD_TYPE=PSD_TYPE)
 
     template, delta_t, start_time = inject_signal_with_peak_in_window(
                                             signal_ts=signal_ts,
@@ -757,7 +784,7 @@ def save_qtransform_with_checks(waveform_dict, params, path):
             stacked_q.append(np.abs(q.data))
 
     # need exactly 3 detectors
-    if len(stacked_q) != 3:
+    if len(stacked_q) != len(DETECTOR_LIST):
         print(f"{category}: only {len(stacked_q)} detectors passed – skipping save.")
         return False
 

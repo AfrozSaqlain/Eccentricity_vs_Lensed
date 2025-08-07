@@ -50,6 +50,7 @@ def parse_args():
     parser.add_argument('--gamma', type=float, default=0.7)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--model-path', type=str, default='model_alpha.pth', help="Model will be saved in models directory with extention as .pth")
+    parser.add_argument('--num-channels', type=int, default=3, help="Defines what is the input channels of the model. Default is 3 for signals from 3 detectors.")
     return parser.parse_args()
 
 class GWDataset(Dataset):
@@ -64,7 +65,7 @@ class GWDataset(Dataset):
         img_path = self.file_list[idx]
         # img = Image.open(img_path)
         # img_transformed = self.transform(img)[:3, :, :]
-        img = Image.open(img_path).convert("RGB")  
+        img = Image.open(img_path)#.convert("RGB")  
         img = self.transform(img)
 
         label_str = img_path.split("/")[-1].split("_")[0]
@@ -117,7 +118,7 @@ def load_data(seed, batch_size):
 
     return train_loader, valid_loader, test_loader, class_weights
 
-def get_model(name, device):
+def get_model(name, num_channels, device):
     if name == 'CvT':
         return CvT(num_classes=3, s1_emb_dim=64, s1_emb_kernel=7, s1_emb_stride=4, s1_proj_kernel=3,
                    s1_kv_proj_stride=2, s1_heads=1, s1_depth=1, s1_mlp_mult=4, s2_emb_dim=192,
@@ -128,7 +129,7 @@ def get_model(name, device):
     else:
         transformer = Linformer(dim=128, seq_len=50, depth=12, heads=8, k=64, dropout=0.4)
         return ViT(dim=128, image_size=224, patch_size=32, num_classes=3,
-                   transformer=transformer, channels=3).to(device)
+                   transformer=transformer, channels=num_channels).to(device)
 
 def train_model(model, train_loader, valid_loader, class_weights, device, epochs, lr, gamma):
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -216,7 +217,7 @@ def main():
 
     print(f"Using device: {device}")
     train_loader, valid_loader, test_loader, class_weights = load_data(args.seed, args.batch_size)
-    model = get_model(args.model, device)
+    model = get_model(args.model, args.num_channels, device)
 
     if os.path.exists(f'./models/{args.model_path}'):
         print("Pretrained model found. Loading...")
@@ -232,8 +233,8 @@ def main():
     print(f"Validation misclassifications: {len(val_misclassified)}")
     print(f"Test misclassifications: {len(test_misclassified)}")
 
-    torch.save(model.state_dict(), args.model_path)
-    print(f"Model saved to {args.model_path}")
+    torch.save(model.state_dict(), f'./models/{args.model_path}')
+    print(f"Model saved to ./models/{args.model_path}")
 
 if __name__ == "__main__":
     main()

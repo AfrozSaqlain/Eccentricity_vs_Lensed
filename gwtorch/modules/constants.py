@@ -9,7 +9,7 @@ default_detector = Detector(DETECTOR_NAME)
 REFERENCE_DISTANCE = 300
 
 
-DETECTOR_LIST = ['E1', 'E2', 'E3']
+DETECTOR_LIST = ['E1', 'E2', 'E3', 'C1']
 detector_list = []
 for i in DETECTOR_LIST:
     detector_list.append(Detector(i))
