@@ -441,7 +441,7 @@ def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens
 
 def add_noise(signal_ts, detector=default_detector, SEED = None):
 
-    PSD_TYPE = get_psd_type(detector)
+    PSD_TYPE, psd = get_psd_type(detector)
 
     noise = generate_noise(PSD_TYPE=PSD_TYPE, seed = int(SEED)) if SEED is not None else generate_noise(PSD_TYPE=PSD_TYPE)
 
@@ -768,9 +768,14 @@ def save_qtransform_with_checks(waveform_dict, params, path):
             # PSD & ln B
             duration = hp_.duration
             flen     = tlen // 2 + 1
-            psd      = pycbc.psd.EinsteinTelescopeP1600143(
-                           flen, 1/duration, F_LOWER
-                       )
+
+            if key.name == 'E1' or key.name == 'E2' or key.name == 'E3':
+                psd = pycbc.psd.EinsteinTelescopeP1600143(flen, 1/duration, F_LOWER)
+            elif key.name == 'C1':
+                psd = pycbc.psd.CosmicExplorerP1600143(flen, 1/duration, F_LOWER)
+            elif key.name == 'L1' or key.name == 'H1' or key.name == 'V1' or key.name == 'A1':
+                psd = pycbc.psd.aLIGOZeroDetHighPower(flen, 1/duration, F_LOWER)
+
             m = pycbc.filter.match(hp_, sp_, psd=psd, low_frequency_cutoff=5)[0]
             ln_B = 0.5 * (1 - m**2) * signal_snr**2
             compute_q = ln_B >= np.log(10)
