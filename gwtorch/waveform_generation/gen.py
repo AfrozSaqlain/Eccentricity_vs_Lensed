@@ -114,7 +114,7 @@ def main():
 
     samples = generate_prior(num_samples=num_samples, snr_type=snr_prior)
 
-    print(f"Generating {len(samples)} samples...")
+    print(f"Generating {len(samples)} samples in each class...")
 
     args_list = [(i, samples[i], jump, output_path) for i in range(num_samples)]
 

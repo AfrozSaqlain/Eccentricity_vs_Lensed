@@ -225,7 +225,7 @@ def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_dete
         unlens_dict = {'unlensed_signal': unlens_noisy, 'snr_u': snr_u, 'distance_u': distance_u}
 
         del hp, hc, sp, sc, sp_lensed, sc_lensed
-        del ecc, unlensed, lensed, ecc_noisy, lens_noisy, unlens_noisy
+        del ecc, unlensed, lensed, ecc_noisy, lens_noisy, unlens_noisy, ecc_padded, lens_padded, unlens_padded
         gc.collect()
 
         return ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens
@@ -364,6 +364,8 @@ def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens
         - 'lensed': Point-mass lensed waveform.
     peak_window : tuple (float, float)
         Time window (in seconds) before the end of the noise where the signal peak should be injected.
+    detector : pycbc.detector.Detector, optional
+        The detector object used to project the waveform onto the detector frame. Default is `default_detector`.
 
     Returns
     -------
@@ -750,11 +752,10 @@ def save_qtransform_with_checks(waveform_dict, params, path):
                     lambda1=0, lambda2=0,
                     spin1z=params['spin1z'], spin2z=params['spin2z'],
                     distance=distance, delta_t=DELTA_T,
-                    ecc   = 0.0,  # non‑eccentric reference
+                    ecc   = 0.0,  # quasi-circular reference
                     coa_phase=params['coa_phase'], f_lower=F_LOWER
                 )
             else:  # lensed
-                # user‑supplied helper must exist; interface unchanged
                 sp_, _, _ = compute_lensed_waveform(hp_, _, m_lens, y_lens)
 
             # standardise length / dt
@@ -776,7 +777,7 @@ def save_qtransform_with_checks(waveform_dict, params, path):
             elif key.name == 'L1' or key.name == 'H1' or key.name == 'V1' or key.name == 'A1':
                 psd = pycbc.psd.aLIGOZeroDetHighPower(flen, 1/duration, F_LOWER)
 
-            m = pycbc.filter.match(hp_, sp_, psd=psd, low_frequency_cutoff=5)[0]
+            m = pycbc.filter.match(hp_, sp_, psd=psd, low_frequency_cutoff=F_LOWER)[0]
             ln_B = 0.5 * (1 - m**2) * signal_snr**2
             compute_q = ln_B >= np.log(10)
 
@@ -787,11 +788,14 @@ def save_qtransform_with_checks(waveform_dict, params, path):
                                 frange=(F_LOWER, 512),
                                 whiten=True, qrange=(4, 64))
             stacked_q.append(np.abs(q.data))
+        else:
+            print(f"{category}: {key.name} failed ln_B test – skipping Q-transform.")
+            return False
 
-    # need exactly 3 detectors
-    if len(stacked_q) != len(DETECTOR_LIST):
-        print(f"{category}: only {len(stacked_q)} detectors passed – skipping save.")
-        return False
+    # # need exactly 3 detectors
+    # if len(stacked_q) != len(DETECTOR_LIST):
+    #     print(f"{category}: only {len(stacked_q)} detectors passed – skipping save.")
+    #     return False
 
     # Find the maximum shape across all detectors
     max_shape = (
@@ -803,14 +807,25 @@ def save_qtransform_with_checks(waveform_dict, params, path):
     padded_q = [pad_to_shape(q, max_shape) for q in stacked_q]
     normed = [Normalize()(q) for q in padded_q]
     
-    # Now stack should work since all arrays have the same shape
-    rgb_img = np.stack(normed, axis=0).transpose(2, 1, 0)
+    # # Now stack should work since all arrays have the same shape
+    # rgb_img = np.stack(normed, axis=0).transpose(2, 1, 0)
 
-    plt.figure(figsize=(12, 8))
-    plt.imshow(rgb_img, aspect='auto', origin='lower')
-    plt.axis('off')
-    plt.savefig(path, bbox_inches='tight', pad_inches=0)
-    plt.close()
+    # plt.figure(figsize=(12, 8))
+    # plt.imshow(rgb_img, aspect='auto', origin='lower')
+    # plt.axis('off')
+    # plt.savefig(path, bbox_inches='tight', pad_inches=0)
+    # plt.close()
+    # return True
+
+    stacked = np.stack(normed, axis=0)              # (C, H, W)
+    stacked_img = np.transpose(stacked, (2, 1, 0))  # (H, W, C)
+
+    # Save as .npy or .tiff
+    out_path = str(path)
+    if out_path.endswith('.png'):
+        out_path = out_path.replace('.png', '.npy')
+    np.save(out_path, np.asarray(stacked_img))
+    
     return True
 
 def pad_to_shape(arr, target_shape):

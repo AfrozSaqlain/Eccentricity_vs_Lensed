@@ -1,5 +1,6 @@
 import argparse
 import os
+import numpy as np
 import random
 import glob
 from pathlib import Path
@@ -53,6 +54,28 @@ def parse_args():
     parser.add_argument('--num-channels', type=int, default=3, help="Defines what is the input channels of the model. Default is 3 for signals from 3 detectors.")
     return parser.parse_args()
 
+# class GWDataset(Dataset):
+#     def __init__(self, file_list, transform=None):
+#         self.file_list = file_list
+#         self.transform = transform
+
+#     def __len__(self):
+#         return len(self.file_list)
+
+#     def __getitem__(self, idx):
+#         img_path = self.file_list[idx]
+#         # img = Image.open(img_path)
+#         # img_transformed = self.transform(img)[:3, :, :]
+#         img = Image.open(img_path)#.convert("RGB")  
+#         img = self.transform(img)
+
+#         label_str = img_path.split("/")[-1].split("_")[0]
+#         label = {'lensed': 0, 'eccentric': 1, 'unlensed': 2}[label_str]
+#         file_number = img_path.split("/")[-1].split("_")[1]
+
+#         return img, label, file_number, img_path
+
+
 class GWDataset(Dataset):
     def __init__(self, file_list, transform=None):
         self.file_list = file_list
@@ -62,25 +85,35 @@ class GWDataset(Dataset):
         return len(self.file_list)
 
     def __getitem__(self, idx):
-        img_path = self.file_list[idx]
-        # img = Image.open(img_path)
-        # img_transformed = self.transform(img)[:3, :, :]
-        img = Image.open(img_path)#.convert("RGB")  
-        img = self.transform(img)
+        file_path = self.file_list[idx]
 
-        label_str = img_path.split("/")[-1].split("_")[0]
+        # Load .npy file
+        arr = np.load(file_path)  # shape: (H, W, C)
+
+        # Transpose to (H, W, C) only if needed
+        if arr.ndim == 2:
+            arr = arr[:, :, np.newaxis]  # Convert to (H, W, 1)
+
+        arr = arr.astype(np.float32)
+
+        # Apply torchvision transforms
+        
+        arr = self.transform(arr)  # Will convert to tensor inside transforms if needed
+
+        # Extract label and metadata
+        label_str = file_path.split("/")[-1].split("_")[0]
         label = {'lensed': 0, 'eccentric': 1, 'unlensed': 2}[label_str]
-        file_number = img_path.split("/")[-1].split("_")[1]
+        file_number = file_path.split("/")[-1].split("_")[1].split(".")[0]
 
-        return img, label, file_number, img_path
+        return arr, label, file_number, file_path
 
 def custom_collate_fn(batch):
     images, labels, file_numbers, img_paths = zip(*batch)
     return torch.stack(images), torch.tensor(labels), file_numbers, img_paths
 
 def load_data(seed, batch_size):
-    train_list = glob.glob('./data/train/*.png')
-    test_list = glob.glob('./data/test/*.png')
+    train_list = glob.glob('./data/train/*.npy')
+    test_list = glob.glob('./data/test/*.npy')
     labels = [path.split('/')[-1].split('_')[0] for path in train_list]
 
     train_list, valid_list = train_test_split(
@@ -88,8 +121,8 @@ def load_data(seed, batch_size):
     )
 
     transform = transforms.Compose([
-        transforms.Resize((224, 224)),
         transforms.ToTensor(),
+        transforms.Resize((224, 224)),
         # transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)
     ])
 
