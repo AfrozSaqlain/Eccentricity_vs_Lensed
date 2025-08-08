@@ -291,7 +291,7 @@ def save_misclassified_files_to_dict(misclassified_info, filename):
 #     plt.legend(loc="lower right", fontsize=10)
 #     plt.grid(True, alpha=0.3)
 #     plt.tight_layout()
-#     plt.savefig(results_dir / f'ROC_Curves_{title}.png', dpi=300, bbox_inches='tight')
+#     plt.savefig(results_dir / f'ROC_Curves_{title}.pdf', dpi=300, bbox_inches='tight')
 #     plt.show()
     
 #     return plt.gcf()
@@ -339,7 +339,7 @@ def plot_roc_curves(fpr, tpr, roc_auc, class_names, title_suffix="", results_dir
     if results_dir:
         results_dir = Path(results_dir)
         os.makedirs(results_dir / 'Plots', exist_ok=True)
-        plt.savefig(results_dir / f'Plots/ROC_Curves_{title}.png', dpi=300, bbox_inches='tight')
+        plt.savefig(results_dir / f'Plots/ROC_Curves_{title}.pdf', dpi=300, bbox_inches='tight')
     plt.show()
 
 
@@ -370,7 +370,7 @@ def plot_confusion_matrix(y_true, y_pred, class_names, title_suffix="", results_
     plt.ylabel('True Label', fontsize=12)
     plt.tight_layout()
     if results_dir is not None:
-        plt.savefig(results_dir / f'Plots/Confusion_Matrix_{title}.png', dpi=300, bbox_inches='tight')
+        plt.savefig(results_dir / f'Plots/Confusion_Matrix_{title}.pdf', dpi=300, bbox_inches='tight')
     plt.show()
 
     # return plt.gcf()
@@ -411,5 +411,5 @@ def plot_training_curves(train_losses, val_losses, train_accuracies, val_accurac
     plt.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig(results_dir / 'Plots/Training_curves.png', dpi=300, bbox_inches='tight')
+    plt.savefig(results_dir / 'Plots/Training_curves.pdf', dpi=300, bbox_inches='tight')
     plt.show()

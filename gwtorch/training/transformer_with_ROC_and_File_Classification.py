@@ -111,45 +111,81 @@ def custom_collate_fn(batch):
     images, labels, file_numbers, img_paths = zip(*batch)
     return torch.stack(images), torch.tensor(labels), file_numbers, img_paths
 
-def load_data(seed, batch_size):
-    train_list = glob.glob('./data/train/*.npy')
-    test_list = glob.glob('./data/test/*.npy')
-    labels = [path.split('/')[-1].split('_')[0] for path in train_list]
+# def load_data(seed, batch_size):
+#     train_list = glob.glob('./data/train/*.npy')
+#     test_list = glob.glob('./data/test/*.npy')
+#     labels = [path.split('/')[-1].split('_')[0] for path in train_list]
 
-    train_list, valid_list = train_test_split(
-        train_list, test_size=0.2, stratify=labels, shuffle=True, random_state=seed
+#     train_list, valid_list = train_test_split(
+#         train_list, test_size=0.2, stratify=labels, shuffle=True, random_state=seed
+#     )
+
+#     transform = transforms.Compose([
+#         transforms.ToTensor(),
+#         transforms.Resize((224, 224)),
+#         # transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)
+#     ])
+
+#     train_data = GWDataset(train_list, transform)
+#     valid_data = GWDataset(valid_list, transform)
+#     test_data  = GWDataset(test_list,  transform)
+
+#     label_to_idx = {"lensed": 0, "eccentric": 1, "unlensed": 2}
+#     train_labels = [path.split('/')[-1].split('_')[0] for path in train_list]
+#     label_counts = Counter(train_labels)
+#     class_counts = [label_counts['lensed'], label_counts['eccentric'], label_counts['unlensed']]
+#     class_weights = 1. / torch.tensor(class_counts, dtype=torch.float)
+#     class_weights = class_weights / class_weights.sum()
+
+#     sample_weights = [class_weights[label_to_idx[label]] for label in train_labels]
+#     sampler = WeightedRandomSampler(sample_weights, num_samples=len(sample_weights), replacement=True)
+
+#     train_loader = DataLoader(train_data, batch_size=batch_size, sampler=sampler,
+#                               num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+
+#     valid_loader = DataLoader(valid_data, batch_size=batch_size, shuffle=False,
+#                               num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+
+#     test_loader  = DataLoader(test_data,  batch_size=batch_size, shuffle=False,
+#                               num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+
+#     return train_loader, valid_loader, test_loader, class_weights
+
+
+def load_all_data(seed=42, batch_size=32):
+    # Load all files from both train and test folders
+    all_files = glob.glob('./data/train/*.npy') + glob.glob('./data/test/*.npy')
+    all_labels = [path.split('/')[-1].split('_')[0] for path in all_files]
+
+    # Stratified split: 70% train, 15% val, 15% test
+    train_files, temp_files, train_labels, temp_labels = train_test_split(
+        all_files, all_labels, test_size=0.3, stratify=all_labels, random_state=seed
     )
 
+    val_files, test_files, val_labels, test_labels = train_test_split(
+        temp_files, temp_labels, test_size=0.5, stratify=temp_labels, random_state=seed
+    )
+
+    # Define transforms
     transform = transforms.Compose([
-        transforms.ToTensor(),
+        transforms.Lambda(lambda x: torch.tensor(x).permute(2, 0, 1)),
         transforms.Resize((224, 224)),
-        # transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)
     ])
 
-    train_data = GWDataset(train_list, transform)
-    valid_data = GWDataset(valid_list, transform)
-    test_data  = GWDataset(test_list,  transform)
+    # Create datasets
+    train_data = GWDataset(train_files, transform)
+    val_data   = GWDataset(val_files, transform)
+    test_data  = GWDataset(test_files, transform)
 
-    label_to_idx = {"lensed": 0, "eccentric": 1, "unlensed": 2}
-    train_labels = [path.split('/')[-1].split('_')[0] for path in train_list]
-    label_counts = Counter(train_labels)
-    class_counts = [label_counts['lensed'], label_counts['eccentric'], label_counts['unlensed']]
-    class_weights = 1. / torch.tensor(class_counts, dtype=torch.float)
-    class_weights = class_weights / class_weights.sum()
-
-    sample_weights = [class_weights[label_to_idx[label]] for label in train_labels]
-    sampler = WeightedRandomSampler(sample_weights, num_samples=len(sample_weights), replacement=True)
-
-    train_loader = DataLoader(train_data, batch_size=batch_size, sampler=sampler,
+    # Create loaders
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True,
+                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+    val_loader   = DataLoader(val_data, batch_size=batch_size, shuffle=False,
+                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+    test_loader  = DataLoader(test_data, batch_size=batch_size, shuffle=False,
                               num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
 
-    valid_loader = DataLoader(valid_data, batch_size=batch_size, shuffle=False,
-                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
-
-    test_loader  = DataLoader(test_data,  batch_size=batch_size, shuffle=False,
-                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
-
-    return train_loader, valid_loader, test_loader, class_weights
+    return train_loader, val_loader, test_loader
 
 def get_model(name, num_channels, device):
     if name == 'CvT':
@@ -158,17 +194,17 @@ def get_model(name, num_channels, device):
                    s2_emb_kernel=3, s2_emb_stride=2, s2_proj_kernel=3, s2_kv_proj_stride=2, s2_heads=3,
                    s2_depth=2, s2_mlp_mult=4, s3_emb_dim=384, s3_emb_kernel=3, s3_emb_stride=2,
                    s3_proj_kernel=3, s3_kv_proj_stride=2, s3_heads=4, s3_depth=10, s3_mlp_mult=4,
-                   dropout=0.4).to(device)
+                   dropout=0.2).to(device)
     else:
-        transformer = Linformer(dim=128, seq_len=50, depth=12, heads=8, k=64, dropout=0.4)
+        transformer = Linformer(dim=128, seq_len=50, depth=12, heads=8, k=64, dropout=0.2)
         return ViT(dim=128, image_size=224, patch_size=32, num_classes=3,
                    transformer=transformer, channels=num_channels).to(device)
 
-def train_model(model, train_loader, valid_loader, class_weights, device, epochs, lr, gamma):
+def train_model(model, train_loader, valid_loader, device, epochs, lr, gamma): #class_weights, device, epochs, lr, gamma):
     optimizer = optim.Adam(model.parameters(), lr=lr)
     scheduler = StepLR(optimizer, step_size=5, gamma=gamma)
-    weights = class_weights.detach().clone().to(device)
-    criterion = nn.CrossEntropyLoss(weight=weights)
+    # weights = class_weights.detach().clone().to(device)
+    criterion = nn.CrossEntropyLoss()#weight=weights)
 
     train_losses, val_losses, train_accs, val_accs = [], [], [], []
 
@@ -249,7 +285,8 @@ def main():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     print(f"Using device: {device}")
-    train_loader, valid_loader, test_loader, class_weights = load_data(args.seed, args.batch_size)
+    # train_loader, valid_loader, test_loader, class_weights = load_data(args.seed, args.batch_size)
+    train_loader, valid_loader, test_loader = load_all_data(args.seed, args.batch_size)
     model = get_model(args.model, args.num_channels, device)
 
     if os.path.exists(f'./models/{args.model_path}'):
@@ -258,7 +295,8 @@ def main():
     else:
         print("No pretrained model found. Training from scratch...")
 
-    train_losses, val_losses, train_accs, val_accs = train_model(model, train_loader, valid_loader, class_weights, device, args.epochs, args.lr, args.gamma)
+    # train_losses, val_losses, train_accs, val_accs = train_model(model, train_loader, valid_loader, class_weights, device, args.epochs, args.lr, args.gamma)
+    train_losses, val_losses, train_accs, val_accs = train_model(model, train_loader, valid_loader, device, args.epochs, args.lr, args.gamma)
     val_misclassified, test_misclassified = evaluate_and_plot(model, valid_loader, test_loader, device)
     plot_training_curves(train_losses, val_losses, train_accs, val_accs, Path('./results/transformer_results'))
 
