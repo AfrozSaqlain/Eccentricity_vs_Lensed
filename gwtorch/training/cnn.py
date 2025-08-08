@@ -11,6 +11,7 @@ from torchvision import transforms
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data import WeightedRandomSampler
 
+import random
 from PIL import Image
 import numpy as np
 from sklearn.metrics import classification_report
@@ -24,6 +25,14 @@ from gwtorch.modules.general_utils import (
     save_misclassified_files_to_dict
 )
 from gwtorch.modules.neural_net import CNN_Model
+
+def seed_everything(seed):
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
 
 # ----------------- Constants -----------------
 RANDOM_SEED = 42
@@ -44,13 +53,27 @@ class GWDataset(Dataset):
         return len(self.file_list)
 
     def __getitem__(self, idx):
-        img_path = self.file_list[idx]
-        img = Image.open(img_path).convert("RGB")  # Ensures 3 channels
-        img = self.transform(img)
-        label_str = img_path.split("/")[-1].split("_")[0]
-        label = {"lensed": 0, "eccentric": 1, "unlensed": 2}.get(label_str, 0)
-        file_number = img_path.split("/")[-1].split("_")[1]
-        return img, label, file_number, img_path
+        file_path = self.file_list[idx]
+
+        # Load .npy file
+        arr = np.load(file_path)  # shape: (H, W, C)
+
+        # Transpose to (H, W, C) only if needed
+        if arr.ndim == 2:
+            arr = arr[:, :, np.newaxis]  # Convert to (H, W, 1)
+
+        arr = arr.astype(np.float32)
+
+        # Apply torchvision transforms
+        
+        arr = self.transform(arr)  # Will convert to tensor inside transforms if needed
+
+        # Extract label and metadata
+        label_str = file_path.split("/")[-1].split("_")[0]
+        label = {'lensed': 0, 'eccentric': 1, 'unlensed': 2}[label_str]
+        file_number = file_path.split("/")[-1].split("_")[1].split(".")[0]
+
+        return arr, label, file_number, file_path
 
 # ----------------- Utility Functions -----------------
 def custom_collate_fn(batch):
@@ -63,49 +86,43 @@ def parse_args():
     parser.add_argument('--epochs', type=int, default=EPOCHS)
     parser.add_argument('--lr', type=float, default=LR)
     parser.add_argument('--gamma', type=float, default=GAMMA)
+    parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--model-path', type=str, default='./models/cnn_model0.pth')
+    parser.add_argument('--num-channels', type=int, default=3, help="Defines what is the input channels of the model. Default is 3 for signals from 3 detectors.")
     return parser.parse_args()
 
-def setup_data_loaders(train_dir, test_dir, batch_size):
-    train_list = glob.glob(os.path.join(train_dir, '*.png'))
-    test_list = glob.glob(os.path.join(test_dir, '*.png'))
+def setup_data_loaders(train_dir, test_dir, batch_size, seed=42):
+    # all_files = glob.glob(os.path.join(train_dir, '*.npy')) + glob.glob(os.path.join(test_dir, '*.npy'))
+    all_files = glob.glob('./data/train/*.npy') + glob.glob('./data/test/*.npy')
+    all_labels = [path.split('/')[-1].split('_')[0] for path in all_files]
 
-    labels = [path.split('/')[-1].split('_')[0] for path in train_list]
-    train_list, valid_list = train_test_split(train_list, test_size=0.2, stratify=labels, shuffle=True, random_state=RANDOM_SEED)
+    # Stratified split: 70% train, 15% val, 15% test
+    train_files, temp_files, train_labels, temp_labels = train_test_split(
+        all_files, all_labels, test_size=0.3, stratify=all_labels, random_state=seed
+    )
 
+    val_files, test_files, val_labels, test_labels = train_test_split(
+        temp_files, temp_labels, test_size=0.5, stratify=temp_labels, random_state=seed
+    )
+
+    # Define transforms
     transform = transforms.Compose([
+        transforms.Lambda(lambda x: torch.tensor(x).permute(2, 0, 1)),
         transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        # transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)
     ])
     
-    train_data = GWDataset(train_list, transform)
-    valid_data = GWDataset(valid_list, transform)
-    test_data = GWDataset(test_list, transform)
+    train_data = GWDataset(train_files, transform)
+    val_data   = GWDataset(val_files, transform)
+    test_data  = GWDataset(test_files, transform)
 
-    # Compute class weights for training data
-    label_to_idx = {"lensed": 0, "eccentric": 1, "unlensed": 2}
-    train_labels = [path.split('/')[-1].split('_')[0] for path in train_list]
-    label_counts = Counter(train_labels)
-    class_counts = [label_counts['lensed'], label_counts['eccentric'], label_counts['unlensed']]
-    class_weights = 1. / torch.tensor(class_counts, dtype=torch.float)
-    class_weights = class_weights / class_weights.sum()
-
-    # Assign sample weights for sampler
-    sample_weights = [class_weights[label_to_idx[label]] for label in train_labels]
-    sampler = WeightedRandomSampler(sample_weights, num_samples=len(sample_weights), replacement=True)
-
-    train_loader = DataLoader(train_data, batch_size=batch_size, sampler=sampler,
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True,
+                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+    val_loader   = DataLoader(val_data, batch_size=batch_size, shuffle=False,
+                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+    test_loader  = DataLoader(test_data, batch_size=batch_size, shuffle=False,
                               num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
 
-    # Use regular shuffling or no shuffling for val/test
-    valid_loader = DataLoader(valid_data, batch_size=batch_size, shuffle=False,
-                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
-
-    test_loader  = DataLoader(test_data,  batch_size=batch_size, shuffle=False,
-                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
-
-    return train_loader, valid_loader, test_loader, class_weights
+    return train_loader, val_loader, test_loader
 
 def train_model(model, train_loader, valid_loader, loss_fn, optimizer, scheduler, epochs):
     train_losses, val_losses = [], []
@@ -162,9 +179,11 @@ def main():
 
     print(f"Using device: {device}")
 
-    train_loader, valid_loader, test_loader, class_weights = setup_data_loaders('./data/train', './data/test', args.batch_size)
+    seed_everything(args.seed)
 
-    model = CNN_Model().to(device)
+    train_loader, valid_loader, test_loader = setup_data_loaders('./data/train', './data/test', args.batch_size)
+
+    model = CNN_Model(input_channlels=args.num_channels).to(device)
     
     if os.path.exists(args.model_path):
         model.load_state_dict(torch.load(args.model_path, map_location=device))
@@ -172,8 +191,7 @@ def main():
     else:
         print(f"No pre-trained model found. Training from scratch.")
 
-    weights = class_weights.detach().clone().to(device)
-    loss_fn = nn.CrossEntropyLoss(weight=weights)
+    loss_fn = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=args.gamma)
 
