@@ -194,9 +194,9 @@ def get_model(name, num_channels, device):
                    s2_emb_kernel=3, s2_emb_stride=2, s2_proj_kernel=3, s2_kv_proj_stride=2, s2_heads=3,
                    s2_depth=2, s2_mlp_mult=4, s3_emb_dim=384, s3_emb_kernel=3, s3_emb_stride=2,
                    s3_proj_kernel=3, s3_kv_proj_stride=2, s3_heads=4, s3_depth=10, s3_mlp_mult=4,
-                   dropout=0.2).to(device)
+                   dropout=0.4).to(device)
     else:
-        transformer = Linformer(dim=128, seq_len=50, depth=12, heads=8, k=64, dropout=0.2)
+        transformer = Linformer(dim=128, seq_len=50, depth=12, heads=8, k=64, dropout=0.4)
         return ViT(dim=128, image_size=224, patch_size=32, num_classes=3,
                    transformer=transformer, channels=num_channels).to(device)
 
