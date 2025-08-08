@@ -41,7 +41,7 @@ def seed_everything(seed):
 
 def setup_directories():
     os.makedirs('./models', exist_ok=True)
-    os.makedirs('./results/transformer_results/Plots', exist_ok=True)
+    os.makedirs('./results/Binary_transformer_results/Plots', exist_ok=True)
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train Transformer for binary GW classification (eccentric vs lensed)")
@@ -51,7 +51,8 @@ def parse_args():
     parser.add_argument('--lr', type=float, default=3e-5)
     parser.add_argument('--gamma', type=float, default=0.7)
     parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--model-path', type=str, default='./models/model_binary.pth')
+    parser.add_argument('--model-path', type=str, default='transformer_model_binary.pth')
+    parser.add_argument('--num-channels', type=int, default=3, help="Defines what is the input channels of the model. Default is 3 for signals from 3 detectors.")
     return parser.parse_args()
 
 class GWDataset(Dataset):
@@ -154,7 +155,7 @@ def custom_collate_fn(batch):
 
 def load_two_class_data(seed=42, batch_size=32):
     # Load all files from both train and test folders
-    all_files = glob.glob('./data/train/*.png') + glob.glob('./data/test/*.png')
+    all_files = glob.glob('./data/train/*.npy') + glob.glob('./data/test/*.npy')
     
     # Filter for only 'eccentric' and 'lensed'
     valid_files = [f for f in all_files if f.split('/')[-1].split('_')[0] in ['eccentric', 'lensed']]
@@ -180,7 +181,7 @@ def load_two_class_data(seed=42, batch_size=32):
     test_data  = GWDataset(test_files, transform)
 
     # DataLoaders
-    train_loader = DataLoader(train_data, batch_size=batch_size, huffle=True,
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True,
                               num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
     val_loader   = DataLoader(val_data, batch_size=batch_size, shuffle=False,
                               num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
@@ -249,9 +250,9 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, gamma):
 
     return train_losses, val_losses, train_accs, val_accs
 
-def evaluate_and_plot(model, valid_loader, test_loader, device):
+def evaluate_and_plot(model, valid_loader, test_loader, device, results_dir):
     class_names = ['Eccentric', 'Lensed']
-    results_dir = Path('./results/transformer_results')
+    
 
     val_fpr, val_tpr, val_roc_auc, val_labels, val_preds, _, val_misclassified = compute_roc_auc_with_misclassifications(model, valid_loader, device, class_names)
     test_fpr, test_tpr, test_roc_auc, test_labels, test_preds, _, test_misclassified = compute_roc_auc_with_misclassifications(model, test_loader, device, class_names)
@@ -290,21 +291,25 @@ def main():
     seed_everything(args.seed)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
+    results_dir = Path('./results/Binary_transformer_results')
+
     print(f"Using device: {device}")
     print("Training binary classifier: Eccentric vs Lensed")
     
-    train_loader, valid_loader, test_loader, class_weights = load_two_class_data(args.seed, args.batch_size)
-    model = get_model(args.model, device)
+    train_loader, valid_loader, test_loader = load_two_class_data(args.seed, args.batch_size)
+    model = get_model(args.model, args.num_channels, device)
 
-    if os.path.exists(args.model_path):
+    model_path = "./models/args.model_path"
+
+    if os.path.exists(model_path):
         print("Pretrained binary model found. Loading...")
-        model.load_state_dict(torch.load(args.model_path))
+        model.load_state_dict(torch.load(model_path))
     else:
         print("No pretrained binary model found. Training from scratch...")
 
     train_losses, val_losses, train_accs, val_accs = train_model(model, train_loader, valid_loader, device, args.epochs, args.lr, args.gamma)
-    val_misclassified, test_misclassified = evaluate_and_plot(model, valid_loader, test_loader, device)
-    plot_training_curves(train_losses, val_losses, train_accs, val_accs, Path('./results/transformer_results'))
+    val_misclassified, test_misclassified = evaluate_and_plot(model, valid_loader, test_loader, device, results_dir)
+    plot_training_curves(train_losses, val_losses, train_accs, val_accs, results_dir)
 
     print("\nBinary Training complete. Summary:")
     print(f"Validation misclassifications: {len(val_misclassified)}")

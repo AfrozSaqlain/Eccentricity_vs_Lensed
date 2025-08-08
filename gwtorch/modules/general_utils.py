@@ -449,11 +449,19 @@ def get_file_prefix(results_dir):
     Get the file prefix for saving results based on the results directory.
     """
     file = str(results_dir)
-    prefix = file.split('/')[-1].split('_')[0]
-    if prefix == 'transformer':
-        return 'ViT'
-    elif prefix == 'cnn':
-        return 'CNN'
+    prefix = file.split('/')[-1].split('_')#[0]
+    if len(prefix) == 2:
+        prefix = prefix[0]
+        if prefix == 'transformer':
+            return 'ViT'
+        elif prefix == 'cnn':
+            return 'CNN'
+    elif len(prefix) == 3:
+        prefix = f"{prefix[0]}_{prefix[1]}"
+        if prefix == 'Binary_transformer':
+            return 'Binary_ViT'
+        elif prefix == 'Binary_cnn':
+            return 'Binary_CNN'
 
 def plot_roc_curves(fpr, tpr, roc_auc, class_names, title_suffix="", results_dir=None):
 
