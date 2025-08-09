@@ -88,7 +88,7 @@ def main():
     if args.path_name:
         directory = f"./data/{args.path_name}"
         
-        ecc_pattern = os.path.join(directory, 'eccentric_*.png')
+        ecc_pattern = os.path.join(directory, 'eccentric_*')
         ecc_files = len([f for f in glob.glob(ecc_pattern) if os.path.isfile(f)])
         
         lens_pattern = os.path.expanduser(directory + '/lensed_*')
