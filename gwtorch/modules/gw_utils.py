@@ -519,7 +519,7 @@ def inject_signal_with_peak_in_window(signal_ts, noise_ts, peak_window=(2.0, 2.2
 
     return padded_signal, delta_t, signal_ts.start_time
 
-def save_qtransform(ts, path):
+def save_qtransform(ts, file_name):
     """
     Compute and save the Q-transform spectrogram of a time series.
 
@@ -532,7 +532,7 @@ def save_qtransform(ts, path):
     ----------
     ts : pycbc.types.TimeSeries
         The input time series to analyze, typically containing gravitational wave strain data.
-    path : str
+    file_name : str
         The file path where the generated Q-transform image will be saved.
 
     Returns
@@ -540,11 +540,16 @@ def save_qtransform(ts, path):
     None
         The function saves the figure to disk and does not return anything.
     """
+    if not isinstance(ts, TimeSeries):
+        ts = TimeSeries.from_pycbc(ts)
+
+    qt = ts.q_transform(logf=True, norm='median', frange=(F_LOWER, 512), whiten=True, qrange=(4, 64))
+
     plt.figure(figsize=(12, 8))
-    plt.pcolormesh(ts.q_transform(logf=True, norm='mean', frange=(5, 512), whiten=True, qrange=(4, 64)))
+    plt.pcolormesh(qt)
     plt.axis('off')
     plt.yscale('log')
-    plt.savefig(path, transparent=True, bbox_inches='tight', pad_inches=0)
+    plt.savefig(file_name, transparent=True, bbox_inches='tight', pad_inches=0)
     plt.close()
 
 
@@ -570,7 +575,7 @@ def display_qtransform(ts):
     if not isinstance(ts, TimeSeries):
         ts = TimeSeries.from_pycbc(ts)
 
-    qt = ts.q_transform(logf=True, norm='mean', frange=(10, 512), qrange=(4, 64), whiten=True)
+    qt = ts.q_transform(logf=True, norm='mean', frange=(F_LOWER, 512), qrange=(4, 64), whiten=True)
     
     plt.figure(figsize=(12, 8), frameon=False)
     plt.pcolormesh(qt)
