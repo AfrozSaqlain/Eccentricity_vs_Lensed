@@ -795,7 +795,7 @@ def save_qtransform_with_checks(waveform_dict, params, path):
             # stacked_q.append(np.abs(q.data)) # OLD ONE
             stacked_q.append(np.abs(q.data).T)
         else:
-            print(f"{category}: {key.name} failed ln_B test – skipping Q-transform.")
+            # print(f"{category}: {key.name} failed ln_B test – skipping Q-transform.")
             return False
 
     # # need exactly 3 detectors
