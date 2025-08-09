@@ -38,7 +38,7 @@ def seed_everything(seed):
 RANDOM_SEED = 42
 BATCH_SIZE = 512
 EPOCHS = 20
-LR = 3e-4
+LR = 3e-5
 GAMMA = 0.7
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 class_names = ["Lensed", "Eccentric", "Quasi-Circular Unlensed"]
