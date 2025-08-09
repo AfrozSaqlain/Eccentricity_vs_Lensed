@@ -567,13 +567,18 @@ def display_qtransform(ts):
     None
         The function displays the figure does not return anything.
     """
-    ts = TimeSeries.from_pycbc(ts)
+    if not isinstance(ts, TimeSeries):
+        ts = TimeSeries.from_pycbc(ts)
 
+    qt = ts.q_transform(logf=True, norm='mean', frange=(10, 512), qrange=(4, 64), whiten=True)
+    
     plt.figure(figsize=(12, 8), frameon=False)
-    plt.pcolormesh(ts.q_transform(logf=True, norm='mean', frange=(5, 512), whiten=True, qrange=(4, 64)))
+    plt.pcolormesh(qt)
     plt.axis('off')
     plt.yscale('log')
     plt.show()
+
+    return qt
 
 
 # def save_qtransform_with_checks(waveform_dict, params, path):
@@ -787,7 +792,8 @@ def save_qtransform_with_checks(waveform_dict, params, path):
             q  = ts.q_transform(logf=True, norm='median',
                                 frange=(F_LOWER, 512),
                                 whiten=True, qrange=(4, 64))
-            stacked_q.append(np.abs(q.data))
+            # stacked_q.append(np.abs(q.data)) # OLD ONE
+            stacked_q.append(np.abs(q.data).T)
         else:
             print(f"{category}: {key.name} failed ln_B test – skipping Q-transform.")
             return False
@@ -818,7 +824,8 @@ def save_qtransform_with_checks(waveform_dict, params, path):
     # return True
 
     stacked = np.stack(normed, axis=0)              # (C, H, W)
-    stacked_img = np.transpose(stacked, (2, 1, 0))  # (H, W, C)
+    # stacked_img = np.transpose(stacked, (2, 1, 0))  # (H, W, C) OLD ONE
+    stacked_img = np.transpose(stacked, (1, 2, 0))
 
     # Save as .npy or .tiff
     out_path = str(path)
