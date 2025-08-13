@@ -44,20 +44,18 @@ all = [
 
 [project.scripts]
 # Waveform generation tools
-generate-waveform = "gwtorch.waveform_generation.gen:main"
-generate-evaluation-waveform = "gwtorch.waveform_generation.gw_signal_gen_on_ln_B_basis:main"
-exp-data-gen = "gwtorch.waveform_generation.gen_with_additional_functionalities:main"
+generate_waveform_gwtorch = "gwtorch.waveform_generation.gen:main"
+generate_evaluation_waveform_gwtorch = "gwtorch.waveform_generation.gw_signal_gen_on_ln_B_basis:main"
+exp_data_gen_gwtorch = "gwtorch.waveform_generation.gen_with_additional_functionalities:main"
 
 # Training tools
-cnn-train = "gwtorch.training.cnn:main"
-transformer-train = "gwtorch.training.transformer:main"
-binary-transformer-train = "gwtorch.training.binary_transformer_classifier:main"
-binary-cnn-train = "gwtorch.training.binary_cnn_classifier:main"
+cnn_train_gwtorch = "gwtorch.training.cnn:main"
+transformer_train_gwtorch = "gwtorch.training.transformer:main"
+binary_transformer_train_gwtorch = "gwtorch.training.binary_transformer_classifier:main"
+binary_cnn_train_gwtorch = "gwtorch.training.binary_cnn_classifier:main"
 
 # Inference tools
-transformer-inference = "gwtorch.inference.transformer_eval:main"
-
-exp_data_gen_gwtorch = "gwtorch.waveform_generation.gen_with_additional_functionalities:main"
+transformer_inference_gwtorch = "gwtorch.inference.transformer_eval:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

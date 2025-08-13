@@ -32,6 +32,17 @@ from gwtorch.modules.general_utils import (
     plot_average_training_curves
 )
 
+# ----------------- Constants -----------------
+RANDOM_SEED = 42
+BATCH_SIZE = 512
+EPOCHS = 20
+LR = 3e-5
+GAMMA = 0.7
+K_FOLDS = 5
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+class_names = ["Lensed", "Eccentric", "Quasi-Circular Unlensed"]
+
+# ----------------- Functions -----------------
 def seed_everything(seed):
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
@@ -47,17 +58,18 @@ def setup_directories():
 def parse_args():
     parser = argparse.ArgumentParser(description="Train Transformer for GW classification")
     parser.add_argument('--model', type=str, default='ViT', choices=['CvT', 'ViT'], help='Model to train')
-    parser.add_argument('--batch-size', type=int, default=512)
-    parser.add_argument('--epochs', type=int, default=20)
-    parser.add_argument('--lr', type=float, default=3e-5)
-    parser.add_argument('--gamma', type=float, default=0.7)
-    parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--model-path', type=str, default='model_alpha.pth', help="Model will be saved in models directory with extention as .pth")
+    parser.add_argument('--batch-size', type=int, default=BATCH_SIZE)
+    parser.add_argument('--epochs', type=int, default=EPOCHS)
+    parser.add_argument('--lr', type=float, default=LR)
+    parser.add_argument('--gamma', type=float, default=GAMMA)
+    parser.add_argument('--seed', type=int, default=RANDOM_SEED)
+    parser.add_argument('--model-path', type=str, default='vit_model.pth', help="Model will be saved in models directory with extention as .pth")
     # parser.add_argument('--num-channels', type=int, default=3, help="Defines what is the input channels of the model. Default is 3 for signals from 3 detectors.")
-    parser.add_argument('--k-folds', type=int, default=5, help="Number of folds for k-fold cross validation")
+    parser.add_argument('--k-folds', type=int, default=K_FOLDS, help="Number of folds for k-fold cross validation")
     parser.add_argument('--use-kfold', action='store_true', help="Use k-fold cross validation instead of single train/val/test split")
     return parser.parse_args()
 
+# ----------------- Dataset Class -----------------
 class GWDataset(Dataset):
     def __init__(self, file_list, transform=None):
         self.file_list = file_list
@@ -85,6 +97,7 @@ class GWDataset(Dataset):
 
         return arr, label, file_number, file_path
 
+# ----------------- Utility Functions -----------------
 def custom_collate_fn(batch):
     images, labels, file_numbers, img_paths = zip(*batch)
     return torch.stack(images), torch.tensor(labels), file_numbers, img_paths
@@ -229,7 +242,7 @@ def evaluate_model(model, data_loader, device):
     return np.array(all_preds), np.array(all_labels), all_file_paths
 
 def evaluate_and_plot(model, valid_loader, test_loader, device, fold=None):
-    class_names = ['Lensed', 'Eccentric', ' Quasi-Circular Unlensed']
+    """Evaluate model on validation and test sets, plot results, and save misclassified files"""
     results_dir = Path('./results/transformer_results')
     
     if fold is not None:
@@ -338,7 +351,6 @@ def run_kfold_training(args, device):
             model, val_loader, test_loader, device, fold=fold+1
         )
 
-        class_names = ['Lensed', 'Eccentric', ' Quasi-Circular Unlensed']
         val_fpr, val_tpr, val_roc_auc_detailed, _, _, _, _ = compute_roc_auc_with_misclassifications(
             model, val_loader, device, class_names
         )
@@ -394,7 +406,6 @@ def run_kfold_training(args, device):
 
     plot_average_training_curves(fold_results, Path('./results/transformer_results'))
 
-    class_names = ['Lensed', 'Eccentric', ' Quasi-Circular Unlensed']
     plot_kfold_roc_curves(fold_results, Path('./results/transformer_results'), class_names)
     
     return fold_results
@@ -418,6 +429,7 @@ def main():
 
         print("\nRunning single train/validation/test split...")
         num_channels, train_loader, valid_loader, test_loader = load_all_data(args.seed, args.batch_size)
+        
         model = get_model(name=args.model, num_channels=num_channels, device=device)
 
         print(f"\nNumber of channels in data: {num_channels}")
