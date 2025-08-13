@@ -39,7 +39,17 @@ def generate_sample(args):
             'unlensed_saved': save_qtransform_with_checks(waveform_dict, params, output_path / f"unlensed_{num + jump['unlens_files']}.png")
         }
 
-        return {
+        snr_e_network = np.sqrt(
+            sum((waveform_dict[det]['eccentric']['snr_e'])**2 for det in detector_list)
+        )
+        snr_l_network = np.sqrt(
+            sum((waveform_dict[det]['lensed']['snr_l'])**2 for det in detector_list)
+        )
+        snr_u_network = np.sqrt(
+            sum((waveform_dict[det]['unlensed']['snr_u'])**2 for det in detector_list)
+        )
+
+        result = {
             'sample': num,
             'mass1': float(mass1), 'mass2': float(mass2),
             'chirp_mass': float(params['chirp_mass']),
@@ -56,11 +66,17 @@ def generate_sample(args):
             'Log_Mlz': float(params['Log_Mlz']),
             'yl': float(y_lens),
             # 'time_delay': float(t_delay),
-            'eccentric_snr': float(ecc_dict["snr_e"]),
-            'lensed_snr': float(lens_dict['snr_l']),
-            'unlensed_snr': float(unlens_dict['snr_u']),
+            'eccentric_snr': snr_e_network,
+            'lensed_snr': snr_l_network,
+            'unlensed_snr': snr_u_network,
             **count
         }
+
+        del ecc_dict, lens_dict, unlens_dict, waveform_dict
+        gc.collect()
+
+        return result
+    
     except Exception as e:
         print(f"[Sample {num}] Error: {e}")
         import traceback

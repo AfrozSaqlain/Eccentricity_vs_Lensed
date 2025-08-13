@@ -17,6 +17,9 @@ from sklearn.preprocessing import LabelBinarizer
 import os
 import csv
 
+import matplotlib.pyplot as plt
+from sklearn.metrics import auc
+
 # At the top of the plotting script
 from matplotlib import rc
 rc('text', usetex=True)
@@ -449,19 +452,40 @@ def get_file_prefix(results_dir):
     Get the file prefix for saving results based on the results directory.
     """
     file = str(results_dir)
-    prefix = file.split('/')[-1].split('_')#[0]
-    if len(prefix) == 2:
-        prefix = prefix[0]
-        if prefix == 'transformer':
+    prefix = file.split('/')
+    prefix1 = file.split('/')[1].split('_')
+    prefix2 = None
+
+    if 'fold' in prefix[-1]:
+        prefix2 = file.split('/')[2].split('_')
+
+    if len(prefix1) == 2:
+    
+        prefix1 = prefix1[0]
+        prefix2 = prefix2[1]
+
+        if prefix1 == 'transformer' and prefix2 is None:
             return 'ViT'
-        elif prefix == 'cnn':
+        elif prefix1 == 'cnn' and prefix2 is None:
             return 'CNN'
-    elif len(prefix) == 3:
-        prefix = f"{prefix[0]}_{prefix[1]}"
-        if prefix == 'Binary_transformer':
+        elif prefix1 == 'transformer' and prefix2 is not None:
+            return f'ViT_Fold_{prefix2}'
+        elif prefix1 == 'cnn' and prefix2 is not None:
+            return f'CNN_Fold_{prefix2}'
+
+    elif len(prefix1) == 3:
+        
+        prefix1 = f"{prefix1[0]}_{prefix1[1]}"
+        prefix2 = prefix2[1]
+
+        if prefix1 == 'Binary_transformer' and prefix2 is None:
             return 'Binary_ViT'
-        elif prefix == 'Binary_cnn':
+        elif prefix1 == 'Binary_cnn' and prefix2 is None:
             return 'Binary_CNN'
+        elif prefix1 == 'Binary_transformer' and prefix2 is not None:
+            return f'Binary_ViT_Fold_{prefix2}'
+        elif prefix1 == 'Binary_cnn' and prefix2 is not None:
+            return f'Binary_CNN_Fold_{prefix2}'
 
 def plot_roc_curves(fpr, tpr, roc_auc, class_names, title_suffix="", results_dir=None):
 
@@ -580,7 +604,7 @@ def plot_training_curves(train_losses, val_losses, train_accuracies, val_accurac
     prefix = get_file_prefix(results_dir) if results_dir else ''
 
     print("Generating training curves...")
-    fig, axs = plt.subplots(1, 3, figsize=(15, 5))
+    fig, axs = plt.subplots(1, 2, figsize=(15, 5))
 
     axs[0].plot(train_losses, label='Train Loss')
     axs[0].plot(val_losses, label='Validation Loss')
@@ -600,20 +624,199 @@ def plot_training_curves(train_losses, val_losses, train_accuracies, val_accurac
     axs[1].grid(True, alpha=0.3)
     set_tick_sizes(axs[1])
 
-    epochs_range = range(1, len(train_losses) + 1)
-    axs[2].plot(epochs_range, train_losses, 'b-', label='Train Loss')
-    axs[2].plot(epochs_range, val_losses, 'r-', label='Val Loss')
-    axs[2].fill_between(epochs_range, train_losses, alpha=0.3, color='blue')
-    axs[2].fill_between(epochs_range, val_losses, alpha=0.3, color='red')
-    axs[2].set_title('Loss Progression')
-    axs[2].set_xlabel('Epoch')
-    axs[2].set_ylabel('Loss')
-    axs[2].legend()
-    axs[2].grid(True, alpha=0.3)
-    set_tick_sizes(axs[2])
+    # epochs_range = range(1, len(train_losses) + 1)
+    # axs[2].plot(epochs_range, train_losses, 'b-', label='Train Loss')
+    # axs[2].plot(epochs_range, val_losses, 'r-', label='Val Loss')
+    # axs[2].fill_between(epochs_range, train_losses, alpha=0.3, color='blue')
+    # axs[2].fill_between(epochs_range, val_losses, alpha=0.3, color='red')
+    # axs[2].set_title('Loss Progression')
+    # axs[2].set_xlabel('Epoch')
+    # axs[2].set_ylabel('Loss')
+    # axs[2].legend()
+    # axs[2].grid(True, alpha=0.3)
+    # set_tick_sizes(axs[2])
 
     plt.tight_layout()
     results_dir = Path(results_dir)
     os.makedirs(results_dir / 'Plots', exist_ok=True)
     fig.savefig(results_dir / f'Plots/{prefix}_Training_curves.pdf', dpi=300, bbox_inches='tight')
     plt.show()
+
+def plot_kfold_roc_curves(fold_results, results_dir, class_names):
+    """Plot ROC curves for all folds with mean and std"""
+        
+    # Create figure with subplots for each class
+    fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+    axes = axes.ravel()
+    
+    colors = plt.cm.Set1(np.linspace(0, 1, len(fold_results['roc_data'])))
+    
+    for class_idx, class_name in enumerate(class_names):
+        ax = axes[class_idx]
+        
+        # Common FPR values for interpolation
+        mean_fpr = np.linspace(0, 1, 100)
+        tprs = []
+        aucs = []
+        
+        # Plot individual fold ROC curves
+        for fold_idx, (fpr_dict, tpr_dict, auc_dict) in enumerate(fold_results['roc_data']):
+            fpr = fpr_dict[class_idx]
+            tpr = tpr_dict[class_idx]
+            roc_auc = auc_dict[class_idx]
+            
+            # Interpolate TPR at common FPR values
+            interp_tpr = np.interp(mean_fpr, fpr, tpr)
+            interp_tpr[0] = 0.0
+            tprs.append(interp_tpr)
+            aucs.append(roc_auc)
+            
+            # Plot individual fold
+            ax.plot(fpr, tpr, alpha=0.3, color=colors[fold_idx], 
+                    label=f'Fold {fold_idx+1} (AUC = {roc_auc:.3f})')
+        
+        # Calculate mean and std
+        mean_tpr = np.mean(tprs, axis=0)
+        mean_tpr[-1] = 1.0
+        mean_auc = auc(mean_fpr, mean_tpr)
+        std_auc = np.std(aucs)
+        
+        # Plot mean ROC curve
+        ax.plot(mean_fpr, mean_tpr, color='b', linewidth=1.5,
+                label=f'Mean ROC (AUC = {mean_auc:.3f} ± {std_auc:.3f})')
+        
+        # Plot confidence interval
+        std_tpr = np.std(tprs, axis=0)
+        tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
+        tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
+        ax.fill_between(mean_fpr, tprs_lower, tprs_upper, color='grey', alpha=0.3,
+                        label='± 1 std. dev.')
+        
+        # Plot diagonal line
+        ax.plot([0, 1], [0, 1], 'k--', alpha=0.5)
+        
+        # Customize plot
+        ax.set_xlim([0.0, 1.0])
+        ax.set_ylim([0.0, 1.05])
+        ax.set_xlabel('False Positive Rate')
+        ax.set_ylabel('True Positive Rate')
+        ax.set_title(f'ROC Curves - {class_name}\nK-Fold Cross Validation')
+        ax.legend(loc="lower right", fontsize=8)
+        ax.grid(True, alpha=0.3)
+        
+        # Store mean AUC for summary
+        fold_results[f'mean_auc_{class_name.lower().replace(" ", "_")}'] = mean_auc
+        fold_results[f'std_auc_{class_name.lower().replace(" ", "_")}'] = std_auc
+    
+    # Overall summary plot
+    ax = axes[3]
+    ax.axis('off')
+    
+    # Create summary text
+    summary_text = "K-Fold ROC AUC Summary\n" + "="*25 + "\n\n"
+    for class_idx, class_name in enumerate(class_names):
+        class_key = class_name.lower().replace(" ", "_")
+        mean_auc = fold_results[f'mean_auc_{class_key}']
+        std_auc = fold_results[f'std_auc_{class_key}']
+        summary_text += f"{class_name}:\n"
+        summary_text += f"  Mean AUC: {mean_auc:.4f} ± {std_auc:.4f}\n"
+        summary_text += f"  Individual AUCs: {[f'{auc:.3f}' for _, _, auc_dict in fold_results['roc_data'] for auc in [auc_dict[class_idx]]]}\n\n"
+    
+    ax.text(0.1, 0.9, summary_text, transform=ax.transAxes, fontsize=10,
+            verticalalignment='top', fontfamily='monospace',
+            bbox=dict(boxstyle='round', facecolor='lightgray', alpha=0.8))
+    
+    plt.tight_layout()
+    plt.savefig(results_dir / 'kfold_roc_curves_summary.png', dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    # Also create a simplified version with just mean curves
+    fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+    
+    class_colors = ['red', 'green', 'blue']
+    for class_idx, class_name in enumerate(class_names):
+        # Recalculate mean for simplified plot
+        mean_fpr = np.linspace(0, 1, 100)
+        tprs = []
+        aucs = []
+        
+        for fpr_dict, tpr_dict, auc_dict in fold_results['roc_data']:
+            fpr = fpr_dict[class_idx]
+            tpr = tpr_dict[class_idx]
+            roc_auc = auc_dict[class_idx]
+            
+            interp_tpr = np.interp(mean_fpr, fpr, tpr)
+            interp_tpr[0] = 0.0
+            tprs.append(interp_tpr)
+            aucs.append(roc_auc)
+        
+        mean_tpr = np.mean(tprs, axis=0)
+        mean_tpr[-1] = 1.0
+        mean_auc = auc(mean_fpr, mean_tpr)
+        std_auc = np.std(aucs)
+        
+        ax.plot(mean_fpr, mean_tpr, color=class_colors[class_idx], linewidth=1,
+                label=f'{class_name} (AUC = {mean_auc:.3f} ± {std_auc:.3f})')
+    
+    ax.plot([0, 1], [0, 1], 'k--', alpha=0.5)
+    ax.set_xlim([0.0, 1.0])
+    ax.set_ylim([0.0, 1.05])
+    ax.set_xlabel('False Positive Rate')
+    ax.set_ylabel('True Positive Rate')
+    ax.set_title('Mean ROC Curves - K-Fold Cross Validation')
+    ax.legend(loc="lower right")
+    ax.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plt.savefig(results_dir / 'kfold_mean_roc_curves.png', dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    print("ROC curve plots saved successfully!")
+    
+def plot_average_training_curves(fold_results, results_dir):
+    """Plot average training curves across all folds"""
+
+    # Calculate means and stds
+    train_losses_mean = np.mean(fold_results['train_losses_all'], axis=0)
+    train_losses_std = np.std(fold_results['train_losses_all'], axis=0)
+    val_losses_mean = np.mean(fold_results['val_losses_all'], axis=0)
+    val_losses_std = np.std(fold_results['val_losses_all'], axis=0)
+    
+    train_accs_mean = np.mean(fold_results['train_accs_all'], axis=0)
+    train_accs_std = np.std(fold_results['train_accs_all'], axis=0)
+    val_accs_mean = np.mean(fold_results['val_accs_all'], axis=0)
+    val_accs_std = np.std(fold_results['val_accs_all'], axis=0)
+    
+    epochs = range(1, len(train_losses_mean) + 1)
+    
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+    
+    # Loss plot
+    ax1.plot(epochs, train_losses_mean, 'b-', label='Training Loss')
+    ax1.fill_between(epochs, train_losses_mean - train_losses_std, 
+                    train_losses_mean + train_losses_std, alpha=0.2, color='blue')
+    ax1.plot(epochs, val_losses_mean, 'r-', label='Validation Loss')
+    ax1.fill_between(epochs, val_losses_mean - val_losses_std, 
+                    val_losses_mean + val_losses_std, alpha=0.2, color='red')
+    ax1.set_title('Average Training and Validation Loss (K-Fold)')
+    ax1.set_xlabel('Epoch')
+    ax1.set_ylabel('Loss')
+    ax1.legend()
+    ax1.grid(True)
+    
+    # Accuracy plot
+    ax2.plot(epochs, train_accs_mean, 'b-', label='Training Accuracy')
+    ax2.fill_between(epochs, train_accs_mean - train_accs_std, 
+                    train_accs_mean + train_accs_std, alpha=0.2, color='blue')
+    ax2.plot(epochs, val_accs_mean, 'r-', label='Validation Accuracy')
+    ax2.fill_between(epochs, val_accs_mean - val_accs_std, 
+                    val_accs_mean + val_accs_std, alpha=0.2, color='red')
+    ax2.set_title('Average Training and Validation Accuracy (K-Fold)')
+    ax2.set_xlabel('Epoch')
+    ax2.set_ylabel('Accuracy')
+    ax2.legend()
+    ax2.grid(True)
+    
+    plt.tight_layout()
+    plt.savefig(results_dir / 'average_training_curves_kfold.png', dpi=300, bbox_inches='tight')
+    plt.close()

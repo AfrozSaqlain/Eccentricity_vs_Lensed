@@ -1,124 +1,62 @@
-from __future__ import print_function
-
-import glob
+import argparse
 import os
-import sys
-import random
-
-import matplotlib.pyplot as plt
 import numpy as np
+import random
+import glob
+from pathlib import Path
+from collections import Counter
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from linformer import Linformer
-from PIL import Image
-from sklearn.model_selection import train_test_split
+from torchvision import transforms
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader, Dataset
-from torchvision import transforms
-from sklearn.metrics import confusion_matrix, roc_curve, auc
-import seaborn as sns
-from sklearn.preprocessing import LabelBinarizer
 
+from PIL import Image
+from sklearn.model_selection import train_test_split, StratifiedKFold
+from sklearn.metrics import classification_report
+
+from linformer import Linformer
 from vit_pytorch.efficient import ViT
 from vit_pytorch.cvt import CvT
 
-model_selection = str(sys.argv[1])
-
-# sys.stdout = open("log.out", "w")
-# sys.stderr = open("error.err", "w")
-
-batch_size = 512
-epochs = 20
-lr = 3e-5
-gamma = 0.7
-seed = 42
-
-print("Code is running")
+from gwtorch.modules.general_utils import (
+    compute_roc_auc_with_misclassifications,
+    plot_roc_curves,
+    plot_confusion_matrix,
+    print_misclassified_files,
+    save_misclassified_files_to_txt,
+    plot_training_curves,
+    plot_kfold_roc_curves,
+    plot_average_training_curves
+)
 
 def seed_everything(seed):
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
-    np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
 
-seed_everything(seed)
+def setup_directories():
+    os.makedirs('./models', exist_ok=True)
+    os.makedirs('./results/transformer_results/Plots', exist_ok=True)
 
-
-# device = 'cuda' if torch.cuda.is_available() else "cpu"
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
-print(f"The device is {device}")
-
-
-train_dir = '../data/train'
-test_dir = '../data/test'
-
-
-train_list = glob.glob(os.path.join(train_dir,'*.png'))
-test_list = glob.glob(os.path.join(test_dir, '*.png'))
-
-
-
-print(f"Train Data: {len(train_list)}")
-print(f"Test Data: {len(test_list)}")
-
-
-
-
-labels = [path.split('/')[-1].split('_')[0] for path in train_list]
-
-
-
-train_list, valid_list = train_test_split(train_list, 
-                                          test_size=0.2,
-                                          stratify=labels,
-                                          shuffle=True,
-                                          random_state=seed)
-
-
-
-
-print(f"Train Data: {len(train_list)}")
-print(f"Validation Data: {len(valid_list)}")
-print(f"Test Data: {len(test_list)}")
-
-
-
-
-train_transforms = transforms.Compose(
-    [
-        transforms.Resize((224, 224)),
-        # transforms.RandomResizedCrop(224),
-        # transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-    ]
-)
-
-val_transforms = transforms.Compose(
-    [
-        transforms.Resize((224, 224)),
-        # transforms.Resize(256),
-        # transforms.CenterCrop(224),
-        transforms.ToTensor(),
-    ]
-)
-
-
-test_transforms = transforms.Compose(
-    [
-        transforms.Resize((224, 224)),
-        # transforms.Resize(256),
-        # transforms.CenterCrop(224),
-        transforms.ToTensor(),
-    ]
-)
-
-
-
+def parse_args():
+    parser = argparse.ArgumentParser(description="Train Transformer for GW classification")
+    parser.add_argument('--model', type=str, default='ViT', choices=['CvT', 'ViT'], help='Model to train')
+    parser.add_argument('--batch-size', type=int, default=512)
+    parser.add_argument('--epochs', type=int, default=20)
+    parser.add_argument('--lr', type=float, default=3e-5)
+    parser.add_argument('--gamma', type=float, default=0.7)
+    parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--model-path', type=str, default='model_alpha.pth', help="Model will be saved in models directory with extention as .pth")
+    # parser.add_argument('--num-channels', type=int, default=3, help="Defines what is the input channels of the model. Default is 3 for signals from 3 detectors.")
+    parser.add_argument('--k-folds', type=int, default=5, help="Number of folds for k-fold cross validation")
+    parser.add_argument('--use-kfold', action='store_true', help="Use k-fold cross validation instead of single train/val/test split")
+    return parser.parse_args()
 
 class GWDataset(Dataset):
     def __init__(self, file_list, transform=None):
@@ -126,251 +64,385 @@ class GWDataset(Dataset):
         self.transform = transform
 
     def __len__(self):
-        self.filelength = len(self.file_list)
-        return self.filelength
+        return len(self.file_list)
 
     def __getitem__(self, idx):
-        img_path = self.file_list[idx]
-        img = Image.open(img_path)
-        
-        # Apply transformations if provided
-        img_transformed = self.transform(img)
-        img_transformed = img_transformed[:3, :, :]  # Ensure correct format for channels
+        file_path = self.file_list[idx]
 
-        # Determine the label based on filename
-        label_str = img_path.split("/")[-1].split("_")[0]
-        if label_str == "eccentric":
-            label = 1
-        elif label_str == "unlensed":
-            label = 2
-        else:
-            label = 0 
+        arr = np.load(file_path)  # shape: (H, W, C)
 
-        return img_transformed, label
+        # Transpose to (H, W, C) only if needed
+        if arr.ndim == 2:
+            arr = arr[:, :, np.newaxis]  # Convert to (H, W, 1)
 
+        arr = arr.astype(np.float32)
 
+        arr = self.transform(arr)
 
+        label_str = file_path.split("/")[-1].split("_")[0]
+        label = {'lensed': 0, 'eccentric': 1, 'unlensed': 2}[label_str]
+        file_number = file_path.split("/")[-1].split("_")[1].split(".")[0]
 
+        return arr, label, file_number, file_path
 
-train_data = GWDataset(train_list, transform=train_transforms)
-valid_data = GWDataset(valid_list, transform=test_transforms)
-test_data = GWDataset(test_list, transform=test_transforms)
+def custom_collate_fn(batch):
+    images, labels, file_numbers, img_paths = zip(*batch)
+    return torch.stack(images), torch.tensor(labels), file_numbers, img_paths
 
+def load_all_data(seed=42, batch_size=32):
 
-
-train_loader = DataLoader(dataset = train_data, batch_size=batch_size, shuffle=True )
-valid_loader = DataLoader(dataset = valid_data, batch_size=batch_size, shuffle=True)
-test_loader = DataLoader(dataset = test_data, batch_size=batch_size, shuffle=True)
+    all_files = glob.glob('./data/train/*.npy') + glob.glob('./data/test/*.npy')
+    all_labels = [path.split('/')[-1].split('_')[0] for path in all_files]
 
 
+    train_files, temp_files, train_labels, temp_labels = train_test_split(
+        all_files, all_labels, test_size=0.3, stratify=all_labels, random_state=seed
+    )
 
+    val_files, test_files, val_labels, test_labels = train_test_split(
+        temp_files, temp_labels, test_size=0.5, stratify=temp_labels, random_state=seed
+    )
 
-print(f"Train Dataset Length: {len(train_data)}, Test Dataloader Length: {len(train_loader)}")
+    transform = transforms.Compose([
+        transforms.Lambda(lambda x: torch.tensor(x).permute(2, 0, 1)),
+        transforms.Resize((224, 224)),
+    ])
 
-print(f"Validation Dataset Length: {len(valid_data)}, Validation Dataloader Length: {len(valid_loader)}")
+    train_data = GWDataset(train_files, transform)
+    val_data   = GWDataset(val_files, transform)
+    test_data  = GWDataset(test_files, transform)
 
+    num_channels = train_data[0][0].shape[0] if isinstance(train_data[0][0], torch.Tensor) else 3
 
+    # Create loaders
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True,
+                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+    val_loader   = DataLoader(val_data, batch_size=batch_size, shuffle=False,
+                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+    test_loader  = DataLoader(test_data, batch_size=batch_size, shuffle=False,
+                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
 
-if model_selection == 'CvT':
-    model =  CvT(num_classes = 3,
-                s1_emb_dim = 64,        # stage 1 - dimension
-                s1_emb_kernel = 7,      # stage 1 - conv kernel
-                s1_emb_stride = 4,      # stage 1 - conv stride
-                s1_proj_kernel = 3,     # stage 1 - attention ds-conv kernel size
-                s1_kv_proj_stride = 2,  # stage 1 - attention key / value projection stride
-                s1_heads = 1,           # stage 1 - heads
-                s1_depth = 1,           # stage 1 - depth
-                s1_mlp_mult = 4,        # stage 1 - feedforward expansion factor
-                s2_emb_dim = 192,       # stage 2 - (same as above)
-                s2_emb_kernel = 3,
-                s2_emb_stride = 2,
-                s2_proj_kernel = 3,
-                s2_kv_proj_stride = 2,
-                s2_heads = 3,
-                s2_depth = 2,
-                s2_mlp_mult = 4,
-                s3_emb_dim = 384,       # stage 3 - (same as above)
-                s3_emb_kernel = 3,
-                s3_emb_stride = 2,
-                s3_proj_kernel = 3,
-                s3_kv_proj_stride = 2,
-                s3_heads = 4,
-                s3_depth = 10,
-                s3_mlp_mult = 4,
-                dropout = 0.3).to(device)
-else:
-    efficient_transformer = Linformer(
-        dim=128,
-        seq_len=49+1,  # 7x7 patches + 1 cls-token
-        depth=12,
-        heads=8,
-        k=64,
-        dropout=0.2,)
+    return num_channels, train_loader, val_loader, test_loader
 
-    model = ViT(
-        dim=128,
-        image_size=224,
-        patch_size=32,
-        num_classes=3,
-        transformer=efficient_transformer,
-        channels=3,
-    ).to(device)
+def prepare_kfold_data():
+    """Prepare data for k-fold cross validation"""
 
-
-################################################################################################
-
-file_path = "./model.pth"
-
-if os.path.exists(file_path):
-    print("Pre-trained model found. Training continued...")
-    model_path = 'model.pth'
-    model.load_state_dict(torch.load(model_path))
-else:
-    print("Pre-trained model not found. Training from beginning...")
-
-################################################################################################
-
-criterion = nn.CrossEntropyLoss()
-
-optimizer = optim.Adam(model.parameters(), lr=lr)
-
-scheduler = StepLR(optimizer, step_size=1, gamma=gamma)
-
-
-train_losses = []
-val_losses = []
-train_accuracies = []
-val_accuracies = []
-
-
-for epoch in range(epochs):
-    epoch_loss = 0
-    epoch_accuracy = 0
+    all_files = glob.glob('./data/train/*.npy') + glob.glob('./data/test/*.npy')
+    all_labels = [path.split('/')[-1].split('_')[0] for path in all_files]
     
-    for data, label in train_loader:
-        data = data.to(device)
-        label = label.to(device)
+    return all_files, all_labels
 
-        output = model(data)
-        loss = criterion(output, label)
+def create_fold_loaders(train_files, val_files, batch_size):
+    """Create data loaders for a specific fold"""
 
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+    transform = transforms.Compose([
+        transforms.Lambda(lambda x: torch.tensor(x).permute(2, 0, 1)),
+        transforms.Resize((224, 224)),
+    ])
 
-        acc = (output.argmax(dim=1) == label).float().mean()
-        epoch_accuracy += acc / len(train_loader)
-        epoch_loss += loss / len(train_loader)
-    
-    train_losses.append(epoch_loss.item())
-    train_accuracies.append(epoch_accuracy.item())
-    
-    with torch.no_grad():
-        epoch_val_accuracy = 0
-        epoch_val_loss = 0
-        for data, label in valid_loader:
-            data = data.to(device)
-            label = label.to(device)
+    train_data = GWDataset(train_files, transform)
+    val_data   = GWDataset(val_files, transform)
 
-            val_output = model(data)
-            val_loss = criterion(val_output, label)
+    num_channels = train_data[0][0].shape[0] if isinstance(train_data[0][0], torch.Tensor) else 3
 
-            acc = (val_output.argmax(dim=1) == label).float().mean()
-            epoch_val_accuracy += acc / len(valid_loader)
-            epoch_val_loss += val_loss / len(valid_loader)
-    
-    val_losses.append(epoch_val_loss.item())
-    val_accuracies.append(epoch_val_accuracy.item())
-    
-    print(f"Epoch : {epoch+1} - loss : {epoch_loss:.4f} - acc: {epoch_accuracy:.4f} - val_loss : {epoch_val_loss:.4f} - val_acc: {epoch_val_accuracy:.4f}\n")
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True,
+                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+    val_loader   = DataLoader(val_data, batch_size=batch_size, shuffle=False,
+                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
 
+    return num_channels, train_loader, val_loader
 
-plt.figure(figsize=(12, 5))
+def get_model(name, num_channels, device):
+    if name == 'CvT':
+        return CvT(num_classes=3, s1_emb_dim=64, s1_emb_kernel=7, s1_emb_stride=4, s1_proj_kernel=3,
+                   s1_kv_proj_stride=2, s1_heads=1, s1_depth=1, s1_mlp_mult=4, s2_emb_dim=192,
+                   s2_emb_kernel=3, s2_emb_stride=2, s2_proj_kernel=3, s2_kv_proj_stride=2, s2_heads=3,
+                   s2_depth=2, s2_mlp_mult=4, s3_emb_dim=384, s3_emb_kernel=3, s3_emb_stride=2,
+                   s3_proj_kernel=3, s3_kv_proj_stride=2, s3_heads=4, s3_depth=10, s3_mlp_mult=4,
+                   dropout=0.4).to(device)
+    else:
+        transformer = Linformer(dim=128, seq_len=50, depth=12, heads=8, k=64, dropout=0.4)
+        return ViT(dim=128, image_size=224, patch_size=32, num_classes=3,
+                   transformer=transformer, channels=num_channels).to(device)
 
+def train_model(model, train_loader, valid_loader, device, epochs, lr, gamma):
+    optimizer = optim.Adam(model.parameters(), lr=lr)
+    scheduler = StepLR(optimizer, step_size=5, gamma=gamma)
+    criterion = nn.CrossEntropyLoss()
 
-plt.subplot(1, 2, 1)
-plt.plot(range(1, epochs + 1), train_losses, label='Train Loss')
-plt.plot(range(1, epochs + 1), val_losses, label='Validation Loss')
-plt.xlabel('Epochs')
-plt.ylabel('Loss')
-plt.title('Loss Curve')
-plt.legend()
+    train_losses, val_losses, train_accs, val_accs = [], [], [], []
 
+    for epoch in range(epochs):
+        model.train()
+        running_loss, running_acc = 0, 0
+        for data, labels, *_ in train_loader:
+            data, labels = data.to(device), labels.to(device)
+            optimizer.zero_grad()
+            output = model(data)
+            loss = criterion(output, labels)
+            loss.backward()
+            optimizer.step()
+            acc = (output.argmax(1) == labels).float().mean()
+            running_loss += loss.item()
+            running_acc += acc.item()
 
-plt.subplot(1, 2, 2)
-plt.plot(range(1, epochs + 1), train_accuracies, label='Train Accuracy')
-plt.plot(range(1, epochs + 1), val_accuracies, label='Validation Accuracy')
-plt.xlabel('Epochs')
-plt.ylabel('Accuracy')
-plt.title('Accuracy Curve')
-plt.legend()
+        train_losses.append(running_loss / len(train_loader))
+        train_accs.append(running_acc / len(train_loader))
 
-plt.savefig('Loss_Curve.png')
+        model.eval()
+        val_loss, val_acc = 0, 0
+        with torch.no_grad():
+            for data, labels, *_ in valid_loader:
+                data, labels = data.to(device), labels.to(device)
+                output = model(data)
+                loss = criterion(output, labels)
+                acc = (output.argmax(1) == labels).float().mean()
+                val_loss += loss.item()
+                val_acc += acc.item()
 
+        val_losses.append(val_loss / len(valid_loader))
+        val_accs.append(val_acc / len(valid_loader))
 
-with torch.no_grad():
+        scheduler.step()
+
+        print(f"Epoch {epoch+1}: Train Loss={train_losses[-1]:.4f}, Acc={train_accs[-1]:.4f}; Val Loss={val_losses[-1]:.4f}, Acc={val_accs[-1]:.4f}")
+
+    return train_losses, val_losses, train_accs, val_accs
+
+def evaluate_model(model, data_loader, device):
+    """Evaluate model and return predictions and labels"""
     model.eval()
     all_preds = []
     all_labels = []
+    all_file_paths = []
+    
+    with torch.no_grad():
+        for data, labels, file_numbers, file_paths in data_loader:
+            data, labels = data.to(device), labels.to(device)
+            output = model(data)
+            preds = output.argmax(1)
+            
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+            all_file_paths.extend(file_paths)
+    
+    return np.array(all_preds), np.array(all_labels), all_file_paths
 
-    # Inference loop
-    for data, label in test_loader:
-        data = data.to(device)
-        label = label.to(device)
-        output = model(data)
+def evaluate_and_plot(model, valid_loader, test_loader, device, fold=None):
+    class_names = ['Lensed', 'Eccentric', ' Quasi-Circular Unlensed']
+    results_dir = Path('./results/transformer_results')
+    
+    if fold is not None:
+        fold_dir = results_dir / f'fold_{fold}'
+        fold_dir.mkdir(exist_ok=True)
+        results_dir = fold_dir
+
+    val_fpr, val_tpr, val_roc_auc, val_labels, val_preds, _, val_misclassified = compute_roc_auc_with_misclassifications(model, valid_loader, device, class_names)
+    test_fpr, test_tpr, test_roc_auc, test_labels, test_preds, _, test_misclassified = compute_roc_auc_with_misclassifications(model, test_loader, device, class_names)
+
+    if fold is not None:
+        print(f"\n=== FOLD {fold} RESULTS ===")
+    
+    print_misclassified_files(val_misclassified, "Validation Set")
+    print_misclassified_files(test_misclassified, "Test Set")
+    save_misclassified_files_to_txt(val_misclassified, "Validation", results_dir / "misclassified_validation.txt")
+    save_misclassified_files_to_txt(test_misclassified, "Test", results_dir / "misclassified_test.txt")
+
+    suffix = f" Fold {fold}" if fold is not None else ""
+    plot_roc_curves(val_fpr, val_tpr, val_roc_auc, class_names, f" (Validation Set{suffix})", results_dir)
+    plot_roc_curves(test_fpr, test_tpr, test_roc_auc, class_names, f" (Test Set{suffix})", results_dir)
+    plot_confusion_matrix(val_labels, val_preds, class_names, f" (Validation Set{suffix})", results_dir)
+    plot_confusion_matrix(test_labels, test_preds, class_names, f" (Test Set{suffix})", results_dir)
+
+    print("Validation Classification Report:")
+    val_report = classification_report(val_labels, val_preds, target_names=class_names)
+    print(val_report)
+    val_report_path = results_dir / "val_classification_report.txt"
+    with open(val_report_path, "w") as f:
+        f.write("Validation Classification Report:\n")
+        f.write(val_report)
+
+    print("\nTest Classification Report:")
+    test_report = classification_report(test_labels, test_preds, target_names=class_names)
+    print(test_report)
+    test_report_path = results_dir / "test_classification_report.txt"
+    with open(test_report_path, "w") as f:
+        f.write("Test Classification Report:\n")
+        f.write(test_report)
+
+    return val_misclassified, test_misclassified, val_roc_auc, test_roc_auc
+
+def run_kfold_training(args, device):
+    """Run k-fold cross validation training"""
+    print(f"\n{'='*50}")
+    print(f"Starting {args.k_folds}-Fold Cross Validation")
+    print(f"{'='*50}")
+    
+    all_files, all_labels = prepare_kfold_data()
+    
+    skf = StratifiedKFold(n_splits=args.k_folds, shuffle=True, random_state=args.seed)
+
+    fold_results = {
+        'val_accuracies': [],
+        'test_accuracies': [],  # We'll use validation as test for k-fold
+        'val_roc_aucs': [],
+        'train_losses_all': [],
+        'val_losses_all': [],
+        'train_accs_all': [],
+        'val_accs_all': [],
+        'roc_data': []  # Store FPR, TPR, AUC for each fold
+    }
+    
+    train_val_files, test_files, train_val_labels, test_labels = train_test_split(
+        all_files, all_labels, test_size=0.2, stratify=all_labels, random_state=args.seed
+    )
+    
+    transform = transforms.Compose([
+        transforms.Lambda(lambda x: torch.tensor(x).permute(2, 0, 1)),
+        transforms.Resize((224, 224)),
+    ])
+    test_data = GWDataset(test_files, transform)
+    test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False,
+                           num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+    
+    for fold, (train_idx, val_idx) in enumerate(skf.split(train_val_files, train_val_labels)):
         
-        preds = torch.argmax(output, dim=1).cpu().numpy()
-        labels = label.cpu().numpy()
+        train_files_fold = [train_val_files[i] for i in train_idx]
+        val_files_fold = [train_val_files[i] for i in val_idx]
 
-        # Map numeric labels to class names
-        class_mapping = {0: 'Lensed', 1: 'Eccentric', 2: 'Unlensed'}
-        preds = [class_mapping[p] for p in preds]
-        labels = [class_mapping[l] for l in labels]
+        num_channels, train_loader, val_loader = create_fold_loaders(train_files_fold, val_files_fold, args.batch_size)
 
-        all_preds.extend(preds)
-        all_labels.extend(labels)
+        if fold == 0:
+            print(f"\nNumber of channels in data: {num_channels}")
+        
+        print(f"\n{'='*30}")
+        print(f"FOLD {fold + 1}/{args.k_folds}")
+        print(f"{'='*30}")
 
-    # Compute the confusion matrix
-    cm_labels = ['Lensed', 'Eccentric', 'Unlensed']
-    cm = confusion_matrix(all_labels, all_preds, labels=cm_labels)
-    cm_sum = cm.sum(axis=1)[:, np.newaxis]
-    cm_percentage = np.divide(cm.astype('float'), cm_sum, out=np.zeros_like(cm, dtype=float), where=cm_sum != 0) * 100
 
-    # Annotate the confusion matrix with counts and percentages
-    annotations = np.array([[f"{count}\n({percent:.2f}%)" for count, percent in zip(row, row_perc)] 
-                             for row, row_perc in zip(cm, cm_percentage)])
+        model = get_model(name=args.model, num_channels=num_channels, device=device)
+        
+        print(f"Training fold {fold + 1}...")
+        print(f"Train samples: {len(train_files_fold)}, Val samples: {len(val_files_fold)}")
 
-    # Plot the confusion matrix
-    plt.figure(figsize=(8, 6))
-    sns.heatmap(cm, annot=annotations, fmt='', cmap='Blues', xticklabels=cm_labels, yticklabels=cm_labels)
-    plt.xlabel('Predicted Labels')
-    plt.ylabel('True Labels')
-    plt.title('Confusion Matrix: Lensed, Eccentric, Unlensed')
-    plt.savefig("Confusion_matrix.png")
+        train_losses, val_losses, train_accs, val_accs = train_model(
+            model, train_loader, val_loader, device, args.epochs, args.lr, args.gamma
+        )
 
-    # # Compute ROC and AUC for each class (One-vs-Rest approach)
-    # all_labels_numeric = np.array([list(class_mapping.keys())[list(class_mapping.values()).index(label)] for label in all_labels])
-    # all_preds_numeric = np.array([list(class_mapping.keys())[list(class_mapping.values()).index(pred)] for pred in all_preds])
+        fold_results['train_losses_all'].append(train_losses)
+        fold_results['val_losses_all'].append(val_losses)
+        fold_results['train_accs_all'].append(train_accs)
+        fold_results['val_accs_all'].append(val_accs)
 
-    # # Convert multi-class labels to One-vs-Rest format for ROC
-    # binarizer = LabelBinarizer()
-    # all_labels_binarized = binarizer.fit_transform(all_labels_numeric)
-    # all_preds_binarized = binarizer.transform(all_preds_numeric)
+        val_misclassified, test_misclassified, val_roc_auc, test_roc_auc = evaluate_and_plot(
+            model, val_loader, test_loader, device, fold=fold+1
+        )
 
-    # plt.figure(figsize=(8, 6))
-    # for i, class_name in enumerate(cm_labels):
-    #     fpr, tpr, _ = roc_curve(all_labels_binarized[:, i], all_preds_binarized[:, i])
-    #     roc_auc = auc(fpr, tpr)
-    #     plt.plot(fpr, tpr, label=f'{class_name} (AUC = {roc_auc:.2f})')
+        class_names = ['Lensed', 'Eccentric', ' Quasi-Circular Unlensed']
+        val_fpr, val_tpr, val_roc_auc_detailed, _, _, _, _ = compute_roc_auc_with_misclassifications(
+            model, val_loader, device, class_names
+        )
 
-    # plt.plot([0, 1], [0, 1], color='red', linestyle='--', label='Random Guess')
-    # plt.xlabel('False Positive Rate')
-    # plt.ylabel('True Positive Rate')
-    # plt.title('Receiver Operating Characteristic (ROC) Curve (Multiclass)')
-    # plt.legend(loc='lower right')
-    # plt.savefig("ROC_AUC_curve.png")
+        fold_results['roc_data'].append((val_fpr, val_tpr, val_roc_auc_detailed))
 
-torch.save(model.state_dict(), f"model.pth")
+        fold_results['val_accuracies'].append(val_accs[-1])
+        fold_results['test_accuracies'].append(test_roc_auc) 
+        fold_results['val_roc_aucs'].append(val_roc_auc)
 
-# sys.stdout.close()
-# sys.stderr.close()
+        fold_dir = Path('./results/transformer_results') / f'fold_{fold+1}'
+        plot_training_curves(train_losses, val_losses, train_accs, val_accs, fold_dir)
+
+        model_path = f'./models/{args.model_path.split(".")[0]}_fold_{fold+1}.pth'
+        torch.save(model.state_dict(), model_path)
+        print(f"Model for fold {fold+1} saved to {model_path}")
+        
+        print(f"Fold {fold+1} - Final Val Accuracy: {val_accs[-1]:.4f}")
+        print(f"Fold {fold+1} - Val misclassifications: {len(val_misclassified)}")
+        print(f"Fold {fold+1} - Test misclassifications: {len(test_misclassified)}")
+
+    print(f"\n{'='*50}")
+    print("K-FOLD CROSS VALIDATION SUMMARY")
+    print(f"{'='*50}")
+    
+    val_acc_mean = np.mean(fold_results['val_accuracies'])
+    val_acc_std = np.std(fold_results['val_accuracies'])
+    
+    print(f"Validation Accuracy: {val_acc_mean:.4f} ± {val_acc_std:.4f}")
+    print(f"Individual fold accuracies: {[f'{acc:.4f}' for acc in fold_results['val_accuracies']]}")
+
+    summary_path = Path('./results/transformer_results/kfold_summary.txt')
+    with open(summary_path, 'w') as f:
+        f.write(f"K-Fold Cross Validation Summary ({args.k_folds} folds)\n")
+        f.write(f"{'='*50}\n")
+        f.write(f"Model: {args.model}\n")
+        f.write(f"Epochs: {args.epochs}\n")
+        f.write(f"Learning Rate: {args.lr}\n")
+        f.write(f"Batch Size: {args.batch_size}\n")
+        f.write(f"Seed: {args.seed}\n\n")
+        f.write(f"Validation Accuracy: {val_acc_mean:.4f} ± {val_acc_std:.4f}\n")
+        f.write(f"Individual fold accuracies: {fold_results['val_accuracies']}\n\n")
+
+        if hasattr(fold_results, 'mean_auc_lensed'):
+            f.write("ROC AUC Summary:\n")
+            f.write("-" * 20 + "\n")
+            for class_name in ['Lensed', 'Eccentric', ' Quasi-Circular Unlensed']:
+                class_key = class_name.lower().replace(" ", "_").replace("-", "_")
+                if f'mean_auc_{class_key}' in fold_results:
+                    mean_auc = fold_results[f'mean_auc_{class_key}']
+                    std_auc = fold_results[f'std_auc_{class_key}']
+                    f.write(f"{class_name}: {mean_auc:.4f} ± {std_auc:.4f}\n")
+
+    plot_average_training_curves(fold_results, Path('./results/transformer_results'))
+
+    class_names = ['Lensed', 'Eccentric', ' Quasi-Circular Unlensed']
+    plot_kfold_roc_curves(fold_results, Path('./results/transformer_results'), class_names)
+    
+    return fold_results
+
+
+
+def main():
+    args = parse_args()
+    setup_directories()
+    seed_everything(args.seed)
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    print(f"Using device: {device}")
+    
+    if args.use_kfold:
+
+        fold_results = run_kfold_training(args, device)
+        print(f"\nK-fold cross validation completed!")
+        
+    else:
+
+        print("\nRunning single train/validation/test split...")
+        num_channels, train_loader, valid_loader, test_loader = load_all_data(args.seed, args.batch_size)
+        model = get_model(name=args.model, num_channels=num_channels, device=device)
+
+        print(f"\nNumber of channels in data: {num_channels}")
+
+        if os.path.exists(f'./models/{args.model_path}'):
+            print("Pretrained model found. Loading...\n")
+            model.load_state_dict(torch.load(f'./models/{args.model_path}'))
+        else:
+            print("No pretrained model found. Training from scratch...\n")
+
+        train_losses, val_losses, train_accs, val_accs = train_model(
+            model, train_loader, valid_loader, device, args.epochs, args.lr, args.gamma
+        )
+        val_misclassified, test_misclassified, _, _ = evaluate_and_plot(
+            model, valid_loader, test_loader, device
+        )
+        plot_training_curves(train_losses, val_losses, train_accs, val_accs, 
+                           Path('./results/transformer_results'))
+
+        print("\nTraining complete. Summary:")
+        print(f"Validation misclassifications: {len(val_misclassified)}")
+        print(f"Test misclassifications: {len(test_misclassified)}")
+
+        torch.save(model.state_dict(), f'./models/{args.model_path}')
+        print(f"Model saved to ./models/{args.model_path}")
+
+if __name__ == "__main__":
+    main()
