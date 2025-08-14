@@ -225,7 +225,7 @@ def evaluate_model(model, data_loader, device):
 
 def evaluate_and_plot(model, valid_loader, test_loader, device, fold=None):
     """Evaluate model on validation and test sets, plot results, and save misclassified files"""
-    results_dir = Path('./results/transformer_results')
+    results_dir = Path('./results/cnn_results')
     
     if fold is not None:
         fold_dir = results_dir / f'fold_{fold}'
@@ -343,7 +343,7 @@ def run_kfold_training(args, device):
         fold_results['test_accuracies'].append(test_roc_auc) 
         fold_results['val_roc_aucs'].append(val_roc_auc)
 
-        fold_dir = Path('./results/transformer_results') / f'fold_{fold+1}'
+        fold_dir = Path('./results/cnn_results') / f'fold_{fold+1}'
         plot_training_curves(train_losses, val_losses, train_accs, val_accs, fold_dir)
 
         model_path = f'./models/{args.model_path}_fold_{fold+1}.pth'
@@ -364,7 +364,7 @@ def run_kfold_training(args, device):
     print(f"Validation Accuracy: {val_acc_mean:.4f} ± {val_acc_std:.4f}")
     print(f"Individual fold accuracies: {[f'{acc:.4f}' for acc in fold_results['val_accuracies']]}")
 
-    summary_path = Path('./results/transformer_results/kfold_summary.txt')
+    summary_path = Path('./results/cnn_results/kfold_summary.txt')
     with open(summary_path, 'w') as f:
         f.write(f"K-Fold Cross Validation Summary ({args.k_folds} folds)\n")
         f.write(f"{'='*50}\n")
@@ -386,9 +386,9 @@ def run_kfold_training(args, device):
                     std_auc = fold_results[f'std_auc_{class_key}']
                     f.write(f"{class_name}: {mean_auc:.4f} ± {std_auc:.4f}\n")
 
-    plot_average_training_curves(fold_results, Path('./results/transformer_results'))
+    plot_average_training_curves(fold_results, Path('./results/cnn_results'))
 
-    plot_kfold_roc_curves(fold_results, Path('./results/transformer_results'), class_names)
+    plot_kfold_roc_curves(fold_results, Path('./results/cnn_results'), class_names)
     
     return fold_results
 
@@ -426,7 +426,7 @@ def main():
             model, valid_loader, test_loader, device
         )
         plot_training_curves(train_losses, val_losses, train_accs, val_accs, 
-                           Path('./results/transformer_results'))
+                           Path('./results/cnn_results'))
 
         print("\nTraining complete. Summary:")
         print(f"Validation misclassifications: {len(val_misclassified)}")
