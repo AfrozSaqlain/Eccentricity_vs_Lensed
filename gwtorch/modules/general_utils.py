@@ -727,7 +727,7 @@ def plot_kfold_roc_curves(fold_results, results_dir, class_names):
             bbox=dict(boxstyle='round', facecolor='lightgray', alpha=0.8))
     
     plt.tight_layout()
-    plt.savefig(results_dir / 'kfold_roc_curves_summary.png', dpi=300, bbox_inches='tight')
+    plt.savefig(results_dir / 'kfold_roc_curves_summary.pdf', dpi=300, bbox_inches='tight')
     plt.close()
     
     # Also create a simplified version with just mean curves
@@ -768,7 +768,7 @@ def plot_kfold_roc_curves(fold_results, results_dir, class_names):
     ax.grid(True, alpha=0.3)
     
     plt.tight_layout()
-    plt.savefig(results_dir / 'kfold_mean_roc_curves.png', dpi=300, bbox_inches='tight')
+    plt.savefig(results_dir / 'kfold_mean_roc_curves.pdf', dpi=300, bbox_inches='tight')
     plt.close()
     
     print("ROC curve plots saved successfully!")
@@ -818,5 +818,5 @@ def plot_average_training_curves(fold_results, results_dir):
     ax2.grid(True)
     
     plt.tight_layout()
-    plt.savefig(results_dir / 'average_training_curves_kfold.png', dpi=300, bbox_inches='tight')
+    plt.savefig(results_dir / 'average_training_curves_kfold.pdf', dpi=300, bbox_inches='tight')
     plt.close()

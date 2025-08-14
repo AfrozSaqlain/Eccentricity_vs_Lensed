@@ -379,7 +379,7 @@ def run_kfold_training(args, device):
         if hasattr(fold_results, 'mean_auc_lensed'):
             f.write("ROC AUC Summary:\n")
             f.write("-" * 20 + "\n")
-            for class_name in ['Lensed', 'Eccentric', ' Quasi-Circular Unlensed']:
+            for class_name in ['Lensed', 'Eccentric', 'Quasi-Circular Unlensed']:
                 class_key = class_name.lower().replace(" ", "_").replace("-", "_")
                 if f'mean_auc_{class_key}' in fold_results:
                     mean_auc = fold_results[f'mean_auc_{class_key}']
