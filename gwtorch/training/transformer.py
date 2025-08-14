@@ -1,10 +1,7 @@
-import argparse
 import os
-import numpy as np
-import random
 import glob
+import argparse
 from pathlib import Path
-from collections import Counter
 
 import torch
 import torch.nn as nn
@@ -13,9 +10,10 @@ from torchvision import transforms
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader, Dataset
 
-from PIL import Image
-from sklearn.model_selection import train_test_split, StratifiedKFold
+import random
+import numpy as np
 from sklearn.metrics import classification_report
+from sklearn.model_selection import train_test_split, StratifiedKFold
 
 from linformer import Linformer
 from vit_pytorch.efficient import ViT
