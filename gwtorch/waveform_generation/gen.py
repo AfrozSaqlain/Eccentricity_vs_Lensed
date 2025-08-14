@@ -135,7 +135,7 @@ def main():
     args_list = [(i, samples[i], jump, output_path) for i in range(num_samples)]
 
     with Pool(args.num_workers) as pool:
-        results = list(tqdm(pool.imap(generate_sample, args_list), total=num_samples))
+        results = list(tqdm(pool.imap_unordered(generate_sample, args_list), total=num_samples))
 
     valid_results = [res for res in results if res is not None]
 
