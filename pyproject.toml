@@ -20,8 +20,6 @@ dependencies = [
 
 [project.optional-dependencies]
 ml = [
-    "torch==2.7.0+cu128",
-    "torchvision==0.22.0+cu128",
     "vit-pytorch==1.10.1",
     "scikit-learn==1.6.1"
 ]
@@ -33,8 +31,6 @@ gw = [
 ]
 
 all = [
-    "torch==2.7.0+cu128",
-    "torchvision==0.22.0+cu128",
     "vit-pytorch==1.10.1",
     "scikit-learn==1.6.1",
     "PyCBC==2.9.0",

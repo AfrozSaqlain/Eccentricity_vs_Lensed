@@ -1,0 +1,22 @@
+name: gwtorch-env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - gcc_linux-64
+  - gxx_linux-64
+  - gmpy2
+  - mpmath
+  - pip:
+      # PyTorch with CUDA 12.8 wheels
+      - torch==2.7.0+cu128
+      - torchvision==0.22.0+cu128
+      - --index-url https://download.pytorch.org/whl/cu128
+
+      # gwmat from GitLab (pinned commit recommended)
+      - git+https://git.ligo.org/anuj.mishra/gwmat.git@main
+
+      # Your package with all extras
+      - -e .[all]
