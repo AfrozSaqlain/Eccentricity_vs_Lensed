@@ -9,6 +9,7 @@ dependencies:
   - gxx_linux-64
   - gmpy2
   - mpmath
+  - Cython
   - pip:
       # PyTorch with CUDA 12.8 wheels
       - torch==2.7.0+cu128
