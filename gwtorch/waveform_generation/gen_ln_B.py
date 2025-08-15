@@ -254,64 +254,14 @@ def save_qtransform_with_checks(waveform_dict, params, path):
 
         # --- Bayes factor / match test where applicable ------------------------
         compute_q = True  # default for unlensed case
-        if category in ("eccentric", "lensed"):
-            # reference (un‑lensed, zero‑ecc) waveform
-            hp_, hc_ = get_td_waveform(
-                approximant='teobresums',
-                mass1=mass1, mass2=mass2,
-                lambda1=0, lambda2=0,
-                spin1z=params['spin1z'], spin2z=params['spin2z'],
-                distance=distance, delta_t=DELTA_T,
-                ecc = 0 if category=="lensed" else params['eccentricity'],
-                coa_phase=params['coa_phase'], f_lower=F_LOWER
-            )
-
-            # comparison waveform
-            if category == "eccentric":
-                sp_, sc_ = get_td_waveform(
-                    approximant='teobresums',
-                    mass1=mass1, mass2=mass2,
-                    lambda1=0, lambda2=0,
-                    spin1z=params['spin1z'], spin2z=params['spin2z'],
-                    distance=distance, delta_t=DELTA_T,
-                    ecc   = 0.0,  # quasi-circular reference
-                    coa_phase=params['coa_phase'], f_lower=F_LOWER
-                )
-            else:  # lensed
-                sp_, sc_, _ = compute_lensed_waveform(hp_, hc_, m_lens, y_lens)
-
-            # standardise length / dt
-            tlen = max(len(hp_), len(sp_))
-            hp_.resize(tlen)
-            sp_.resize(tlen)
-            sp_ = pycbc.types.TimeSeries(sp_.data,
-                                         delta_t=hp_.delta_t,
-                                         epoch=hp_.start_time)
-
-            # # PSD & ln B
-            # duration = hp_.duration
-            # flen     = tlen // 2 + 1
-
-            # if key.name == 'E1' or key.name == 'E2' or key.name == 'E3':
-            #     psd = pycbc.psd.EinsteinTelescopeP1600143(flen, 1/duration, F_LOWER)
-            # elif key.name == 'C1':
-            #     psd = pycbc.psd.CosmicExplorerP1600143(flen, 1/duration, F_LOWER)
-            # elif key.name == 'L1' or key.name == 'H1' or key.name == 'V1' or key.name == 'A1':
-            #     psd = pycbc.psd.aLIGOZeroDetHighPower(flen, 1/duration, F_LOWER)
-
-            # m = pycbc.filter.match(hp_, sp_, psd=psd, low_frequency_cutoff=F_LOWER)[0]
-            # ln_B = 0.5 * (1 - m**2) * signal_snr**2
-            # compute_q = ln_B >= np.log(10)
 
         # --- Q‑transform & stack ------------------------------------------------
-        if compute_q:
-            ts = TimeSeries.from_pycbc(ts_raw)
-            q  = ts.q_transform(logf=True, norm='median',
-                                frange=(F_LOWER, 512),
-                                whiten=True, qrange=(4, 64))
-            stacked_q.append(np.abs(q.data).T)
-        else:
-            return False
+
+        ts = TimeSeries.from_pycbc(ts_raw)
+        q  = ts.q_transform(logf=True, norm='median',
+                            frange=(F_LOWER, 512),
+                            whiten=True, qrange=(4, 64))
+        stacked_q.append(np.abs(q.data).T)
 
     max_shape = (
         max(q.shape[0] for q in stacked_q),
