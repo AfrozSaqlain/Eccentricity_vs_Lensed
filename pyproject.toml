@@ -41,7 +41,7 @@ all = [
 [project.scripts]
 # Waveform generation tools
 generate_waveform_gwtorch = "gwtorch.waveform_generation.gen:main"
-generate_evaluation_waveform_gwtorch = "gwtorch.waveform_generation.gw_signal_gen_on_ln_B_basis:main"
+filtered_waveform_gen_gwtorch = "gwtorch.waveform_generation.gen_ln_B:main"
 exp_data_gen_gwtorch = "gwtorch.waveform_generation.gen_with_additional_functionalities:main"
 
 # Training tools
