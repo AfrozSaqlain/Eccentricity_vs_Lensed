@@ -252,9 +252,6 @@ def save_qtransform_with_checks(waveform_dict, params, path):
             signal_snr = wf['lensed']['snr_l']
             ts_raw     = wf['lensed']['lensed_signal']
 
-        # --- Bayes factor / match test where applicable ------------------------
-        compute_q = True  # default for unlensed case
-
         # --- Q‑transform & stack ------------------------------------------------
 
         ts = TimeSeries.from_pycbc(ts_raw)
