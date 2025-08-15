@@ -462,7 +462,8 @@ def get_file_prefix(results_dir):
     if len(prefix1) == 2:
     
         prefix1 = prefix1[0]
-        prefix2 = prefix2[1]
+        if prefix2 is not None:
+            prefix2 = prefix2[1]
 
         if prefix1 == 'transformer' and prefix2 is None:
             return 'ViT'
@@ -476,7 +477,8 @@ def get_file_prefix(results_dir):
     elif len(prefix1) == 3:
         
         prefix1 = f"{prefix1[0]}_{prefix1[1]}"
-        prefix2 = prefix2[1]
+        if prefix2 is not None:
+            prefix2 = prefix2[1] 
 
         if prefix1 == 'Binary_transformer' and prefix2 is None:
             return 'Binary_ViT'
