@@ -71,6 +71,8 @@ def generate_prior(num_samples, snr_type = "powerlaw"):
     for key in ['a_1', 'a_2', 'tilt_1', 'tilt_2', 'theta_jn', 'phi_12', 'phi_jl', 'luminosity_distance', 'psi', 'phase']:
         priors.pop(key, None)
 
+    priors['mass_1'].minimum = 10
+    priors['mass_2'].minimum = 10
     priors['chirp_mass'] = bilby.gw.prior.UniformInComponentsChirpMass(name='chirp_mass', minimum=10, maximum=100)
     priors['mass_ratio'] = bilby.gw.prior.UniformInComponentsMassRatio(name='mass_ratio', minimum=0.1, maximum=1)
     priors['spin1z'] = bilby.core.prior.Uniform(name='spin1z', minimum=-0.9, maximum=0.9)
@@ -78,7 +80,7 @@ def generate_prior(num_samples, snr_type = "powerlaw"):
     priors['eccentricity'] = bilby.core.prior.Uniform(name='eccentricity', minimum=0.1, maximum=0.6)
     priors['coa_phase'] = bilby.core.prior.Uniform(name='coa_phase', minimum=0.0, maximum=2 * np.pi)
     priors['polarization'] = bilby.core.prior.Uniform(minimum=0., maximum=np.pi, boundary="periodic")
-    priors['Log_Mlz'] = bilby.core.prior.Uniform(minimum=2, maximum=5)
+    priors['Log_Mlz'] = bilby.core.prior.Uniform(minimum=1, maximum=5)
     priors['yl'] = bilby.core.prior.PowerLaw(alpha=1, minimum=0.01, maximum=1.0)
     if snr_type == "powerlaw":
         priors['snr'] = bilby.core.prior.PowerLaw(minimum=10, maximum=500, alpha=-4)
@@ -832,7 +834,6 @@ def save_qtransform_with_checks(waveform_dict, params, path):
     # stacked_img = np.transpose(stacked, (2, 1, 0))  # (H, W, C) OLD ONE
     stacked_img = np.transpose(stacked, (1, 2, 0))
 
-    # Save as .npy or .tiff
     out_path = str(path)
     if out_path.endswith('.png'):
         out_path = out_path.replace('.png', '.npy')

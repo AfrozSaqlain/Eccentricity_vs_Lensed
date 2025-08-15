@@ -102,7 +102,7 @@ def custom_collate_fn(batch):
 
 def load_all_data(seed=42, batch_size=32):
 
-    all_files = glob.glob('./data/train/*.npy') + glob.glob('./data/test/*.npy')
+    all_files = glob.glob('./data/*.npy')
     all_labels = [path.split('/')[-1].split('_')[0] for path in all_files]
 
 
@@ -138,7 +138,7 @@ def load_all_data(seed=42, batch_size=32):
 def prepare_kfold_data():
     """Prepare data for k-fold cross validation"""
 
-    all_files = glob.glob('./data/train/*.npy') + glob.glob('./data/test/*.npy')
+    all_files = glob.glob('./data/*.npy')
     all_labels = [path.split('/')[-1].split('_')[0] for path in all_files]
     
     return all_files, all_labels

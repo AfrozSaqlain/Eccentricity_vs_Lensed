@@ -34,9 +34,9 @@ def generate_sample(args):
             }
 
         count = {
-            'eccentric_saved': save_qtransform_with_checks(waveform_dict, params, output_path / f"eccentric_{num + jump['ecc_files']}.png"),
-            'lensed_saved': save_qtransform_with_checks(waveform_dict, params, output_path / f"lensed_{num + jump['lens_files']}.png"),
-            'unlensed_saved': save_qtransform_with_checks(waveform_dict, params, output_path / f"unlensed_{num + jump['unlens_files']}.png")
+            'eccentric_saved': save_qtransform_with_checks(waveform_dict, params, output_path / f"eccentric_{num + jump}.npy"),
+            'lensed_saved': save_qtransform_with_checks(waveform_dict, params, output_path / f"lensed_{num + jump}.npy"),
+            'unlensed_saved': save_qtransform_with_checks(waveform_dict, params, output_path / f"unlensed_{num + jump}.npy")
         }
 
         snr_e_network = np.sqrt(
@@ -88,8 +88,6 @@ def generate_sample(args):
 def main():
     parser = argparse.ArgumentParser(description="Generate Q-transform training dataset.")
     parser.add_argument('--num-samples', type=int, required=True)
-    parser.add_argument('--path-name', type=str, choices=['train', 'test', 'tmp'], default=None,
-                        help="Optional. If not provided, data will be stored directly in './data'")
     parser.add_argument('--num-workers', type=int, default=max(1, os.cpu_count() - 2))
     parser.add_argument('--snr-prior', type=str, choices=['uniform', 'powerlaw'], default='powerlaw',
                         help='Defines the prior distribution for sampling in SNR. Default is PowerLaw.')
@@ -99,34 +97,22 @@ def main():
     num_samples = args.num_samples
     snr_prior = args.snr_prior
 
-    jump = {"ecc_files": 0, "lens_files": 0, "unlens_files": 0}
+    jump = 0   
     
-    if args.path_name:
-        directory = f"./data/{args.path_name}"
-        
-        ecc_pattern = os.path.join(directory, 'eccentric_*')
-        ecc_files = len([f for f in glob.glob(ecc_pattern) if os.path.isfile(f)])
-        
-        lens_pattern = os.path.expanduser(directory + '/lensed_*')
-        lens_files = len([f for f in glob.glob(lens_pattern) if os.path.isfile(f)])
-        
-        unlens_pattern = os.path.expanduser(directory + '/unlensed_*')
-        unlens_files = len([f for f in glob.glob(unlens_pattern) if os.path.isfile(f)])
+    directory = f"./data"
 
-        jump = {"ecc_files": ecc_files, "lens_files": lens_files, "unlens_files": unlens_files}
+    if os.path.exists(directory):
+    
+        file_pattern = os.path.join(directory, 'unlensed_*')
+        jump = len([f for f in glob.glob(file_pattern) if os.path.isfile(f)])
 
-    if args.path_name is not None:
-        output_path = Path(f"./data/{args.path_name}")
+    output_path = Path(f"./data")
+    results_dir = Path('./results')
+    
+    if not output_path.exists():
         output_path.mkdir(parents=True, exist_ok=True)
-        results_dir = Path('./results')
+    if not results_dir.exists():
         results_dir.mkdir(exist_ok=True)
-        save_prefix = f"{args.path_name}_"
-    else:
-        output_path = Path(f"./data/")
-        output_path.mkdir(parents=True, exist_ok=True)
-        results_dir = Path('./data/results')
-        results_dir.mkdir(parents=True, exist_ok=True)
-        save_prefix = ""
 
     samples = generate_prior(num_samples=num_samples, snr_type=snr_prior)
 
@@ -139,8 +125,8 @@ def main():
 
     valid_results = [res for res in results if res is not None]
 
-    save_csv(results_dir / f"{save_prefix}data_parameters.csv", valid_results)
-    save_csv(results_dir / f"{save_prefix}data_snr_lookup_table.csv",
+    save_csv(results_dir / f"parameters.csv", valid_results)
+    save_csv(results_dir / f"snr_lookup_table.csv",
              [{'sample': r['sample'], 'eccentric_snr': r['eccentric_snr'], 'lensed_snr': r['lensed_snr'],
                'unlensed_snr': r['unlensed_snr'], 'eccentric_distance': r['eccentric_distance'],
                'lensed_distance': r['lensed_distance'], 'unlensed_distance': r['unlensed_distance']} for r in valid_results])
