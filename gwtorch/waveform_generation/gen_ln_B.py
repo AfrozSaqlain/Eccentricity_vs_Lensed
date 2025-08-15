@@ -38,7 +38,6 @@ def generate_prior(num_samples, bin = "10-30"):
     priors['polarization'] = bilby.core.prior.Uniform(minimum=0., maximum=np.pi, boundary="periodic")
     priors['Log_Mlz'] = bilby.core.prior.Uniform(minimum=1, maximum=5)
     priors['yl'] = bilby.core.prior.PowerLaw(alpha=1, minimum=0.01, maximum=1.0)
-    # Remove lnB from priors - we'll compute it from the physics
     
     parameters = priors.sample(num_samples)
     return [
@@ -194,7 +193,7 @@ def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_dete
         lens_match = pycbc.filter.match(sp_lensed, sp, psd=psd, low_frequency_cutoff=F_LOWER)[0]
         
         if bin_type == '10-30':
-            bin_min, bin_max = 15, 25
+            bin_min, bin_max = 10, 30
         else:
             bin_min, bin_max = 30, 100
         
@@ -239,17 +238,10 @@ def save_qtransform_with_checks(waveform_dict, params, path):
     for key in waveform_dict:
         wf = waveform_dict[key]
 
-        mass1, mass2  = wf['mass1'],  wf['mass2']
-        m_lens, y_lens = wf['m_lens'], wf['y_lens']
-
-        # pick fields that differ by category
         if category == "eccentric":
-            distance   = wf['eccentric']['distance_e']
-            signal_snr = wf['eccentric']['snr_e']
             ts_raw     = wf['eccentric']['ecc_signal']
         elif category == "lensed":
-            distance   = wf['lensed']['distance_l']
-            signal_snr = wf['lensed']['snr_l']
+
             ts_raw     = wf['lensed']['lensed_signal']
 
         # --- Q‑transform & stack ------------------------------------------------
