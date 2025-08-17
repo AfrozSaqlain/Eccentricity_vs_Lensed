@@ -390,10 +390,8 @@ def main():
     valid_results = [res for res in results if res is not None]
 
     save_csv(results_dir / f"parameters.csv", valid_results)
-    save_csv(results_dir / f"snr_lookup_table.csv",
-             [{'sample': r['sample'], #'eccentric_snr': r['eccentric_snr'], 'lensed_snr': r['lensed_snr'],
-               'eccentric_distance': r['eccentric_distance'],
-               'lensed_distance': r['lensed_distance']} for r in valid_results])
+    save_csv(results_dir / f"lnB_lookup_table.csv",
+             [{'sample': r['sample'], 'Target_ln_B': r['Target_ln_B'], 'ecc_lb_B': r['ecc_ln_B'], 'lens_ln_B': r['lens_ln_B']} for r in valid_results])
 
     n_eccentric = sum(1 for r in valid_results if r.get('eccentric_saved'))
     n_lensed = sum(1 for r in valid_results if r.get('lensed_saved'))
