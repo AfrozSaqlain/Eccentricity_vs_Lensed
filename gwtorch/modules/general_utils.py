@@ -562,7 +562,15 @@ def plot_confusion_matrix(y_true, y_pred, class_names, title_suffix="", results_
     title = title_suffix.split(" Set")[0].split("(")[1]
 
     cm = confusion_matrix(y_true, y_pred)
-    cm_percentage = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis] * 100
+    # cm_percentage = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis] * 100
+    row_sums = cm.sum(axis=1)[:, np.newaxis]
+    cm_percentage = np.divide(
+        cm.astype('float') * 100, 
+        row_sums,
+        out=np.zeros_like(cm, dtype=float),
+        where=row_sums != 0
+    )
+
 
     # Only percentages as annotations (escaped % for LaTeX)
     annotations = [[f"{cm_percentage[i, j]:.1f}\\%" for j in range(cm.shape[1])]
