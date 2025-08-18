@@ -15,13 +15,10 @@ dependencies:
   - matplotlib=3.10.3
   - scipy=1.15.3
   - pip:
-      # PyTorch with CUDA 12.8 wheels
+      - --extra-index-url https://download.pytorch.org/whl/cu128
       - torch==2.7.0+cu128
       - torchvision==0.22.0+cu128
-      - --index-url https://download.pytorch.org/whl/cu128
-
-      # gwmat from GitLab (pinned commit recommended)
+      - scikit-learn
+      - vit-pytorch
       - git+https://git.ligo.org/anuj.mishra/gwmat.git@main
-
-      # Your package with all extras
       - -e .[all]

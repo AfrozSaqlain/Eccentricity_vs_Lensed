@@ -31,8 +31,6 @@ gw = [
 ]
 
 all = [
-    "scikit-learn",
-    "vit-pytorch",
     "PyCBC==2.9.0",
     "bilby==2.5.1",
     "gwpy==3.0.12"
