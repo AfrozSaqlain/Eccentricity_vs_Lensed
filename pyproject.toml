@@ -50,6 +50,7 @@ binary_cnn_train_gwtorch = "gwtorch.training.binary_cnn_classifier:main"
 
 # Inference tools
 transformer_inference_gwtorch = "gwtorch.inference.transformer_eval:main"
+cnn_inference_gwtorch = "gwtorch.inference.cnn_eval:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
