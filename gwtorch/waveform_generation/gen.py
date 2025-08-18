@@ -52,8 +52,6 @@ def generate_sample(args):
         result = {
             'sample': num,
             'mass1': float(mass1), 'mass2': float(mass2),
-            'chirp_mass': float(params['chirp_mass']),
-            'mass_ratio': float(params['mass_ratio']),
             'spin1z': float(params['spin1z']), 'spin2z': float(params['spin2z']),
             'eccentricity': float(params['eccentricity']),
             'coa_phase': float(params['coa_phase']),
@@ -63,7 +61,6 @@ def generate_sample(args):
             'ra': float(params['ra']), 'dec': float(params['dec']),
             'polarization': float(params['polarization']),
             'm_lens': float(m_lens), 'y_lens': float(y_lens),
-            'Log_Mlz': float(params['Log_Mlz']),
             'yl': float(y_lens),
             # 'time_delay': float(t_delay),
             'eccentric_snr': snr_e_network,
