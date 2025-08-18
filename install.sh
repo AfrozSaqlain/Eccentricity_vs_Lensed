@@ -10,6 +10,9 @@ echo ">>> Activating environment gwtorch-env"
 eval "$(conda shell.bash hook)"
 conda activate gwtorch-env
 
+# Step 2.5: Go back one directory
+cd .. 
+
 # Step 3: Clone teobresums (Dali branch)
 if [ ! -d teobresums ]; then
     echo ">>> Cloning teobresums (Dali branch)"
