@@ -61,7 +61,6 @@ def generate_sample(args):
             'ra': float(params['ra']), 'dec': float(params['dec']),
             'polarization': float(params['polarization']),
             'm_lens': float(m_lens), 'y_lens': float(y_lens),
-            'yl': float(y_lens),
             # 'time_delay': float(t_delay),
             'eccentric_snr': snr_e_network,
             'lensed_snr': snr_l_network,
