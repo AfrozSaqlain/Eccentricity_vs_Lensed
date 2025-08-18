@@ -1,16 +1,14 @@
 import os
 import glob
-import random
 import argparse
 import numpy as np
 from pathlib import Path
 
 import torch
 from torchvision import transforms
-from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
+from torch.utils.data import DataLoader, Dataset
 
 from sklearn.metrics import classification_report
-from sklearn.model_selection import train_test_split
 
 from linformer import Linformer
 from vit_pytorch.cvt import CvT
@@ -24,23 +22,15 @@ from gwtorch.modules.general_utils import (
     save_misclassified_files_to_txt,
 )
 
-def seed_everything(seed):
-    random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-
 def setup_directories():
-    os.makedirs('./results/transformer_results/Plots', exist_ok=True)
+    os.makedirs('./inference_results/transformer_results/Plots', exist_ok=True)
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Train Transformer for GW classification")
+    parser = argparse.ArgumentParser(description="Test Transformer for GW classification")
     parser.add_argument('--model', type=str, default='ViT', choices=['CvT', 'ViT'], help='Model to train')
     parser.add_argument('--batch-size', type=int, default=512)
-    parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--model-path', type=str, default='model_alpha.pth', help="Model will be saved in models directory with extention as .pth")
+    parser.add_argument('--path-name', type=str, default='data', help='Path to the dataset directory. Default is "data".')
     return parser.parse_args()
 
 
@@ -75,9 +65,9 @@ def custom_collate_fn(batch):
     images, labels, file_numbers, img_paths = zip(*batch)
     return torch.stack(images), torch.tensor(labels), file_numbers, img_paths
 
-def load_all_data(seed=42, batch_size=32):
+def load_all_data(path_name='data', batch_size=32):
 
-    all_files = glob.glob('./data/*.npy')
+    all_files = glob.glob(f'./{path_name}/*.npy')
     all_labels = [path.split('/')[-1].split('_')[0] for path in all_files]
 
 
@@ -113,7 +103,7 @@ def get_model(name, num_channels, device):
 
 def evaluate_and_plot(model, test_loader, device):
     class_names = ['Lensed', 'Eccentric', 'Quasi-Circular Unlensed']
-    results_dir = Path('./results/transformer_results')
+    results_dir = Path('./inference_results/transformer_results')
 
     
     test_fpr, test_tpr, test_roc_auc, test_labels, test_preds, _, test_misclassified = compute_roc_auc_with_misclassifications(model, test_loader, device, class_names)
@@ -140,11 +130,11 @@ def evaluate_and_plot(model, test_loader, device):
 def main():
     args = parse_args()
     setup_directories()
-    seed_everything(args.seed)
+    
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     print(f"Using device: {device}")
-    num_channels, test_loader = load_all_data(args.seed, args.batch_size)
+    num_channels, test_loader = load_all_data(path_name=args.path_name, batch_size=args.batch_size)
     model = get_model(args.model, num_channels=num_channels, device=device)
 
     if os.path.exists(f'./models/{args.model_path}'):

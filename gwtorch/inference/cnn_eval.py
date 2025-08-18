@@ -1,47 +1,34 @@
 import os
 import glob
+import argparse
+import numpy as np
 from pathlib import Path
-from PIL import Image
 
 import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
-import argparse
+from torch.utils.data import DataLoader, Dataset
 
-import numpy as np
+from sklearn.metrics import classification_report
+
+from gwtorch.modules.neural_net import CNN_Model
 
 from gwtorch.modules.general_utils import (
     compute_roc_auc_with_misclassifications,
     plot_roc_curves,
     plot_confusion_matrix,
-    save_misclassified_files_to_dict
+    print_misclassified_files,
+    save_misclassified_files_to_txt,
 )
-from gwtorch.modules.neural_net import CNN_Model
+
+def setup_directories():
+    os.makedirs('./inference_results/cnn_results/Plots', exist_ok=True)
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Evaluate a CNN model on test data")
-
-    parser.add_argument("--model_path", type=str, required=True, help="Path to the trained model (.pth)")
-    parser.add_argument("--test_dir", type=str, required=True, help="Path to the directory with test data")
-    parser.add_argument("--results_dir", type=str, default="./results/cnn_results", help="Directory to store evaluation results")
-    parser.add_argument("--batch_size", type=int, default=128, help="Batch size for DataLoader")
-
-    args = parser.parse_args()
-
-def get_device():
-    return 'cuda' if torch.cuda.is_available() else 'cpu'
-
-def prepare_test_data(test_dir, transform):
-    test_list = glob.glob(os.path.join(test_dir, '*.png'))
-    print(f"Test Data: {len(test_list)}")
-    return GWDataset(test_list, transform=transform)
-
-def get_transforms():
-    return transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-    ])
+    parser = argparse.ArgumentParser(description="Test CNN for GW classification")
+    parser.add_argument('--batch-size', type=int, default=512)
+    parser.add_argument('--model-path', type=str, default='model_cnn.pth', help="Model will be saved in models directory with extention as .pth")
+    parser.add_argument('--path-name', type=str, default='data', help='Path to the dataset directory. Default is "data".')
+    return parser.parse_args()
 
 class GWDataset(Dataset):
     def __init__(self, file_list, transform=None):
@@ -52,70 +39,97 @@ class GWDataset(Dataset):
         return len(self.file_list)
 
     def __getitem__(self, idx):
-        img_path = self.file_list[idx]
-        img = Image.open(img_path)
+        file_path = self.file_list[idx]
 
-        img_transformed = self.transform(img)
-        img_transformed = img_transformed[:3, :, :]
+        arr = np.load(file_path)  # shape: (H, W, C)
 
-        label_str = img_path.split("/")[-1].split("_")[0]
-        if label_str == "eccentric":
-            label = 1
-        elif label_str == "unlensed":
-            label = 2
-        else:
-            label = 0
+        # Transpose to (H, W, C) only if needed
+        if arr.ndim == 2:
+            arr = arr[:, :, np.newaxis]  # Convert to (H, W, 1)
 
-        file_number = img_path.split("/")[-1].split("_")[1]
-        return img_transformed, label, file_number, img_path
+        arr = arr.astype(np.float32)
+
+        arr = self.transform(arr)
+
+        label_str = file_path.split("/")[-1].split("_")[0]
+        label = {'lensed': 0, 'eccentric': 1, 'unlensed': 2}[label_str]
+        file_number = file_path.split("/")[-1].split("_")[1].split(".")[0]
+
+        return arr, label, file_number, file_path
 
 def custom_collate_fn(batch):
     images, labels, file_numbers, img_paths = zip(*batch)
-    images = torch.stack(images)
-    labels = torch.tensor(labels)
-    return images, labels, file_numbers, img_paths
+    return torch.stack(images), torch.tensor(labels), file_numbers, img_paths
 
-def load_model(model_path, device):
-    model = CNN_Model().to(device)
-    if os.path.exists(model_path):
-        model.load_state_dict(torch.load(model_path, map_location=device))
-        print(f"Model loaded from {model_path}")
-    else:
-        raise FileNotFoundError(f"No pre-trained model found at {model_path}.")
-    return model
+def load_all_data(path_name='data', batch_size=32):
 
-def evaluate(model, test_loader, device, class_names, results_dir):
-    fpr, tpr, roc_auc, labels, predictions, _, misclassified = compute_roc_auc_with_misclassifications(
-        model=model, data_loader=test_loader, device=device, class_names=class_names
-    )
+    all_files = glob.glob(f'./{path_name}/*.npy')
+    all_labels = [path.split('/')[-1].split('_')[0] for path in all_files]
 
-    roc_fig = plot_roc_curves(fpr=fpr, tpr=tpr, roc_auc=roc_auc, class_names=class_names, title_suffix=" (Test Set)", results_dir=results_dir)
-    plot_confusion_matrix(y_true=labels, y_pred=predictions, class_names=class_names, title_suffix=" (Test Set)", results_dir=results_dir)
-    save_misclassified_files_to_dict(misclassified, results_dir / "misclassified_test.pkl")
+
+    transform = transforms.Compose([
+        transforms.Lambda(lambda x: torch.tensor(x).permute(2, 0, 1)),
+        transforms.Resize((224, 224)),
+    ])
+
+    test_data = GWDataset(all_files, transform)
+
+    num_channels = test_data[0][0].shape[0] if isinstance(test_data[0][0], torch.Tensor) else 3
+
+    # Create loaders
+
+    test_loader  = DataLoader(test_data, batch_size=batch_size, shuffle=False,
+                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+
+    return num_channels, test_loader
+
+def evaluate_and_plot(model, test_loader, device):
+    class_names = ['Lensed', 'Eccentric', 'Quasi-Circular Unlensed']
+    results_dir = Path('./inference_results/cnn_results')
+
+    
+    test_fpr, test_tpr, test_roc_auc, test_labels, test_preds, _, test_misclassified = compute_roc_auc_with_misclassifications(model, test_loader, device, class_names)
+
+    print_misclassified_files(test_misclassified, "Test Set")
+
+    save_misclassified_files_to_txt(test_misclassified, "Test", results_dir / "misclassified_test.txt")
+
+
+    plot_roc_curves(test_fpr, test_tpr, test_roc_auc, class_names, " (Test Set)", results_dir)
+
+    plot_confusion_matrix(test_labels, test_preds, class_names, " (Test Set)", results_dir)
+
+    print("\nTest Classification Report:")
+    test_report = classification_report(test_labels, test_preds, target_names=class_names)
+    print(test_report)
+    test_report_path = results_dir / "test_classification_report.txt"
+    with open(test_report_path, "w") as f:
+        f.write("Test Classification Report:\n")
+        f.write(test_report)
+
+    return test_misclassified
 
 def main():
-    results_dir = Path('./results/cnn_results')
-    test_dir = './data/test'
-    model_path = './models/cnn_model0.pth'
-    class_names = ["Lensed", "Eccentric", "Unlensed"]
+    args = parse_args()
+    setup_directories()
 
-    os.makedirs('./results', exist_ok=True)
-    os.makedirs(results_dir, exist_ok=True)
+    model = CNN_Model(input_channlels=num_channels).to(device)
+    if os.path.exists(args.model_path):
+        model.load_state_dict(torch.load(args.model_path, map_location=device))
+        print(f"Model loaded from {args.model_path}")
+    else:
+        raise FileNotFoundError(f"No pre-trained model found at {args.model_path}.")
+    
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    device = get_device()
-    transform = get_transforms()
-    test_data = prepare_test_data(test_dir, transform)
+    print(f"Using device: {device}")
 
-    test_loader = DataLoader(
-        dataset=test_data,
-        num_workers=os.cpu_count(),
-        batch_size=128,
-        shuffle=False,
-        collate_fn=custom_collate_fn
-    )
+    num_channels, test_loader = load_all_data(path_name=args.path_name, batch_size=args.batch_size)
 
-    model = load_model(model_path, device)
-    evaluate(model, test_loader, device, class_names, results_dir)
+    test_misclassified = evaluate_and_plot(model, test_loader, device)
+
+    print("\nTraining complete. Summary:")
+    print(f"Test misclassifications: {len(test_misclassified)}")
 
 if __name__ == '__main__':
     main()
