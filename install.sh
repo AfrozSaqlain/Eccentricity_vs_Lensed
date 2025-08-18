@@ -13,7 +13,7 @@ conda activate gwtorch-env
 # Step 3: Clone teobresums (Dali branch)
 if [ ! -d teobresums ]; then
     echo ">>> Cloning teobresums (Dali branch)"
-    git clone -b Dali https://bitbucket.org/eob_ihes/teobresums.git
+    git clone -b Dali https://bitbucket.org/teobresums/teobresums.git
 else
     echo ">>> teobresums already exists, skipping clone"
 fi
