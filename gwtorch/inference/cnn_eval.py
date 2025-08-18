@@ -122,9 +122,9 @@ def main():
 
     model = CNN_Model(input_channlels=num_channels).to(device)
 
-    if os.path.exists(f'./model/{args.model_path}'):
-        model.load_state_dict(torch.load(f'./model/{args.model_path}', map_location=device))
-        print(f"Model loaded from ./model/{args.model_path}")
+    if os.path.exists(f'./models/{args.model_path}'):
+        model.load_state_dict(torch.load(f'./models/{args.model_path}', map_location=device))
+        print(f"Model loaded from ./models/{args.model_path}")
     else:
         raise FileNotFoundError(f"No pre-trained model found at {args.model_path}.")
     
