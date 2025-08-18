@@ -138,8 +138,8 @@ def main():
     model = get_model(args.model, num_channels=num_channels, device=device)
 
     if os.path.exists(f'./models/{args.model_path}'):
-        print("Pretrained model found. Loading...")
         model.load_state_dict(torch.load(f'./models/{args.model_path}'))
+        print(f"Model loaded from ./model/{args.model_path}")
     else:
         print("No pretrained model found. Training from scratch...")
 
