@@ -65,6 +65,7 @@ def parse_args():
     # parser.add_argument('--num-channels', type=int, default=3, help="Defines what is the input channels of the model. Default is 3 for signals from 3 detectors.")
     parser.add_argument('--k-folds', type=int, default=K_FOLDS, help="Number of folds for k-fold cross validation")
     parser.add_argument('--use-kfold', action='store_true', help="Use k-fold cross validation instead of single train/val/test split")
+    parser.add_argument('--path-name', type=str, default='data', help='Path to the dataset directory. Default is "data".')
     return parser.parse_args()
 
 # ----------------- Dataset Class -----------------
@@ -100,9 +101,9 @@ def custom_collate_fn(batch):
     images, labels, file_numbers, img_paths = zip(*batch)
     return torch.stack(images), torch.tensor(labels), file_numbers, img_paths
 
-def load_all_data(seed=42, batch_size=32):
+def load_all_data(path_name='data', seed=42, batch_size=32):
 
-    all_files = glob.glob('./data/*.npy')
+    all_files = glob.glob(f'./{path_name}/*.npy')
     all_labels = [path.split('/')[-1].split('_')[0] for path in all_files]
 
 
@@ -135,10 +136,10 @@ def load_all_data(seed=42, batch_size=32):
 
     return num_channels, train_loader, val_loader, test_loader
 
-def prepare_kfold_data():
+def prepare_kfold_data(path_name='data'):
     """Prepare data for k-fold cross validation"""
 
-    all_files = glob.glob('./data/*.npy')
+    all_files = glob.glob(f'./{path_name}/*.npy')
     all_labels = [path.split('/')[-1].split('_')[0] for path in all_files]
     
     return all_files, all_labels
@@ -289,7 +290,7 @@ def run_kfold_training(args, device):
     print(f"Starting {args.k_folds}-Fold Cross Validation")
     print(f"{'='*50}")
     
-    all_files, all_labels = prepare_kfold_data()
+    all_files, all_labels = prepare_kfold_data(path_name=args.path_name)
     
     skf = StratifiedKFold(n_splits=args.k_folds, shuffle=True, random_state=args.seed)
 
@@ -426,7 +427,7 @@ def main():
     else:
 
         print("\nRunning single train/validation/test split...")
-        num_channels, train_loader, valid_loader, test_loader = load_all_data(args.seed, args.batch_size)
+        num_channels, train_loader, valid_loader, test_loader = load_all_data(args.path_name, args.seed, args.batch_size)
         
         model = get_model(name=args.model, num_channels=num_channels, device=device)
 

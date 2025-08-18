@@ -91,6 +91,8 @@ def main():
     parser.add_argument('--num-workers', type=int, default=max(1, os.cpu_count() - 2))
     parser.add_argument('--snr-prior', type=str, choices=['uniform', 'powerlaw'], default='powerlaw',
                         help='Defines the prior distribution for sampling in SNR. Default is PowerLaw.')
+    parser.add_argument('--path-name', type=str, default='data',
+                        help='Path to save the generated data. Default is "data".')
     
     args = parser.parse_args()
 
@@ -99,14 +101,14 @@ def main():
 
     jump = 0   
     
-    directory = f"./data"
+    directory = f"./{args.path_name}"
 
     if os.path.exists(directory):
     
         file_pattern = os.path.join(directory, 'unlensed_*')
         jump = len([f for f in glob.glob(file_pattern) if os.path.isfile(f)])
 
-    output_path = Path(f"./data")
+    output_path = Path(directory)
     results_dir = Path('./results')
     
     if not output_path.exists():
@@ -125,8 +127,8 @@ def main():
 
     valid_results = [res for res in results if res is not None]
 
-    save_csv(results_dir / f"parameters.csv", valid_results)
-    save_csv(results_dir / f"snr_lookup_table.csv",
+    save_csv(results_dir / f"{args.path_name}_parameters.csv", valid_results)
+    save_csv(results_dir / f"{args.path_name}_snr_lookup_table.csv",
              [{'sample': r['sample'], 'eccentric_snr': r['eccentric_snr'], 'lensed_snr': r['lensed_snr'],
                'unlensed_snr': r['unlensed_snr'], 'eccentric_distance': r['eccentric_distance'],
                'lensed_distance': r['lensed_distance'], 'unlensed_distance': r['unlensed_distance']} for r in valid_results])
