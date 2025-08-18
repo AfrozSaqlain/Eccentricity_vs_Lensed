@@ -113,6 +113,13 @@ def main():
     args = parse_args()
     setup_directories()
 
+    
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    print(f"Using device: {device}")
+
+    num_channels, test_loader = load_all_data(path_name=args.path_name, batch_size=args.batch_size)
+
     model = CNN_Model(input_channlels=num_channels).to(device)
 
     if os.path.exists(f'./model/{args.model_path}'):
@@ -121,12 +128,6 @@ def main():
     else:
         raise FileNotFoundError(f"No pre-trained model found at {args.model_path}.")
     
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
-    print(f"Using device: {device}")
-
-    num_channels, test_loader = load_all_data(path_name=args.path_name, batch_size=args.batch_size)
-
     test_misclassified = evaluate_and_plot(model, test_loader, device)
 
     print("\nTraining complete. Summary:")
