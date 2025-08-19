@@ -292,161 +292,6 @@ def save_misclassified_files_to_dict(misclassified_info, filename):
     
     return misclassified_dict
 
-# def plot_roc_curves(fpr, tpr, roc_auc, class_names, title_suffix="", results_dir=None):
-#     """
-#     Plot ROC curves for multi-class classification
-#     """
-
-#     title = title_suffix.split(" Set")[0].split("(")[1]
-
-#     plt.figure(figsize=(12, 8))
-    
-#     colors = ['blue', 'red', 'green', 'orange', 'purple', 'brown']
-    
-#     # Plot ROC curve for each class
-#     for i, class_name in enumerate(class_names):
-#         if i in fpr:
-#             plt.plot(fpr[i], tpr[i], color=colors[i % len(colors)], lw=2,
-#                     label=f'{class_name} (AUC = {roc_auc[i]:.3f})')
-    
-#     # Plot macro-average ROC curve
-#     plt.plot(fpr["macro"], tpr["macro"], color='black', linestyle='--', lw=2,
-#             label=f'Macro-average (AUC = {roc_auc["macro"]:.3f})')
-    
-#     # Plot diagonal line
-#     plt.plot([0, 1], [0, 1], 'k--', lw=1, alpha=0.5)
-    
-#     plt.xlim([0.0, 1.0])
-#     plt.ylim([0.0, 1.05])
-#     plt.xlabel('False Positive Rate', fontsize=12)
-#     plt.ylabel('True Positive Rate', fontsize=12)
-#     plt.title(f'ROC Curves - Multi-class Classification{title_suffix}', fontsize=14)
-#     plt.legend(loc="lower right", fontsize=10)
-#     plt.grid(True, alpha=0.3)
-#     plt.tight_layout()
-#     plt.savefig(results_dir / f'ROC_Curves_{title}.pdf', dpi=300, bbox_inches='tight')
-#     plt.show()
-    
-#     return plt.gcf()
-
-# def plot_roc_curves(fpr, tpr, roc_auc, class_names, title_suffix="", results_dir=None):
-#     """
-#     Plot ROC curves for multi-class classification with log-scaled x-axis.
-#     """
-
-#     title = title_suffix.split(" Set")[0].split("(")[1]
-
-#     plt.figure(figsize=(12, 8))
-
-#     colors = ['blue', 'red', 'green', 'orange', 'purple', 'brown']
-
-#     # Small epsilon to avoid log(0)
-#     eps = 1e-6
-
-#     # Plot ROC curve for each class
-#     for i, class_name in enumerate(class_names):
-#         if i in fpr:
-#             fpr_i = np.maximum(fpr[i], eps)
-#             plt.plot(fpr_i, tpr[i], color=colors[i % len(colors)], lw=2,
-#                      label=f'{class_name} (AUC = {roc_auc[i]:.3f})')
-
-#     # Plot macro-average ROC curve
-#     fpr_macro = np.maximum(fpr["macro"], eps)
-#     plt.plot(fpr_macro, tpr["macro"], color='black', linestyle='--', lw=2,
-#              label=f'Macro-average (AUC = {roc_auc["macro"]:.3f})')
-
-#     # Diagonal reference line (not very meaningful on log scale, but often kept)
-#     plt.plot([eps, 1], [0, 1], 'k--', lw=1, alpha=0.5)
-
-#     plt.xscale('log')
-#     plt.yscale('log')
-#     plt.xlim([eps, 1.0])
-#     plt.ylim([eps, 1.05])
-#     plt.xlabel('False Positive Rate (log scale)', fontsize=12)
-#     plt.ylabel('True Positive Rate', fontsize=12)
-#     plt.title(f'ROC Curves - Multi-class Classification{title_suffix}', fontsize=14)
-#     plt.legend(loc="lower right", fontsize=10)
-#     plt.grid(True, which='both', linestyle='--', alpha=0.3)
-#     plt.tight_layout()
-
-#     if results_dir:
-#         results_dir = Path(results_dir)
-#         os.makedirs(results_dir / 'Plots', exist_ok=True)
-#         plt.savefig(results_dir / f'Plots/ROC_Curves_{title}.pdf', dpi=300, bbox_inches='tight')
-#     plt.show()
-
-
-# def plot_confusion_matrix(y_true, y_pred, class_names, title_suffix="", results_dir=None):
-#     """
-#     Plot confusion matrix with counts and percentages
-#     """
-
-#     title = title_suffix.split(" Set")[0].split("(")[1]
-
-#     cm = confusion_matrix(y_true, y_pred)
-#     cm_percentage = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis] * 100
-
-#     annotations = []
-#     for i in range(cm.shape[0]):
-#         row = []
-#         for j in range(cm.shape[1]):
-#             count = cm[i, j]
-#             percentage = cm_percentage[i, j]
-#             row.append(f"{count}\n({percentage:.1f}%)")
-#         annotations.append(row)
-
-#     plt.figure(figsize=(10, 8))
-#     sns.heatmap(cm, annot=annotations, fmt='', cmap='Blues',
-#                xticklabels=class_names, yticklabels=class_names)
-#     plt.title(f'Confusion Matrix{title_suffix}', fontsize=14)
-#     plt.xlabel('Predicted Label', fontsize=12)
-#     plt.ylabel('True Label', fontsize=12)
-#     plt.tight_layout()
-#     if results_dir is not None:
-#         plt.savefig(results_dir / f'Plots/Confusion_Matrix_{title}.pdf', dpi=300, bbox_inches='tight')
-#     plt.show()
-
-#     # return plt.gcf()
-
-
-# def plot_training_curves(train_losses, val_losses, train_accuracies, val_accuracies, results_dir):
-#     print("Generating training curves...")
-#     plt.figure(figsize=(15, 5))
-
-#     plt.subplot(1, 3, 1)
-#     plt.plot(train_losses, label='Train Loss')
-#     plt.plot(val_losses, label='Validation Loss')
-#     plt.title('Training and Validation Loss')
-#     plt.xlabel('Epoch')
-#     plt.ylabel('Loss')
-#     plt.legend()
-#     plt.grid(True, alpha=0.3)
-
-#     plt.subplot(1, 3, 2)
-#     plt.plot(train_accuracies, label='Train Accuracy')
-#     plt.plot(val_accuracies, label='Validation Accuracy')
-#     plt.title('Training and Validation Accuracy')
-#     plt.xlabel('Epoch')
-#     plt.ylabel('Accuracy')
-#     plt.legend()
-#     plt.grid(True, alpha=0.3)
-
-#     plt.subplot(1, 3, 3)
-#     epochs_range = range(1, len(train_losses) + 1)
-#     plt.plot(epochs_range, train_losses, 'b-', label='Train Loss')
-#     plt.plot(epochs_range, val_losses, 'r-', label='Val Loss')
-#     plt.fill_between(epochs_range, train_losses, alpha=0.3, color='blue')
-#     plt.fill_between(epochs_range, val_losses, alpha=0.3, color='red')
-#     plt.title('Loss Progression')
-#     plt.xlabel('Epoch')
-#     plt.ylabel('Loss')
-#     plt.legend()
-#     plt.grid(True, alpha=0.3)
-
-#     plt.tight_layout()
-#     plt.savefig(results_dir / 'Plots/Training_curves.pdf', dpi=300, bbox_inches='tight')
-#     plt.show()
-
 def get_file_prefix(results_dir):
     """
     Get the file prefix for saving results based on the results directory.
@@ -489,7 +334,7 @@ def get_file_prefix(results_dir):
         elif prefix1 == 'Binary_cnn' and prefix2 is not None:
             return f'Binary_CNN_Fold_{prefix2}'
 
-def plot_roc_curves(fpr, tpr, roc_auc, class_names, title_suffix="", results_dir=None):
+def plot_roc_curves(fpr, tpr, roc_auc, class_names, title_suffix="", results_dir=None, scale='linear'):
 
     prefix = get_file_prefix(results_dir) if results_dir else ''
 
@@ -497,25 +342,42 @@ def plot_roc_curves(fpr, tpr, roc_auc, class_names, title_suffix="", results_dir
 
     fig, ax = plt.subplots(figsize=(12, 8))
     colors = ['blue', 'red', 'green', 'orange', 'purple', 'brown']
-    eps = 1e-6
+    
+    # Set scale-specific parameters
+    if scale == 'log':
+        eps = 1e-6
+        xlabel = r'False Positive Rate (log scale)'
+        xlim = [eps, 1.0]
+        ylim = [eps, 1.05]
+        diagonal = [eps, 1]
+    else:  # linear scale
+        eps = None
+        xlabel = r'False Positive Rate'
+        xlim = [0.0, 1.0]
+        ylim = [0.0, 1.05]
+        diagonal = [0, 1]
 
     for i, class_name in enumerate(class_names):
         if i in fpr:
-            fpr_i = np.maximum(fpr[i], eps)
-            ax.plot(fpr_i, tpr[i], color=colors[i % len(colors)], lw=2,
+            fpr_i = np.maximum(fpr[i], eps) if eps else fpr[i]
+            tpr_i = tpr[i]
+            ax.plot(fpr_i, tpr_i, color=colors[i % len(colors)], lw=2,
                     label=f'{class_name} (AUC = {roc_auc[i]:.3f})')
 
-    fpr_macro = np.maximum(fpr["macro"], eps)
+    fpr_macro = np.maximum(fpr["macro"], eps) if eps else fpr["macro"]
     ax.plot(fpr_macro, tpr["macro"], color='black', linestyle='--', lw=2,
             label=f'Macro-average (AUC = {roc_auc["macro"]:.3f})')
 
-    ax.plot([eps, 1], [0, 1], 'k--', lw=1, alpha=0.5)
+    ax.plot(diagonal, [0, 1], 'k--', lw=1, alpha=0.5)
 
-    ax.set_xscale('log')
-    ax.set_yscale('log')
-    ax.set_xlim([eps, 1.0])
-    ax.set_ylim([eps, 1.05])
-    ax.set_xlabel(r'False Positive Rate (log scale)')
+    # Set scaling
+    if scale == 'log':
+        ax.set_xscale('log')
+        ax.set_yscale('log')
+
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    ax.set_xlabel(xlabel)
     ax.set_ylabel(r'True Positive Rate')
     ax.set_title(f'ROC Curves - Multi-class Classification{title_suffix}')
     ax.legend(loc="lower right")
@@ -529,31 +391,6 @@ def plot_roc_curves(fpr, tpr, roc_auc, class_names, title_suffix="", results_dir
         os.makedirs(results_dir / 'Plots', exist_ok=True)
         fig.savefig(results_dir / f'Plots/{prefix}_ROC_Curves_{title}.pdf', dpi=300, bbox_inches='tight')
     plt.show()
-
-
-# def plot_confusion_matrix(y_true, y_pred, class_names, title_suffix="", results_dir=None):
-
-#     title = title_suffix.split(" Set")[0].split("(")[1]
-
-#     cm = confusion_matrix(y_true, y_pred)
-#     cm_percentage = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis] * 100
-
-#     annotations = [[f"{cm[i, j]}\n({cm_percentage[i, j]:.1f}\\%)" for j in range(cm.shape[1])] for i in range(cm.shape[0])]
-
-#     fig, ax = plt.subplots(figsize=(10, 8))
-#     sns.heatmap(cm, annot=annotations, fmt='', cmap='Blues',
-#                 xticklabels=class_names, yticklabels=class_names, ax=ax)
-#     ax.set_title(f'Confusion Matrix{title_suffix}')
-#     ax.set_xlabel('Predicted Label')
-#     ax.set_ylabel('True Label')
-#     set_tick_sizes(ax)
-
-#     plt.tight_layout()
-#     if results_dir:
-#         results_dir = Path(results_dir)
-#         os.makedirs(results_dir / 'Plots', exist_ok=True)
-#         fig.savefig(results_dir / f'Plots/Confusion_Matrix_{title}.pdf', dpi=300, bbox_inches='tight')
-#     plt.show()
 
 
 def plot_confusion_matrix(y_true, y_pred, class_names, title_suffix="", results_dir=None):
