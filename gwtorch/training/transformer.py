@@ -52,9 +52,9 @@ def seed_everything(seed):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-def setup_directories():
+def setup_directories(model_name=None):
     os.makedirs('./models', exist_ok=True)
-    os.makedirs('./results/transformer_results/Plots', exist_ok=True)
+    os.makedirs(f'./results/{model_name}_results/Plots', exist_ok=True)
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train Transformer for GW classification")
@@ -365,7 +365,7 @@ def run_kfold_training(args, device, get_model=None, model_name=None):
         fold_results['val_accs_all'].append(val_accs)
 
         val_misclassified, test_misclassified, val_roc_auc, test_roc_auc = evaluate_and_plot(
-            model, val_loader, test_loader, device, fold=fold+1
+            model, val_loader, test_loader, device, fold=fold+1, model_name=model_name
         )
 
         val_fpr, val_tpr, val_roc_auc_detailed, _, _, _, _ = compute_roc_auc_with_misclassifications(
@@ -429,7 +429,7 @@ def run_kfold_training(args, device, get_model=None, model_name=None):
 
 def main():
     args = parse_args()
-    setup_directories()
+    setup_directories(model_name=args.model)
     seed_everything(args.seed)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 

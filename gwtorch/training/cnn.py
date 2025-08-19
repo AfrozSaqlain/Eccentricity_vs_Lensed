@@ -49,9 +49,9 @@ def seed_everything(seed):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-def setup_directories():
+def setup_directories(model_name=None):
     os.makedirs('./models', exist_ok=True)
-    os.makedirs('./results/cnn_results/Plots', exist_ok=True)
+    os.makedirs(f'./results/{model_name}_results/Plots', exist_ok=True)
 
 
 def parse_args():
@@ -398,7 +398,7 @@ def run_kfold_training(args, device):
 # ----------------- Main -----------------
 def main():
     args = parse_args()
-    setup_directories()
+    setup_directories(model_name=args.model)
     seed_everything(args.seed)
 
     results_dir = Path('./results/cnn_results')
