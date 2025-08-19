@@ -20,14 +20,15 @@ from gwtorch.modules.general_utils import (
     save_misclassified_files_to_txt,
 )
 
-def setup_directories():
-    os.makedirs('./inference_results/cnn_results/Plots', exist_ok=True)
+def setup_directories(results_dir):
+    os.makedirs(f'./{results_dir}/cnn_results/Plots', exist_ok=True)
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Test CNN for GW classification")
     parser.add_argument('--batch-size', type=int, default=512)
     parser.add_argument('--model-path', type=str, default='model_cnn.pth', help="Model will be saved in models directory with extention as .pth")
     parser.add_argument('--path-name', type=str, default='data', help='Path to the dataset directory. Default is "data".')
+    parser.add_argument('--results-dir', type=str, default='inference_results', help='Path to save the results of the inference made by the model.')
     return parser.parse_args()
 
 class GWDataset(Dataset):
@@ -111,8 +112,7 @@ def evaluate_and_plot(model, test_loader, device):
 
 def main():
     args = parse_args()
-    setup_directories()
-
+    setup_directories(results_dir=args.results_dir)
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
