@@ -53,6 +53,7 @@ class GWDataset(Dataset):
             arr = arr[:, :, np.newaxis]  # Convert to (H, W, 1)
 
         arr = arr.astype(np.float32)
+        arr = torch.from_numpy(arr).float()
 
         arr = self.transform(arr)
 
@@ -73,7 +74,7 @@ def load_all_data(path_name='data', batch_size=32):
 
 
     transform = transforms.Compose([
-        transforms.Lambda(lambda x: torch.tensor(x).permute(2, 0, 1)),
+        # transforms.Lambda(lambda x: torch.tensor(x).permute(2, 0, 1)),
         transforms.Resize((224, 224)),
     ])
 
@@ -102,9 +103,9 @@ def get_model(name, num_channels, device):
                    transformer=transformer, channels=num_channels).to(device)
     
 
-def evaluate_and_plot(model, test_loader, device):
+def evaluate_and_plot(model, test_loader, device, results_dir):
     class_names = ['Lensed', 'Eccentric', 'Quasi-Circular Unlensed']
-    results_dir = Path('./inference_results/transformer_results')
+    results_dir = Path(f'./{results_dir}/transformer_results')
 
     
     test_fpr, test_tpr, test_roc_auc, test_labels, test_preds, _, test_misclassified = compute_roc_auc_with_misclassifications(model, test_loader, device, class_names)
@@ -144,7 +145,7 @@ def main():
     else:
         print("No pretrained model found. Training from scratch...")
 
-    test_misclassified = evaluate_and_plot(model, test_loader, device)
+    test_misclassified = evaluate_and_plot(model, test_loader, device, args.results_dir)
 
     print("\nTraining complete. Summary:")
     print(f"Test misclassifications: {len(test_misclassified)}")
