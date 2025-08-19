@@ -2,6 +2,7 @@ import os
 import glob
 import argparse
 from pathlib import Path
+from collections import Counter
 
 import torch
 import torch.nn as nn
@@ -43,11 +44,13 @@ class_names = ["Lensed", "Eccentric", "Quasi-Circular Unlensed"]
 # ----------------- Functions -----------------
 def seed_everything(seed):
     random.seed(seed)
+    np.random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 def setup_directories():
     os.makedirs('./models', exist_ok=True)
@@ -90,7 +93,7 @@ class GWDataset(Dataset):
 
         arr = self.transform(arr)
 
-        label_str = file_path.split("/")[-1].split("_")[0]
+        label_str = file_path.split("/")[-1].split("_")[0].lower()
         label = {'lensed': 0, 'eccentric': 1, 'unlensed': 2}[label_str]
         file_number = file_path.split("/")[-1].split("_")[1].split(".")[0]
 
@@ -177,10 +180,13 @@ def get_model(name, num_channels, device):
         return ViT(dim=128, image_size=224, patch_size=32, num_classes=3,
                    transformer=transformer, channels=num_channels).to(device)
 
-def train_model(model, train_loader, valid_loader, device, epochs, lr, gamma):
+def train_model(model, train_loader, valid_loader, device, epochs, lr, gamma, class_weights=None):
     optimizer = optim.Adam(model.parameters(), lr=lr)
     scheduler = StepLR(optimizer, step_size=5, gamma=gamma)
-    criterion = nn.CrossEntropyLoss()
+    if class_weights is not None:
+        criterion = nn.CrossEntropyLoss(weight=class_weights.to(device))
+    else:
+        criterion = nn.CrossEntropyLoss()
 
     train_losses, val_losses, train_accs, val_accs = [], [], [], []
 
@@ -240,9 +246,9 @@ def evaluate_model(model, data_loader, device):
     
     return np.array(all_preds), np.array(all_labels), all_file_paths
 
-def evaluate_and_plot(model, valid_loader, test_loader, device, fold=None):
+def evaluate_and_plot(model, valid_loader, test_loader, device, fold=None, model_name=None):
     """Evaluate model on validation and test sets, plot results, and save misclassified files"""
-    results_dir = Path('./results/transformer_results')
+    results_dir = Path(f'./results/{model_name}_results')
     
     if fold is not None:
         fold_dir = results_dir / f'fold_{fold}'
@@ -284,7 +290,14 @@ def evaluate_and_plot(model, valid_loader, test_loader, device, fold=None):
 
     return val_misclassified, test_misclassified, val_roc_auc, test_roc_auc
 
-def run_kfold_training(args, device):
+def filenames_to_label_indices(file_list):
+    labels = []
+    for p in file_list:
+        lab = p.split('/')[-1].split('_')[0].lower()
+        labels.append({'lensed':0,'eccentric':1,'unlensed':2}[lab])
+    return labels
+
+def run_kfold_training(args, device, get_model=None, model_name=None):
     """Run k-fold cross validation training"""
     print(f"\n{'='*50}")
     print(f"Starting {args.k_folds}-Fold Cross Validation")
@@ -322,6 +335,12 @@ def run_kfold_training(args, device):
         train_files_fold = [train_val_files[i] for i in train_idx]
         val_files_fold = [train_val_files[i] for i in val_idx]
 
+        train_labels_fold = filenames_to_label_indices(train_files_fold)
+        counts = Counter(train_labels_fold)
+        total = sum(counts.values())
+        class_weights = torch.tensor([ total/counts[i] for i in range(3) ], dtype=torch.float32)
+        print(f'Class Weights:{class_weights}')
+
         num_channels, train_loader, val_loader = create_fold_loaders(train_files_fold, val_files_fold, args.batch_size)
 
         if fold == 0:
@@ -331,14 +350,13 @@ def run_kfold_training(args, device):
         print(f"FOLD {fold + 1}/{args.k_folds}")
         print(f"{'='*30}")
 
-
         model = get_model(name=args.model, num_channels=num_channels, device=device)
         
         print(f"Training fold {fold + 1}...")
         print(f"Train samples: {len(train_files_fold)}, Val samples: {len(val_files_fold)}")
 
         train_losses, val_losses, train_accs, val_accs = train_model(
-            model, train_loader, val_loader, device, args.epochs, args.lr, args.gamma
+            model, train_loader, val_loader, device, args.epochs, args.lr, args.gamma, class_weights=class_weights
         )
 
         fold_results['train_losses_all'].append(train_losses)
@@ -360,7 +378,7 @@ def run_kfold_training(args, device):
         fold_results['test_accuracies'].append(test_roc_auc) 
         fold_results['val_roc_aucs'].append(val_roc_auc)
 
-        fold_dir = Path('./results/transformer_results') / f'fold_{fold+1}'
+        fold_dir = Path(f'./results/{model_name}_results') / f'fold_{fold+1}'
         plot_training_curves(train_losses, val_losses, train_accs, val_accs, fold_dir)
 
         model_path = f'./models/{args.model_path.split(".")[0]}_fold_{fold+1}.pth'
@@ -381,7 +399,7 @@ def run_kfold_training(args, device):
     print(f"Validation Accuracy: {val_acc_mean:.4f} ± {val_acc_std:.4f}")
     print(f"Individual fold accuracies: {[f'{acc:.4f}' for acc in fold_results['val_accuracies']]}")
 
-    summary_path = Path('./results/transformer_results/kfold_summary.txt')
+    summary_path = Path(f'./results/{model_name}_results/kfold_summary.txt')
     with open(summary_path, 'w') as f:
         f.write(f"K-Fold Cross Validation Summary ({args.k_folds} folds)\n")
         f.write(f"{'='*50}\n")
@@ -403,13 +421,11 @@ def run_kfold_training(args, device):
                     std_auc = fold_results[f'std_auc_{class_key}']
                     f.write(f"{class_name}: {mean_auc:.4f} ± {std_auc:.4f}\n")
 
-    plot_average_training_curves(fold_results, Path('./results/transformer_results'))
+    plot_average_training_curves(fold_results, Path(f'./results/{model_name}_results'))
 
-    plot_kfold_roc_curves(fold_results, Path('./results/transformer_results'), class_names)
+    plot_kfold_roc_curves(fold_results, Path(f'./results/{model_name}_results'), class_names)
     
     return fold_results
-
-
 
 def main():
     args = parse_args()
@@ -421,7 +437,7 @@ def main():
     
     if args.use_kfold:
 
-        fold_results = run_kfold_training(args, device)
+        fold_results = run_kfold_training(args, device, get_model=get_model, model_name=args.model)
         print(f"\nK-fold cross validation completed!")
         
     else:
@@ -435,7 +451,7 @@ def main():
 
         if os.path.exists(f'./models/{args.model_path}'):
             print("Pretrained model found. Loading...\n")
-            model.load_state_dict(torch.load(f'./models/{args.model_path}'))
+            model.load_state_dict(torch.load(f'./models/{args.model_path}', map_location=device))
         else:
             print("No pretrained model found. Training from scratch...\n")
 
@@ -443,7 +459,7 @@ def main():
             model, train_loader, valid_loader, device, args.epochs, args.lr, args.gamma
         )
         val_misclassified, test_misclassified, _, _ = evaluate_and_plot(
-            model, valid_loader, test_loader, device
+            model, valid_loader, test_loader, device , model_name=args.model
         )
         plot_training_curves(train_losses, val_losses, train_accs, val_accs, 
                            Path('./results/transformer_results'))

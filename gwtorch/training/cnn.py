@@ -41,11 +41,13 @@ class_names = ["Lensed", "Eccentric", "Quasi-Circular Unlensed"]
 # ----------------- Functions -----------------
 def seed_everything(seed):
     random.seed(seed)
+    np.random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 def setup_directories():
     os.makedirs('./models', exist_ok=True)
@@ -89,7 +91,7 @@ class GWDataset(Dataset):
         
         arr = self.transform(arr)
 
-        label_str = file_path.split("/")[-1].split("_")[0]
+        label_str = file_path.split("/")[-1].split("_")[0].lower()
         label = {'lensed': 0, 'eccentric': 1, 'unlensed': 2}[label_str]
         file_number = file_path.split("/")[-1].split("_")[1].split(".")[0]
 
@@ -404,7 +406,7 @@ def main():
     print(f"Using device: {device}")
 
     if args.use_kfold:
-        fold_results = run_kfold_training(args, device)
+        fold_results = run_kfold_training(args, device)#, model_name=args.model)
         print(f"\nK-fold cross validation completed!")
     else:
         print("\nRunning single train/validation/test split...")
@@ -416,7 +418,7 @@ def main():
         
         if os.path.exists(f'./models/{args.model_path}'):
             print("Pretrained model found. Loading...\n")
-            model.load_state_dict(torch.load(f'./models/{args.model_path}'))
+            model.load_state_dict(torch.load(f'./models/{args.model_path}', map_location=device))
         else:
             print("No pretrained model found. Training from scratch...\n")
 
@@ -424,7 +426,7 @@ def main():
             model, train_loader, valid_loader, device, args.epochs, args.lr, args.gamma
         )
         val_misclassified, test_misclassified, _, _ = evaluate_and_plot(
-            model, valid_loader, test_loader, device
+            model, valid_loader, test_loader, device #, model_name=args.model
         )
         plot_training_curves(train_losses, val_losses, train_accs, val_accs, 
                            Path('./results/cnn_results'))
