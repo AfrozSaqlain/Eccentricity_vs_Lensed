@@ -40,7 +40,7 @@ all = [
 # Waveform generation tools
 generate_waveform_gwtorch = "gwtorch.waveform_generation.gen:main"
 filtered_waveform_gen_gwtorch = "gwtorch.waveform_generation.gen_ln_B:main"
-exp_data_gen_gwtorch = "gwtorch.waveform_generation.gen_with_additional_functionalities:main"
+exp_gen_gwtorch = "gwtorch.waveform_generation.exp_gen:main"
 
 # Training tools
 cnn_train_gwtorch = "gwtorch.training.cnn:main"
