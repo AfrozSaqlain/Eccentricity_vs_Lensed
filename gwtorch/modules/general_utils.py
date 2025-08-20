@@ -310,13 +310,13 @@ def get_file_prefix(results_dir):
         if prefix2 is not None:
             prefix2 = prefix2[1]
 
-        if prefix1 == 'transformer' and prefix2 is None:
+        if prefix1 == 'ViT' and prefix2 is None:
             return 'ViT'
-        elif prefix1 == 'cnn' and prefix2 is None:
+        elif prefix1 == 'CNN' and prefix2 is None:
             return 'CNN'
-        elif prefix1 == 'transformer' and prefix2 is not None:
+        elif prefix1 == 'ViT' and prefix2 is not None:
             return f'ViT_Fold_{prefix2}'
-        elif prefix1 == 'cnn' and prefix2 is not None:
+        elif prefix1 == 'CNN' and prefix2 is not None:
             return f'CNN_Fold_{prefix2}'
 
     elif len(prefix1) == 3:
@@ -325,13 +325,13 @@ def get_file_prefix(results_dir):
         if prefix2 is not None:
             prefix2 = prefix2[1] 
 
-        if prefix1 == 'Binary_transformer' and prefix2 is None:
+        if prefix1 == 'Binary_ViT' and prefix2 is None:
             return 'Binary_ViT'
-        elif prefix1 == 'Binary_cnn' and prefix2 is None:
+        elif prefix1 == 'Binary_CNN' and prefix2 is None:
             return 'Binary_CNN'
-        elif prefix1 == 'Binary_transformer' and prefix2 is not None:
+        elif prefix1 == 'Binary_ViT' and prefix2 is not None:
             return f'Binary_ViT_Fold_{prefix2}'
-        elif prefix1 == 'Binary_cnn' and prefix2 is not None:
+        elif prefix1 == 'Binary_CNN' and prefix2 is not None:
             return f'Binary_CNN_Fold_{prefix2}'
 
 def plot_roc_curves(fpr, tpr, roc_auc, class_names, title_suffix="", results_dir=None, scale='linear'):

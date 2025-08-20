@@ -22,8 +22,8 @@ from gwtorch.modules.general_utils import (
     save_misclassified_files_to_txt,
 )
 
-def setup_directories(results_dir):
-    os.makedirs(f'./{results_dir}/transformer_results/Plots', exist_ok=True)
+def setup_directories(results_dir, model_name):
+    os.makedirs(f'./{results_dir}/{model_name}_results/Plots', exist_ok=True)
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Test Transformer for GW classification")
@@ -57,7 +57,7 @@ class GWDataset(Dataset):
 
         arr = self.transform(arr)
 
-        label_str = file_path.split("/")[-1].split("_")[0]
+        label_str = file_path.split("/")[-1].split("_")[0].lower()
         label = {'lensed': 0, 'eccentric': 1, 'unlensed': 2}[label_str]
         file_number = file_path.split("/")[-1].split("_")[1].split(".")[0]
 
@@ -103,9 +103,9 @@ def get_model(name, num_channels, device):
                    transformer=transformer, channels=num_channels).to(device)
     
 
-def evaluate_and_plot(model, test_loader, device, results_dir):
+def evaluate_and_plot(model, test_loader, device, results_dir, model_name='ViT'):
     class_names = ['Lensed', 'Eccentric', 'Quasi-Circular Unlensed']
-    results_dir = Path(f'./{results_dir}/transformer_results')
+    results_dir = Path(f'./{results_dir}/{model_name}_results')
 
     
     test_fpr, test_tpr, test_roc_auc, test_labels, test_preds, _, test_misclassified = compute_roc_auc_with_misclassifications(model, test_loader, device, class_names)
@@ -131,7 +131,7 @@ def evaluate_and_plot(model, test_loader, device, results_dir):
 
 def main():
     args = parse_args()
-    setup_directories(results_dir=args.results_dir)
+    setup_directories(results_dir=args.results_dir, model_name=args.model)
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -145,7 +145,7 @@ def main():
     else:
         print("No pretrained model found. Training from scratch...")
 
-    test_misclassified = evaluate_and_plot(model, test_loader, device, args.results_dir)
+    test_misclassified = evaluate_and_plot(model, test_loader, device, args.results_dir, model_name=args.model)
 
     print("\nTraining complete. Summary:")
     print(f"Test misclassifications: {len(test_misclassified)}")

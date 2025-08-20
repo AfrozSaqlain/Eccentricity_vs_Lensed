@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.colors import Normalize
 
 import gc
 import gwmat
@@ -12,7 +13,6 @@ from pycbc.types import FrequencySeries
 from bilby.gw.prior import BBHPriorDict
 from pycbc.filter.matchedfilter import matched_filter
 from pycbc.waveform import get_td_waveform, taper_timeseries
-from matplotlib.colors import Normalize
 
 from gwtorch.modules.constants import *
 
@@ -587,120 +587,6 @@ def display_qtransform(ts):
 
     return qt
 
-
-# def save_qtransform_with_checks(waveform_dict, params, path):
-#     if "eccentric" in str(path):
-#         stacked_q = []
-#         for key in waveform_dict:
-#             mass1 = waveform_dict[key]['mass1']
-#             mass2 = waveform_dict[key]['mass2']
-#             m_lens = waveform_dict[key]['m_lens']
-#             y_lens = waveform_dict[key]['y_lens']
-
-#             distance_e = waveform_dict[key]['eccentric']['distance_e']
-#             signal_snr = waveform_dict[key]['eccentric']['snr_e']
-#             ts = waveform_dict[key]['eccentric']['ecc_signal']
-
-#             # Regenerate same signal with eccentricity and non-eccentricity for lnB check
-#             hp_, _ = get_td_waveform(
-#                 approximant='teobresums', mass1=mass1, mass2=mass2,
-#                 lambda1=0, lambda2=0,
-#                 spin1z=params['spin1z'], spin2z=params['spin2z'],
-#                 distance=distance_e, delta_t=DELTA_T,
-#                 ecc=params['eccentricity'], coa_phase=params['coa_phase'], f_lower=F_LOWER
-#             )
-
-#             sp_, _ = get_td_waveform(
-#                 approximant='teobresums', mass1=mass1, mass2=mass2,
-#                 lambda1=0, lambda2=0,
-#                 spin1z=params['spin1z'], spin2z=params['spin2z'],
-#                 distance=distance_e, delta_t=DELTA_T,
-#                 ecc=0.0, coa_phase=params['coa_phase'], f_lower=F_LOWER
-#             )
-
-#             tlen = max(len(hp_), len(sp_))
-#             hp_.resize(tlen)
-#             sp_.resize(tlen)
-#             sp_ = pycbc.types.TimeSeries(sp_.data, delta_t=hp_.delta_t, epoch=hp_.start_time)
-
-#             duration_ = hp_.duration
-#             delta_f_ = 1 / duration_
-#             flen_ = tlen // 2 + 1
-#             psd = pycbc.psd.EinsteinTelescopeP1600143(flen_, delta_f_, F_LOWER)
-
-#             m = match(hp_, sp_, psd=psd, low_frequency_cutoff=5)[0]
-#             ln_B = 0.5 * (1 - m**2) * signal_snr**2
-
-#             if ln_B >= np.log(10):
-#                 ts = TimeSeries.from_pycbc(ts)
-#                 q = ts.q_transform(logf=True, norm='median', frange=(F_LOWER, 512), whiten=True, qrange=(4, 64))
-#                 q_data = np.abs(q.data)
-#                 stacked_q.append(q_data)
-
-#         if len(stacked_q) != 3:
-#             print(f"Only {len(stacked_q)} detectors passed the ln_B threshold. Not saving plot.")
-#             return False
-
-#         # Normalize each to [0,1] and stack into 3-channel (RGB-like)
-#         normed = [Normalize()(q) for q in stacked_q]
-#         rgb_image = np.stack(normed, axis=-1)  # Shape: (time, freq, 3)
-
-#         plt.figure(figsize=(12, 8))
-#         plt.imshow(rgb_image, aspect='auto', origin='lower')
-#         plt.axis('off')
-#         plt.savefig(path, bbox_inches='tight', pad_inches=0)
-#         plt.close()
-
-#         return True
-
-        
-#     elif "lensed" in str(path) and "unlensed" not in str(path):
-#         hp_, _ = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
-#                                  lambda1=0, lambda2=0,
-#                                  spin1z=params['spin1z'], spin2z=params['spin2z'],
-#                                  distance=distance_l, delta_t=DELTA_T,
-#                                  ecc=0, coa_phase=params['coa_phase'], f_lower=F_LOWER)
-        
-#         sp_, _, _ = compute_lensed_waveform(hp_, _, m_lens, y_lens)
-        
-#         # Ensure both waveforms have the same length and delta_t
-#         tlen = max(len(hp_), len(sp_))
-#         hp_.resize(tlen)
-#         sp_.resize(tlen)
-        
-#         # Force both waveforms to have the same delta_t by recreating sp_
-#         # This ensures consistent frequency resolution for PSD matching
-#         sp_ = pycbc.types.TimeSeries(sp_.data, delta_t=hp_.delta_t, epoch=hp_.start_time)
-
-#         duration_ = hp_.duration
-#         delta_f_ = 1 / duration_
-#         flen_ = tlen // 2 + 1
-#         psd = pycbc.psd.EinsteinTelescopeP1600143(flen_, delta_f_, F_LOWER)
-
-#         match = pycbc.filter.match(hp_, sp_, psd=psd, low_frequency_cutoff=5)[0]
-#         ln_B = 0.5 * (1 - match ** 2) * signal_snr ** 2
-
-#         if ln_B < np.log(10):
-#             # sample_number = str(path).split("_")[1].split(".")[0]
-#             # print(rf"Skipping lensed sample {sample_number} as $\ln B$ is {ln_B}")
-#             return False
-
-#     ts = TimeSeries.from_pycbc(ts)
-
-#     plt.figure(figsize=(12, 8))
-#     plt.pcolormesh(ts.q_transform(logf=True, norm='median', frange=(F_LOWER, 512), whiten=True, qrange=(4, 64)))
-#     plt.axis('off')
-#     plt.yscale('log')
-#     plt.savefig(path, transparent=True, bbox_inches='tight', pad_inches=0)
-#     plt.close()
-
-#     return True
-
-
-
-
-
-
 def _get_category_parts(path_str):
     """Return ('eccentric' | 'lensed' | 'unlensed', True/False)"""
     if "eccentric" in path_str:
@@ -805,11 +691,6 @@ def save_qtransform_with_checks(waveform_dict, params, path):
             # print(f"{category}: {key.name} failed ln_B test – skipping Q-transform.")
             return False
 
-    # # need exactly 3 detectors
-    # if len(stacked_q) != len(DETECTOR_LIST):
-    #     print(f"{category}: only {len(stacked_q)} detectors passed – skipping save.")
-    #     return False
-
     # Find the maximum shape across all detectors
     max_shape = (
         max(q.shape[0] for q in stacked_q),
@@ -819,25 +700,15 @@ def save_qtransform_with_checks(waveform_dict, params, path):
     # Pad all arrays to the same shape, then normalize
     padded_q = [pad_to_shape(q, max_shape) for q in stacked_q]
     normed = [Normalize()(q) for q in padded_q]
-    
-    # # Now stack should work since all arrays have the same shape
-    # rgb_img = np.stack(normed, axis=0).transpose(2, 1, 0)
-
-    # plt.figure(figsize=(12, 8))
-    # plt.imshow(rgb_img, aspect='auto', origin='lower')
-    # plt.axis('off')
-    # plt.savefig(path, bbox_inches='tight', pad_inches=0)
-    # plt.close()
-    # return True
 
     stacked = np.stack(normed, axis=0)              # (C, H, W)
-    # stacked_img = np.transpose(stacked, (2, 1, 0))  # (H, W, C) OLD ONE
-    stacked_img = np.transpose(stacked, (1, 2, 0))
+    # stacked_img = np.transpose(stacked, (1, 2, 0))  # (H, W, C)
 
     out_path = str(path)
     if out_path.endswith('.png'):
         out_path = out_path.replace('.png', '.npy')
-    np.save(out_path, np.asarray(stacked_img))
+    np.save(out_path, np.asarray(stacked))
+    # np.save(out_path, np.asarray(stacked_img))
     
     return True
 

@@ -1,6 +1,5 @@
 import os
 import glob
-import argparse
 from pathlib import Path
 
 import torch
@@ -31,8 +30,23 @@ from gwtorch.modules.general_utils import (
     plot_average_training_curves
 )
 
+dropout = 0.2
 class_names = ["Lensed", "Eccentric", "Quasi-Circular Unlensed"]
 
+def seed_everything(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+def setup_directories(model_name=None):
+    os.makedirs('./models', exist_ok=True)
+    os.makedirs(f'./results/{model_name}_results/Plots', exist_ok=True)
+    
 class GWDataset(Dataset):
     def __init__(self, file_list, transform=None):
         self.file_list = file_list
@@ -51,6 +65,7 @@ class GWDataset(Dataset):
             arr = arr[:, :, np.newaxis]  # Convert to (H, W, 1)
 
         arr = arr.astype(np.float32)
+        arr = torch.from_numpy(arr).float()
         
         arr = self.transform(arr)
 
@@ -79,7 +94,7 @@ def load_all_data(path_name='data', seed=42, batch_size=32):
     )
 
     transform = transforms.Compose([
-        transforms.Lambda(lambda x: torch.tensor(x).permute(2, 0, 1)),
+        # transforms.Lambda(lambda x: torch.tensor(x).permute(2, 0, 1)),
         transforms.Resize((224, 224)),
     ])
 
@@ -111,7 +126,7 @@ def create_fold_loaders(train_files, val_files, batch_size):
     """Create data loaders for a specific fold"""
 
     transform = transforms.Compose([
-        transforms.Lambda(lambda x: torch.tensor(x).permute(2, 0, 1)),
+        # transforms.Lambda(lambda x: torch.tensor(x).permute(2, 0, 1)),
         transforms.Resize((224, 224)),
     ])
 
@@ -134,13 +149,13 @@ def get_model(name, num_channels, device):
                    s2_emb_kernel=3, s2_emb_stride=2, s2_proj_kernel=3, s2_kv_proj_stride=2, s2_heads=3,
                    s2_depth=2, s2_mlp_mult=4, s3_emb_dim=384, s3_emb_kernel=3, s3_emb_stride=2,
                    s3_proj_kernel=3, s3_kv_proj_stride=2, s3_heads=4, s3_depth=10, s3_mlp_mult=4,
-                   dropout=0.4).to(device)
+                   dropout=dropout).to(device)
     elif name == 'ViT':
-        transformer = Linformer(dim=128, seq_len=50, depth=12, heads=8, k=64, dropout=0.4)
+        transformer = Linformer(dim=128, seq_len=50, depth=12, heads=8, k=64, dropout=dropout)
         return ViT(dim=128, image_size=224, patch_size=32, num_classes=3,
                    transformer=transformer, channels=num_channels).to(device)
     elif name == 'CNN':
-        return CNN_Model(input_channlels=num_channels).to(device)
+        return CNN_Model(input_channlels=num_channels, dropout=dropout).to(device)
     
 def train_model(model, train_loader, valid_loader, device, epochs, lr, gamma, class_weights=None):
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -266,7 +281,10 @@ def run_kfold_training(args, device, get_model=None, model_name=None):
     print(f"\n{'='*50}")
     print(f"Starting {args.k_folds}-Fold Cross Validation")
     print(f"{'='*50}")
-    
+
+    model = get_model(name=args.model, num_channels=4, device=device)
+    print(f'Using model: {model}')   # Remove it later
+
     all_files, all_labels = prepare_kfold_data(path_name=args.path_name)
     
     skf = StratifiedKFold(n_splits=args.k_folds, shuffle=True, random_state=args.seed)
@@ -287,9 +305,10 @@ def run_kfold_training(args, device, get_model=None, model_name=None):
     )
     
     transform = transforms.Compose([
-        transforms.Lambda(lambda x: torch.tensor(x).permute(2, 0, 1)),
+        # transforms.Lambda(lambda x: torch.tensor(x).permute(2, 0, 1)),
         transforms.Resize((224, 224)),
     ])
+
     test_data = GWDataset(test_files, transform)
     test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False,
                            num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
@@ -329,7 +348,7 @@ def run_kfold_training(args, device, get_model=None, model_name=None):
         fold_results['val_accs_all'].append(val_accs)
 
         val_misclassified, test_misclassified, val_roc_auc, test_roc_auc = evaluate_and_plot(
-            model, val_loader, test_loader, device, fold=fold+1
+            model, val_loader, test_loader, device, fold=fold+1, model_name=model_name
         )
 
         val_fpr, val_tpr, val_roc_auc_detailed, _, _, _, _ = compute_roc_auc_with_misclassifications(
