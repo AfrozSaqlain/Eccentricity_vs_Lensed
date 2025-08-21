@@ -673,6 +673,9 @@ def pad_to_shape(arr, target_shape):
 
 # ---------------------- Main Worker ---------------------- #
 
+# Replace the problematic section in generate_sample function (around lines 700-715)
+# with this corrected version:
+
 def generate_sample(args):
     num, params, jump, output_path = args
     peak_window = (2.0, 2.2)
@@ -696,16 +699,20 @@ def generate_sample(args):
             'unlensed_saved': save_qtransform_with_checks(waveform_dict, params, output_path / f"unlensed_{num + jump}.npy")
         }
 
-        if ecc_dict['ecc_signal'] is not None:
+        if any(waveform_dict[det]['eccentric']['ecc_signal'] is not None for det in detector_list):
             snr_e_network = np.sqrt(
-                sum((waveform_dict[det]['eccentric']['snr_e'])**2 for det in detector_list)
+                sum((waveform_dict[det]['eccentric']['snr_e'])**2 
+                    for det in detector_list 
+                    if waveform_dict[det]['eccentric']['ecc_signal'] is not None)
             )
         else:
             snr_e_network = None
         
-        if lens_dict['lensed_signal'] is not None:
+        if any(waveform_dict[det]['lensed']['lensed_signal'] is not None for det in detector_list):
             snr_l_network = np.sqrt(    
-                sum((waveform_dict[det]['lensed']['snr_l'])**2 for det in detector_list)
+                sum((waveform_dict[det]['lensed']['snr_l'])**2 
+                    for det in detector_list 
+                    if waveform_dict[det]['lensed']['lensed_signal'] is not None)
             )
         else:
             snr_l_network = None
@@ -714,15 +721,24 @@ def generate_sample(args):
             sum((waveform_dict[det]['unlensed']['snr_u'])**2 for det in detector_list)
         )
 
+        first_detector = detector_list[0]
+        ecc_distance = (waveform_dict[first_detector]['eccentric']['distance_e'] 
+                       if waveform_dict[first_detector]['eccentric']['ecc_signal'] is not None 
+                       else None)
+        lens_distance = (waveform_dict[first_detector]['lensed']['distance_l'] 
+                        if waveform_dict[first_detector]['lensed']['lensed_signal'] is not None 
+                        else None)
+        unlens_distance = waveform_dict[first_detector]['unlensed']['distance_u']
+
         result = {
             'sample': num,
             'mass1': float(mass1), 'mass2': float(mass2),
             'spin1z': float(params['spin1z']), 'spin2z': float(params['spin2z']),
             'eccentricity': float(params['eccentricity']),
             'coa_phase': float(params['coa_phase']),
-            'eccentric_distance': float(ecc_dict["distance_e"]) if ecc_dict['ecc_signal'] is not None else None,
-            'lensed_distance': float(lens_dict["distance_l"]) if lens_dict['lensed_signal'] is not None else None,
-            'unlensed_distance': float(unlens_dict['distance_u']),
+            'eccentric_distance': float(ecc_distance) if ecc_distance is not None else None,
+            'lensed_distance': float(lens_distance) if lens_distance is not None else None,
+            'unlensed_distance': float(unlens_distance),
             'ra': float(params['ra']), 'dec': float(params['dec']),
             'polarization': float(params['polarization']),
             'm_lens': float(m_lens), 'y_lens': float(y_lens),
@@ -731,7 +747,7 @@ def generate_sample(args):
             **count
         }
 
-        del ecc_dict, lens_dict, unlens_dict, waveform_dict
+        del ecc_dict, lens_dict, unlens_dict, waveform_dict, ecc_distance, lens_distance, unlens_distance
         gc.collect()
 
         return result
