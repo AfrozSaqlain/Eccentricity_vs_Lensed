@@ -695,12 +695,12 @@ def generate_sample(args):
         if lens_lnB > np.log(10):
             count["lensed_saved"] = save_qtransform_with_checks(waveform_dict, output_path / "lensed" / f"{num}.npy")
         else:
-            count["unlensed_saved"] = save_qtransform_with_checks(waveform_dict, output_path / "unlensed" / f"{num}-1.npy")
+            count["lens_unlensed_saved"] = save_qtransform_with_checks(waveform_dict, output_path / "unlensed" / f"{num}-1.npy")
 
         if ecc_lnB > np.log(10):
             count['eccentric_saved'] = save_qtransform_with_checks(waveform_dict, output_path / "eccentric" / f"{num}.npy")
         else:
-            count['unlensed_saved'] = save_qtransform_with_checks(waveform_dict, output_path / "unlensed" / f"{num}-2.npy")
+            count['ecc_unlensed_saved'] = save_qtransform_with_checks(waveform_dict, output_path / "unlensed" / f"{num}-2.npy")
 
 
         count["unlensed_saved"] = save_qtransform_with_checks(waveform_dict, output_path / "unlensed" / f"{num}.npy")
@@ -794,7 +794,7 @@ def main():
             
             n_eccentric += sum(1 for r in valid_results if r.get('eccentric_saved'))
             n_lensed += sum(1 for r in valid_results if r.get('lensed_saved'))
-            n_unlensed += sum(1 for r in valid_results if r.get('unlensed_saved'))
+            n_unlensed += sum(1 for r in valid_results if r.get('unlensed_saved')) + sum(1 for r in valid_results if r.get('lens_unlensed_saved')) + sum(1 for r in valid_results if r.get('ecc_unlensed_saved'))
 
             save_csv(results_dir / f"{args.path_name}_parameters.csv", valid_results)
             
