@@ -94,8 +94,9 @@ def save_csv(path, rows):
     for i, row in enumerate(rows):
         row['sample'] = i + sample_offset
 
+    all_keys = set().union(*(row.keys() for row in rows))
     with open(path, 'a', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        writer = csv.DictWriter(f, fieldnames=list(all_keys))
         if not file_exists:
             writer.writeheader()
         writer.writerows(rows)

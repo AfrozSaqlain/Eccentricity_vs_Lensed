@@ -93,7 +93,7 @@ def generate_prior(num_samples, snr_type = "powerlaw"):
     priors['eccentricity'] = bilby.core.prior.Uniform(name='eccentricity', minimum=0.1, maximum=0.6)
     priors['coa_phase'] = bilby.core.prior.Uniform(name='coa_phase', minimum=0.0, maximum=2 * np.pi)
     priors['polarization'] = bilby.core.prior.Uniform(minimum=0., maximum=np.pi, boundary="periodic")
-    priors['Log_Mlz'] = bilby.core.prior.Uniform(minimum=1, maximum=5)
+    priors['Log_Mlz'] = bilby.core.prior.Uniform(minimum=2, maximum=5)
     priors['yl'] = bilby.core.prior.PowerLaw(alpha=1, minimum=0.01, maximum=1.0)
     if snr_type == "powerlaw":
         priors['snr'] = bilby.core.prior.PowerLaw(minimum=10, maximum=500, alpha=-4)
@@ -195,6 +195,10 @@ def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_dete
         ecc_noisy, snr_e, distance_e, ecc_padded = inject_noise_with_target_SNR(ecc, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='eccentric', peak_window=peak_window, detector=detector)
         lens_noisy, snr_l, distance_l, lens_padded = inject_noise_with_target_SNR(lensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='lensed', peak_window=peak_window, detector=detector)
         unlens_noisy, snr_u, distance_u, unlens_padded = inject_noise_with_target_SNR(unlensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='quasi_circular', peak_window=peak_window, detector=detector)
+        
+        ecc_noisy = ecc_noisy.crop(left=24, right=0)
+        lens_noisy = lens_noisy.crop(left=24, right=0)
+        unlens_noisy = unlens_noisy.crop(left=24, right=0)
 
         if check_lnB:
             tlen = max(len(hp), len(sp), len(sp_lensed))
@@ -220,29 +224,15 @@ def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_dete
             ecc_m = pycbc.filter.match(hp, sp, psd=psd, low_frequency_cutoff=F_LOWER)[0]
             lens_m = pycbc.filter.match(sp_lensed, sp, psd=psd, low_frequency_cutoff=F_LOWER)[0]
 
-            ecc_lnB = 0.5 * (1 - ecc_m**2) * snr_e**2
-            lens_lnB = 0.5 * (1 - lens_m**2) * snr_l**2
-
-        if ecc_lnB > np.log(10):
-            ecc_noisy = ecc_noisy.crop(left=24, right=0)
-            ecc_dict = {'ecc_signal': ecc_noisy, 'snr_e': snr_e, 'distance_e': distance_e}
-        else:
-            ecc_dict = {'ecc_signal': None}
-
-        if lens_lnB > np.log(10):
-            lens_noisy = lens_noisy.crop(left=24, right=0)
-            lens_dict = {'lensed_signal': lens_noisy, 'snr_l': snr_l, 'distance_l': distance_l}
-        else:
-            lens_dict = {'lensed_signal': None}
-        
-        unlens_noisy = unlens_noisy.crop(left=24, right=0)
+        lens_dict = {'lensed_signal': lens_noisy, 'snr_l': snr_l, 'distance_l': distance_l}
+        ecc_dict = {'ecc_signal': ecc_noisy, 'snr_e': snr_e, 'distance_e': distance_e}
         unlens_dict = {'unlensed_signal': unlens_noisy, 'snr_u': snr_u, 'distance_u': distance_u}
 
         del hp, hc, sp, sc, sp_lensed, sc_lensed
         del ecc, unlensed, lensed, ecc_noisy, lens_noisy, unlens_noisy, ecc_padded, lens_padded, unlens_padded
         gc.collect()
 
-        return ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens, ecc_lnB,lens_lnB
+        return ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens, lens_m, ecc_m
         
     except Exception as e:
         print(f"[Sample {num}] Error: {e}")
@@ -533,7 +523,7 @@ def inject_signal_with_peak_in_window(signal_ts, noise_ts, peak_window=(2.0, 2.2
 
     return padded_signal, delta_t, signal_ts.start_time
 
-def save_qtransform(ts, file_name):
+def save_simple_qtransform(ts, file_name):
     """
     Compute and save the Q-transform spectrogram of a time series.
 
@@ -601,18 +591,18 @@ def display_qtransform(ts):
 
 def _get_category_parts(path_str):
     """Return ('eccentric' | 'lensed' | 'unlensed', True/False)"""
-    if "eccentric" in path_str:
+    if "eccentric" in path_str or "-2" in path_str:
         return "eccentric"
-    if "lensed"    in path_str and "unlensed" not in path_str:
+    if "lensed" in path_str and "unlensed" not in path_str and "-1" not in path_str:
+        return "lensed"
+    if "-1" in path_str:
         return "lensed"
     return "unlensed"
 
-def save_qtransform_with_checks(waveform_dict, params, path):
+def save_qtransform_with_checks(waveform_dict, path):
     """
-    Saves an RGB‑stacked Q‑transform image:
-      R = detector‑0 spectrogram
-      G = detector‑1 spectrogram
-      B = detector‑2 spectrogram
+    Saves an multi-channeled Q‑transform image:
+      Each channels corresponds to one particular detector.
     Category is inferred from the filename: eccentric / lensed / unlensed.
     Returns True on success, False otherwise.
     """
@@ -631,31 +621,24 @@ def save_qtransform_with_checks(waveform_dict, params, path):
         else:  # unlensed
             ts_raw     = wf['unlensed']['unlensed_signal']
 
-        # ------------------------------------------------------------------------
 
-        
         # --- Q‑transform & stack ------------------------------------------------
-        if ts_raw is not None:
-            ts = TimeSeries.from_pycbc(ts_raw)
-            q  = ts.q_transform(logf=True, norm='median',
-                                frange=(F_LOWER, 512),
-                                whiten=True, qrange=(4, 64))
-            stacked_q.append(np.abs(q.data).T)
-        else:
-            return False
 
-    # Find the maximum shape across all detectors
+        ts = TimeSeries.from_pycbc(ts_raw)
+        q  = ts.q_transform(logf=True, norm='median',
+                            frange=(F_LOWER, 512),
+                            whiten=True, qrange=(4, 64))
+        stacked_q.append(np.abs(q.data).T)
+
     max_shape = (
         max(q.shape[0] for q in stacked_q),
         max(q.shape[1] for q in stacked_q)
     )
     
-    # Pad all arrays to the same shape, then normalize
     padded_q = [pad_to_shape(q, max_shape) for q in stacked_q]
     normed = [Normalize()(q) for q in padded_q]
 
     stacked = np.stack(normed, axis=0)              # (C, H, W)
-    # stacked_img = np.transpose(stacked, (1, 2, 0))  # (H, W, C)
 
     out_path = str(path)
     if out_path.endswith('.png'):
@@ -673,16 +656,13 @@ def pad_to_shape(arr, target_shape):
 
 # ---------------------- Main Worker ---------------------- #
 
-# Replace the problematic section in generate_sample function (around lines 700-715)
-# with this corrected version:
-
 def generate_sample(args):
     num, params, jump, output_path = args
     peak_window = (2.0, 2.2)
     try:
         waveform_dict = {}
         for detector in detector_list:
-            ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens, ecc_lnB, lens_lnB = generate_waveform(num, params, peak_window, detector=detector)
+            ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens, lens_match, ecc_match = generate_waveform(num, params, peak_window, detector=detector)
             waveform_dict[detector] = {
                 'eccentric': ecc_dict,
                 'lensed': lens_dict,
@@ -693,42 +673,37 @@ def generate_sample(args):
                 'y_lens': y_lens,
             }
 
-        count = {
-            'eccentric_saved': save_qtransform_with_checks(waveform_dict, params, output_path / f"eccentric_{num + jump}.npy"),
-            'lensed_saved': save_qtransform_with_checks(waveform_dict, params, output_path / f"lensed_{num + jump}.npy"),
-            'unlensed_saved': save_qtransform_with_checks(waveform_dict, params, output_path / f"unlensed_{num + jump}.npy")
-        }
+        snr_e_network = np.sqrt(
+            sum((waveform_dict[det]['eccentric']['snr_e'])**2 
+                for det in detector_list)
+        )
 
-        if any(waveform_dict[det]['eccentric']['ecc_signal'] is not None for det in detector_list):
-            snr_e_network = np.sqrt(
-                sum((waveform_dict[det]['eccentric']['snr_e'])**2 
-                    for det in detector_list 
-                    if waveform_dict[det]['eccentric']['ecc_signal'] is not None)
-            )
-        else:
-            snr_e_network = None
-        
-        if any(waveform_dict[det]['lensed']['lensed_signal'] is not None for det in detector_list):
-            snr_l_network = np.sqrt(    
-                sum((waveform_dict[det]['lensed']['snr_l'])**2 
-                    for det in detector_list 
-                    if waveform_dict[det]['lensed']['lensed_signal'] is not None)
-            )
-        else:
-            snr_l_network = None
+        snr_l_network = np.sqrt(
+            sum((waveform_dict[det]['lensed']['snr_l'])**2 
+                for det in detector_list)
+        )
 
         snr_u_network = np.sqrt(
             sum((waveform_dict[det]['unlensed']['snr_u'])**2 for det in detector_list)
         )
 
-        first_detector = detector_list[0]
-        ecc_distance = (waveform_dict[first_detector]['eccentric']['distance_e'] 
-                       if waveform_dict[first_detector]['eccentric']['ecc_signal'] is not None 
-                       else None)
-        lens_distance = (waveform_dict[first_detector]['lensed']['distance_l'] 
-                        if waveform_dict[first_detector]['lensed']['lensed_signal'] is not None 
-                        else None)
-        unlens_distance = waveform_dict[first_detector]['unlensed']['distance_u']
+        ecc_lnB = 0.5 * (1 - ecc_match**2) * snr_e_network
+        lens_lnB = 0.5 * (1 - lens_match**2) * snr_l_network
+
+        count = {}
+
+        if lens_lnB > np.log(10):
+            count["lensed_saved"] = save_qtransform_with_checks(waveform_dict, output_path / "lensed" / f"{num}.npy")
+        else:
+            count["unlensed_saved"] = save_qtransform_with_checks(waveform_dict, output_path / "unlensed" / f"{num}-1.npy")
+
+        if ecc_lnB > np.log(10):
+            count['eccentric_saved'] = save_qtransform_with_checks(waveform_dict, output_path / "eccentric" / f"{num}.npy")
+        else:
+            count['unlensed_saved'] = save_qtransform_with_checks(waveform_dict, output_path / "unlensed" / f"{num}-2.npy")
+
+
+        count["unlensed_saved"] = save_qtransform_with_checks(waveform_dict, output_path / "unlensed" / f"{num}.npy")
 
         result = {
             'sample': num,
@@ -736,9 +711,6 @@ def generate_sample(args):
             'spin1z': float(params['spin1z']), 'spin2z': float(params['spin2z']),
             'eccentricity': float(params['eccentricity']),
             'coa_phase': float(params['coa_phase']),
-            'eccentric_distance': float(ecc_distance) if ecc_distance is not None else None,
-            'lensed_distance': float(lens_distance) if lens_distance is not None else None,
-            'unlensed_distance': float(unlens_distance),
             'ra': float(params['ra']), 'dec': float(params['dec']),
             'polarization': float(params['polarization']),
             'm_lens': float(m_lens), 'y_lens': float(y_lens),
@@ -747,7 +719,7 @@ def generate_sample(args):
             **count
         }
 
-        del ecc_dict, lens_dict, unlens_dict, waveform_dict, ecc_distance, lens_distance, unlens_distance
+        del ecc_dict, lens_dict, unlens_dict, waveform_dict
         gc.collect()
 
         return result
@@ -768,26 +740,39 @@ def main():
                         help='Defines the prior distribution for sampling in SNR. Default is PowerLaw.')
     parser.add_argument('--path-name', type=str, default='data',
                         help='Path to save the generated data. Default is "data".')
+    parser.add_argument('--batch-size', type=int, default=150,
+                        help='Batch size saves RAM usage by generating waveforms in batches. Default is 150.')
     
     args = parser.parse_args()
 
     num_samples = args.num_samples
     snr_prior = args.snr_prior
+    batch_size = args.batch_size
 
-    jump = 0   
-    
+    n_eccentric, n_lensed, n_unlensed = 0, 0, 0
+
     directory = f"./{args.path_name}"
 
-    if os.path.exists(directory):
-    
-        file_pattern = os.path.join(directory, 'unlensed_*')
-        jump = len([f for f in glob.glob(file_pattern) if os.path.isfile(f)])
+    jump = 0   
 
+    if os.path.exists(directory):
+        file_pattern = os.path.join(directory, 'unlensed', '*.npy')
+        file_list = glob.glob(file_pattern)
+        files = [i.split('/')[3].split('.')[0] for i in file_list]
+        final_files = set([i.split('-')[0] if '-' in i else i for i in files])
+        jump = len(final_files)
+        
     output_path = Path(directory)
+    eccentric_path = output_path / Path("eccentric")
+    lensed_path = output_path / Path("lensed")
+    unlensed_path = output_path / Path("unlensed")
     results_dir = Path('./results')
     
     if not output_path.exists():
         output_path.mkdir(parents=True, exist_ok=True)
+        eccentric_path.mkdir(parents=True, exist_ok=True)
+        lensed_path.mkdir(parents=True, exist_ok=True)
+        unlensed_path.mkdir(parents=True, exist_ok=True)
     if not results_dir.exists():
         results_dir.mkdir(exist_ok=True)
 
@@ -795,25 +780,33 @@ def main():
 
     print(f"Generating {len(samples)} samples in each class...")
 
-    args_list = [(i, samples[i], jump, output_path) for i in range(num_samples)]
-
     with Pool(args.num_workers) as pool:
-        results = list(tqdm(pool.imap_unordered(generate_sample, args_list), total=num_samples))
+        for i in range(0, len(samples), batch_size):
+            batch_sample = samples[i:i+batch_size]
+            
+            print(f"Jumping {jump} files")
 
-    valid_results = [res for res in results if res is not None]
+            args_list = [(j + jump, batch_sample[j], jump, output_path) for j in range(len(batch_sample))]
 
-    save_csv(results_dir / f"{args.path_name}_parameters.csv", valid_results)
-    save_csv(results_dir / f"{args.path_name}_snr_lookup_table.csv",
-             [{'sample': r['sample'], 'eccentric_snr': r['eccentric_snr'], 'lensed_snr': r['lensed_snr'],
-               'unlensed_snr': r['unlensed_snr'], 'eccentric_distance': r['eccentric_distance'],
-               'lensed_distance': r['lensed_distance'], 'unlensed_distance': r['unlensed_distance']} for r in valid_results])
+            results = list(tqdm(pool.imap_unordered(generate_sample, args_list), total=len(batch_sample)))
 
-    n_eccentric = sum(1 for r in valid_results if r.get('eccentric_saved'))
-    n_lensed = sum(1 for r in valid_results if r.get('lensed_saved'))
-    n_unlensed = sum(1 for r in valid_results if r.get('unlensed_saved'))
+            valid_results = [res for res in results if res is not None]
+            
+            n_eccentric += sum(1 for r in valid_results if r.get('eccentric_saved'))
+            n_lensed += sum(1 for r in valid_results if r.get('lensed_saved'))
+            n_unlensed += sum(1 for r in valid_results if r.get('unlensed_saved'))
+
+            save_csv(results_dir / f"{args.path_name}_parameters.csv", valid_results)
+            
+            print(f"Processed batch: {int(i / batch_size)}")
+
+            jump += (i + 1) * batch_size
+
+            del results, valid_results
+            gc.collect()
+
 
     print(f"\nData generation complete!")
-    print(f"Total valid samples: {len(valid_results)} / {num_samples}")
     print(f"Saved eccentric: {n_eccentric}, lensed: {n_lensed}, unlensed: {n_unlensed}")
 
 
