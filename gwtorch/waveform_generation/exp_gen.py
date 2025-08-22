@@ -687,8 +687,8 @@ def generate_sample(args):
             sum((waveform_dict[det]['unlensed']['snr_u'])**2 for det in detector_list)
         )
 
-        ecc_lnB = 0.5 * (1 - ecc_match**2) * snr_e_network
-        lens_lnB = 0.5 * (1 - lens_match**2) * snr_l_network
+        ecc_lnB = 0.5 * (1 - ecc_match**2) * snr_e_network**2
+        lens_lnB = 0.5 * (1 - lens_match**2) * snr_l_network**2
 
         count = {}
 
