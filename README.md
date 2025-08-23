@@ -2,40 +2,40 @@
 
 A machine learning toolkit to classify gravitational wave (GW) signals — eccentric, lensed, and non-eccentric — using CNN and Transformer models. This project involves generation, preprocessing, training, and evaluation of GW signals using Q-transform spectrograms.
 
+To install the package just: `bash install.sh`
+
 # A guide to File Structure
 
 <pre>
 .
 ├── environment.yml
+├── install.sh
+├── pyproject.toml
 ├── gwtorch
 │   ├── inference
-│   │   ├── cnn_eval.py
 │   │   ├── __pycache__
+│   │   ├── cnn_eval.py
 │   │   └── transformer_eval.py
 │   ├── modules
+│   │   ├── __pycache__
 │   │   ├── constants.py
 │   │   ├── general_utils.py
 │   │   ├── gw_utils.py
 │   │   ├── ml_utils.py
-│   │   ├── neural_net.py
-│   │   └── __pycache__
+│   │   └── neural_net.py
 │   ├── training
+│   │   ├── __pycache__
 │   │   ├── binary_cnn_classifier.py
 │   │   ├── binary_transformer_classifier.py
 │   │   ├── cnn.py
 │   │   ├── Meta_model.py
-│   │   ├── __pycache__
 │   │   └── transformer.py
 │   └── waveform_generation
 │       ├── gen_ln_B.py
 │       ├── gen.py
 │       ├── exp_gen.py
-│       ├── gen_with_additional_functionalities.py
-│       ├── gw_signal_gen_on_ln_B_basis.py
 │       ├── Prior_Files
 │       └── __pycache__
-├── install.sh
-├── pyproject.toml
 └── README.md
 
 </pre>
@@ -70,7 +70,7 @@ translations in the signal.
 
 The signal is then cropped so that the data is of 8s duration.
 
-Then finally we generate the `q_transforms` of each signal and save them as `.npy` file with naming convention such that if the signal is `lensed` then the name of the file is `lensed_{num}.npy`, where `num` just represnts file number.
+Then finally we generate the `q_transforms` of each signal and save them as `.npy` file with naming convention such that if the signal is `lensed` then the file is located at `lensed / {num}.npy`, where `num` just represnts file number.
 
 ## 📋 Prior Distributions Table
 
