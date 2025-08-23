@@ -28,6 +28,7 @@ A machine learning toolkit to classify gravitational wave (GW) signals — eccen
 │   └── waveform_generation
 │       ├── gen_ln_B.py
 │       ├── gen.py
+│       ├── exp_gen.py
 │       ├── gen_with_additional_functionalities.py
 │       ├── gw_signal_gen_on_ln_B_basis.py
 │       ├── Prior_Files
