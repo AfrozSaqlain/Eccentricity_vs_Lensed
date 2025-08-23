@@ -41,10 +41,9 @@ A machine learning toolkit to classify gravitational wave (GW) signals — eccen
 
 ## 📌 Key Files Description
 
-- `exp_gen.py`: Generates Q-transform spectrograms of synthetic GW signals using specified PSD (sampling frequency = 4096 Hz).
+- `exp_gen.py`: Generates Q-transform spectrograms of synthetic GW signals.
 - `cnn.py`, `transformer.py`: Contain CNN and Transformer model definitions with training/testing routines.
-- `transformer_with_ROC_and_File_Classification.py`: Extends training by logging ROC curves, AUC scores, and writing misclassified files.
-- `cnn_eval.py`, `transformer_eval.py`: Evaluates trained CNN and Transformer models on test data.
+- `cnn_eval.py`, `transformer_eval.py`: Specifically used to evaluate trained CNN and Transformer models on test data.
 
 
 # 🖥️ Command Line Interface (CLI)
