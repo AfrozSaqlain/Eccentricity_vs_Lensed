@@ -781,6 +781,7 @@ def main():
     print(f"Generating {len(samples)} samples in each class...")
 
     with Pool(args.num_workers) as pool:
+        count = 1
         for i in range(0, len(samples), batch_size):
             batch_sample = samples[i:i+batch_size]
             
@@ -800,7 +801,8 @@ def main():
             
             print(f"Processed batch: {int(i / batch_size)}")
 
-            jump += (i + 1) * batch_size
+            jump += (count) * batch_size
+            count += 1
 
             del results, valid_results
             gc.collect()

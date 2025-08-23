@@ -40,17 +40,15 @@ A machine learning toolkit to classify gravitational wave (GW) signals — eccen
 
 ## 📌 Key Files Description
 
-- `gen.py`: Generates Q-transform spectrograms of synthetic GW signals using specified PSD (sampling frequency = 4096 Hz).
-- `gw_ln_B.py`: Generates eccentric GW signals and calculates \(\ln B^{\text{Ecc}}_{\text{Qc}}\), grouping samples into two bins with balanced counts.
+- `exp_gen.py`: Generates Q-transform spectrograms of synthetic GW signals using specified PSD (sampling frequency = 4096 Hz).
 - `cnn.py`, `transformer.py`: Contain CNN and Transformer model definitions with training/testing routines.
 - `transformer_with_ROC_and_File_Classification.py`: Extends training by logging ROC curves, AUC scores, and writing misclassified files.
 - `cnn_eval.py`, `transformer_eval.py`: Evaluates trained CNN and Transformer models on test data.
-- `eval_based_on_ln_B*.ipynb`: Evaluates misclassifications across different \(\ln B\) bins using previously generated data.
 
 
 # 🖥️ Command Line Interface (CLI)
 
-- **`generate_waveform_gwtorch --num-samples [int]`** : Used to generate qtransform of the waveform samples.
+- **`exp_gen_gwtorch --num-samples [int] --path-name [str] --batch-size [int]`** : Used to generate qtransform of the waveform samples.
 - **`cnn_train_gwtorch --batch_size [default: 128] --epochs [default: 20] --lr [default: 3e-4] --gamma [default: 0.7] --model_path [default: cnn_model0.pth]  --k-folds [default: 5] --use-kfold [stores Truth value]`**: Train the CNN model on the data generated using previous code. The directory `models` is created if it doesn't exist.
 - **`transformer_train_gwtorch --model [default: ViT] --batch_size [default: 512] --epochs [default 20] --lr [default: 3e-5] --gamma [default: 0.7] --seed [default: 42] --k-folds [default: 5] --use-kfold [stores Truth value]`**:  Train the Transformer model on the data generated.
 
@@ -71,7 +69,7 @@ translations in the signal.
 
 The signal is then cropped so that the data is of 8s duration.
 
-Then finally we generate the `q_transforms` of each signal and save them as `.npy` file with naming convention such that if the signal is `lensed` then the name of the file is `lensed_{num},png`, where `num` just represnts file number.
+Then finally we generate the `q_transforms` of each signal and save them as `.npy` file with naming convention such that if the signal is `lensed` then the name of the file is `lensed_{num}.npy`, where `num` just represnts file number.
 
 ## 📋 Prior Distributions Table
 
@@ -89,8 +87,8 @@ Then finally we generate the `q_transforms` of each signal and save them as `.np
 | `dec`           | `Cosine`                           | [−π/2, π/2]                   |
 | `ra`            | `Uniform` (periodic)               | [0, 2π]                       |
 | `polarization`  | `Uniform` (periodic)               | [0, π]                        |
-| `Log_Mlz`       | `Uniform`                          | [2, 5]                        |
+| `Log_Mlz`       | `Uniform`                          | [1, 5]                        |
 | `yl`            | `PowerLaw` (`α = 1`)               | [0.01, 1.0]                   |
 
 
-**Note:** The `gen.py` script also generates a Lookup table for SNR values and parameter values corresponding to each sample and each category. Also sample `data` generated is given in `data_for_reference` folder alongwith its `SNR Lookup Table` as well as `Parameter Reference` in csv format.
+**Note:** The `exp_gen.py` script also generates a Lookup table for parameter values corresponding to each sample and each category. Also sample `data` generated is given in `data_for_reference` folder alongwith its `Parameter Reference` in csv format.

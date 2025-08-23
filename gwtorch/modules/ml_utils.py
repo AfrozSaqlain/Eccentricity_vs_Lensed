@@ -69,21 +69,19 @@ class GWDataset(Dataset):
         
         arr = self.transform(arr)
 
-        label_str = file_path.split("/")[-1].split("_")[0].lower()
+        label_str = file_path.split("/")[2].lower()
         label = {'lensed': 0, 'eccentric': 1, 'unlensed': 2}[label_str]
-        file_number = file_path.split("/")[-1].split("_")[1].split(".")[0]
 
-        return arr, label, file_number, file_path
+        return arr, label, file_path
     
 def custom_collate_fn(batch):
-    images, labels, file_numbers, img_paths = zip(*batch)
-    return torch.stack(images), torch.tensor(labels), file_numbers, img_paths
+    images, labels, file_paths = zip(*batch)
+    return torch.stack(images), torch.tensor(labels), file_paths
 
 def load_all_data(path_name='data', seed=42, batch_size=32):
 
-    all_files = glob.glob(f'./{path_name}/*.npy')
-    all_labels = [path.split('/')[-1].split('_')[0] for path in all_files]
-
+    all_files = glob.glob(f'./{path_name}/*/*.npy')
+    all_labels = [path.split('/')[2] for path in all_files]
 
     train_files, temp_files, train_labels, temp_labels = train_test_split(
         all_files, all_labels, test_size=0.3, stratify=all_labels, random_state=seed
@@ -94,7 +92,6 @@ def load_all_data(path_name='data', seed=42, batch_size=32):
     )
 
     transform = transforms.Compose([
-        # transforms.Lambda(lambda x: torch.tensor(x).permute(2, 0, 1)),
         transforms.Resize((224, 224)),
     ])
 
@@ -104,7 +101,6 @@ def load_all_data(path_name='data', seed=42, batch_size=32):
 
     num_channels = train_data[0][0].shape[0] if isinstance(train_data[0][0], torch.Tensor) else 3
 
-    # Create loaders
     train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True,
                               num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
     val_loader   = DataLoader(val_data, batch_size=batch_size, shuffle=False,
@@ -117,8 +113,8 @@ def load_all_data(path_name='data', seed=42, batch_size=32):
 def prepare_kfold_data(path_name='data'):
     """Prepare data for k-fold cross validation"""
 
-    all_files = glob.glob(f'./{path_name}/*.npy')
-    all_labels = [path.split('/')[-1].split('_')[0] for path in all_files]
+    all_files = glob.glob(f'./{path_name}/*/*.npy')
+    all_labels = [path.split('/')[2] for path in all_files]
     
     return all_files, all_labels
 
@@ -126,7 +122,6 @@ def create_fold_loaders(train_files, val_files, batch_size):
     """Create data loaders for a specific fold"""
 
     transform = transforms.Compose([
-        # transforms.Lambda(lambda x: torch.tensor(x).permute(2, 0, 1)),
         transforms.Resize((224, 224)),
     ])
 
@@ -272,7 +267,7 @@ from collections import Counter
 def filenames_to_label_indices(file_list):
     labels = []
     for p in file_list:
-        lab = p.split('/')[-1].split('_')[0].lower()
+        lab = p.split('/')[2].lower()
         labels.append({'lensed':0,'eccentric':1,'unlensed':2}[lab])
     return labels
 
@@ -283,7 +278,6 @@ def run_kfold_training(args, device, get_model=None, model_name=None):
     print(f"{'='*50}")
 
     model = get_model(name=args.model, num_channels=4, device=device)
-    print(f'Using model: {model}')   # Remove it later
 
     all_files, all_labels = prepare_kfold_data(path_name=args.path_name)
     
@@ -299,11 +293,11 @@ def run_kfold_training(args, device, get_model=None, model_name=None):
         'val_accs_all': [],
         'roc_data': []  # Store FPR, TPR, AUC for each fold
     }
-    
+
     train_val_files, test_files, train_val_labels, test_labels = train_test_split(
         all_files, all_labels, test_size=0.2, stratify=all_labels, random_state=args.seed
     )
-    
+
     transform = transforms.Compose([
         # transforms.Lambda(lambda x: torch.tensor(x).permute(2, 0, 1)),
         transforms.Resize((224, 224)),

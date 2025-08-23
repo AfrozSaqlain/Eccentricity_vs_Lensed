@@ -115,7 +115,7 @@ def compute_roc_auc_with_misclassifications(model, data_loader, device, class_na
     all_img_paths = []
     
     with torch.no_grad():
-        for data, labels, file_numbers, img_paths in data_loader:
+        for data, labels, img_paths in data_loader:
             data = data.to(device)
             labels = labels.to(device)
             
@@ -126,7 +126,6 @@ def compute_roc_auc_with_misclassifications(model, data_loader, device, class_na
             all_labels.extend(labels.cpu().numpy())
             all_predictions.extend(predictions.cpu().numpy())
             all_probabilities.extend(probabilities.cpu().numpy())
-            all_file_numbers.extend(file_numbers)
             all_img_paths.extend(img_paths)
     
     all_labels = np.array(all_labels)
@@ -140,7 +139,6 @@ def compute_roc_auc_with_misclassifications(model, data_loader, device, class_na
     misclassified_info = []
     for idx in misclassified_indices:
         info = {
-            'file_number': all_file_numbers[idx],
             'file_path': all_img_paths[idx],
             'true_label': all_labels[idx],
             'predicted_label': all_predictions[idx],
@@ -211,7 +209,6 @@ def print_misclassified_files(misclassified_info, dataset_name):
         print(f"{'-'*40}")
         
         for info in files:
-            print(f"File Number: {info['file_number']}")
             print(f"File Path: {info['file_path']}")
             print(f"Predicted as: {info['predicted_class']}")
             print(f"Prediction Probabilities: {info['prediction_probabilities']}")
@@ -245,7 +242,6 @@ def save_misclassified_files_to_txt(misclassified_info, dataset_name, filename):
             f.write(f"{'-'*40}\n")
             
             for info in files:
-                f.write(f"File Number: {info['file_number']}\n")
                 f.write(f"File Path: {info['file_path']}\n")
                 f.write(f"Predicted as: {info['predicted_class']}\n")
                 f.write(f"Prediction Probabilities: {info['prediction_probabilities']}\n")
