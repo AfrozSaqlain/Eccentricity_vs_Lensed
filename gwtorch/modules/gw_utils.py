@@ -93,7 +93,7 @@ def generate_prior(num_samples, snr_type = "powerlaw"):
         for i in range(num_samples)
     ]
 
-def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_detector, display=False):
+def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_detector, display=False, check_lnB=True):
     """
     Generate eccentric, unlensed, and lensed gravitational waveforms with injected noise.
 
@@ -182,55 +182,44 @@ def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_dete
         ecc_noisy, snr_e, distance_e, ecc_padded = inject_noise_with_target_SNR(ecc, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='eccentric', peak_window=peak_window, detector=detector)
         lens_noisy, snr_l, distance_l, lens_padded = inject_noise_with_target_SNR(lensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='lensed', peak_window=peak_window, detector=detector)
         unlens_noisy, snr_u, distance_u, unlens_padded = inject_noise_with_target_SNR(unlensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='quasi_circular', peak_window=peak_window, detector=detector)
-
+        
         ecc_noisy = ecc_noisy.crop(left=24, right=0)
         lens_noisy = lens_noisy.crop(left=24, right=0)
         unlens_noisy = unlens_noisy.crop(left=24, right=0)
 
-        # ecc_padded.start_time = unlens_padded.start_time
-        # lens_padded.start_time = unlens_padded.start_time
-        # ecc_noisy.start_time = unlens_padded.start_time
-        # lens_noisy.start_time = ecc_noisy.start_time
-        # unlens_noisy.start_time = ecc_noisy.start_time
+        if check_lnB:
+            tlen = max(len(hp), len(sp), len(sp_lensed))
+            
+            hp.resize(tlen)
+            sp.resize(tlen)
+            sp_lensed.resize(tlen)
 
-        if display:
+            sp_lensed = pycbc.types.TimeSeries(sp_lensed.data,
+                                         delta_t=hp.delta_t,
+                                         epoch=hp.start_time)
+            
+            duration = hp.duration
+            flen     = tlen // 2 + 1
 
-            fig, axs = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
+            if detector.name == 'E1' or detector.name == 'E2' or detector.name == 'E3':
+                psd = pycbc.psd.EinsteinTelescopeP1600143(flen, 1/duration, F_LOWER)
+            elif detector.name == 'C1':
+                psd = pycbc.psd.CosmicExplorerP1600143(flen, 1/duration, F_LOWER)
+            elif detector.name == 'L1' or detector.name == 'H1' or detector.name == 'V1' or detector.name == 'A1':
+                psd = pycbc.psd.aLIGOZeroDetHighPower(flen, 1/duration, F_LOWER)
 
-            axs[0].plot(ecc_noisy.sample_times, ecc_noisy, label="Eccentric (noisy)", linestyle='-', color='C0')
-            axs[0].plot(ecc_padded.sample_times, ecc_padded, label="Eccentric (padded)", linestyle='-', color='C1')
-            axs[0].set_ylabel("Strain")
-            axs[0].set_title("Eccentric Waveform")
-            axs[0].legend()
-            axs[0].grid(True)
+            ecc_m = pycbc.filter.match(hp, sp, psd=psd, low_frequency_cutoff=F_LOWER)[0]
+            lens_m = pycbc.filter.match(sp_lensed, sp, psd=psd, low_frequency_cutoff=F_LOWER)[0]
 
-            axs[1].plot(lens_noisy.sample_times, lens_noisy, label="Lensed (noisy)", linestyle='-', color='C2')
-            axs[1].plot(lens_padded.sample_times, lens_padded, label="Lensed (padded)", linestyle='-', color='C3')
-            axs[1].set_ylabel("Strain")
-            axs[1].set_title("Lensed Waveform")
-            axs[1].legend()
-            axs[1].grid(True)
-
-            axs[2].plot(unlens_noisy.sample_times, unlens_noisy, label="Unlensed (noisy)", linestyle='-', color='C4')
-            axs[2].plot(unlens_padded.sample_times, unlens_padded, label="Unlensed (padded)", linestyle='-', color='C5')
-            axs[2].set_xlabel("Time [s]")
-            axs[2].set_ylabel("Strain")
-            axs[2].set_title("Unlensed Waveform")
-            axs[2].legend()
-            axs[2].grid(True)
-
-            plt.tight_layout()
-            plt.show()
-
-        ecc_dict = {'ecc_signal': ecc_noisy, 'snr_e': snr_e, 'distance_e': distance_e}
         lens_dict = {'lensed_signal': lens_noisy, 'snr_l': snr_l, 'distance_l': distance_l}
+        ecc_dict = {'ecc_signal': ecc_noisy, 'snr_e': snr_e, 'distance_e': distance_e}
         unlens_dict = {'unlensed_signal': unlens_noisy, 'snr_u': snr_u, 'distance_u': distance_u}
 
         del hp, hc, sp, sc, sp_lensed, sc_lensed
         del ecc, unlensed, lensed, ecc_noisy, lens_noisy, unlens_noisy, ecc_padded, lens_padded, unlens_padded
         gc.collect()
 
-        return ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens
+        return ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens, lens_m, ecc_m
         
     except Exception as e:
         print(f"[Sample {num}] Error: {e}")
@@ -484,44 +473,37 @@ def inject_signal_with_peak_in_window(signal_ts, noise_ts, peak_window=(2.0, 2.2
     injection_index : int
         The index in the array where the peak was injected.
     """
-    # Convert to numpy arrays
     signal = np.asarray(signal_ts)
 
-    # Sampling info
     delta_t = noise_ts.delta_t
     N = len(noise_ts)
     duration = N * delta_t
 
-    # Step 1: Find peak index in the signal
     peak_index = np.argmax(np.abs(signal))
 
-    # Step 2: Choose target time for the peak
     min_offset, max_offset = peak_window
     t_peak = np.random.uniform(duration - max_offset, duration - min_offset)
     target_index = int(t_peak / delta_t)
 
-    # Step 3: Calculate start and end indices for injection
     start_index = target_index - peak_index
     end_index = start_index + len(signal)
 
-    # Step 4: Handle truncation if signal goes out of bounds
     padded_signal = np.zeros(N)
 
     if start_index < 0:
-        signal = signal[-start_index:]  # Trim the front
+        signal = signal[-start_index:]
         start_index = 0
         end_index = start_index + len(signal)
 
     if end_index > N:
-        signal = signal[:N - start_index]  # Trim the end
+        signal = signal[:N - start_index]
         end_index = start_index + len(signal)
 
-    # Step 5: Insert the signal into the padded array
     padded_signal[start_index:end_index] = signal
 
     return padded_signal, delta_t, signal_ts.start_time
 
-def save_qtransform(ts, file_name):
+def save_simple_qtransform(ts, file_name):
     """
     Compute and save the Q-transform spectrogram of a time series.
 
@@ -589,126 +571,57 @@ def display_qtransform(ts):
 
 def _get_category_parts(path_str):
     """Return ('eccentric' | 'lensed' | 'unlensed', True/False)"""
-    if "eccentric" in path_str:
+    if "eccentric" in path_str or "-2" in path_str:
         return "eccentric"
-    if "lensed"    in path_str and "unlensed" not in path_str:
+    if "lensed" in path_str and "unlensed" not in path_str and "-1" not in path_str:
+        return "lensed"
+    if "-1" in path_str:
         return "lensed"
     return "unlensed"
 
-def save_qtransform_with_checks(waveform_dict, params, path):
+def save_qtransform_with_checks(waveform_dict, path):
     """
-    Saves an RGB‑stacked Q‑transform image:
-      R = detector‑0 spectrogram
-      G = detector‑1 spectrogram
-      B = detector‑2 spectrogram
+    Saves an multi-channeled Q‑transform image:
+      Each channels corresponds to one particular detector.
     Category is inferred from the filename: eccentric / lensed / unlensed.
     Returns True on success, False otherwise.
     """
     category = _get_category_parts(str(path))
     stacked_q = []
 
-    # --- iterate over detectors ------------------------------------------------
     for key in waveform_dict:
         wf = waveform_dict[key]
 
-        mass1, mass2  = wf['mass1'],  wf['mass2']
-        m_lens, y_lens = wf['m_lens'], wf['y_lens']
-
-        # pick fields that differ by category
         if category == "eccentric":
-            distance   = wf['eccentric']['distance_e']
-            signal_snr = wf['eccentric']['snr_e']
             ts_raw     = wf['eccentric']['ecc_signal']
         elif category == "lensed":
-            distance   = wf['lensed']['distance_l']
-            signal_snr = wf['lensed']['snr_l']
             ts_raw     = wf['lensed']['lensed_signal']
         else:  # unlensed
-            distance   = wf['unlensed']['distance_u']
-            signal_snr = wf['unlensed']['snr_u']
             ts_raw     = wf['unlensed']['unlensed_signal']
 
-        # --- Bayes factor / match test where applicable ------------------------
-        compute_q = True  # default for unlensed case
-        if category in ("eccentric", "lensed"):
-            # reference (un‑lensed, zero‑ecc) waveform
-            hp_, _ = get_td_waveform(
-                approximant='teobresums',
-                mass1=mass1, mass2=mass2,
-                lambda1=0, lambda2=0,
-                spin1z=params['spin1z'], spin2z=params['spin2z'],
-                distance=distance, delta_t=DELTA_T,
-                ecc = 0 if category=="lensed" else params['eccentricity'],
-                coa_phase=params['coa_phase'], f_lower=F_LOWER
-            )
-
-            # comparison waveform
-            if category == "eccentric":
-                sp_, _ = get_td_waveform(
-                    approximant='teobresums',
-                    mass1=mass1, mass2=mass2,
-                    lambda1=0, lambda2=0,
-                    spin1z=params['spin1z'], spin2z=params['spin2z'],
-                    distance=distance, delta_t=DELTA_T,
-                    ecc   = 0.0,  # quasi-circular reference
-                    coa_phase=params['coa_phase'], f_lower=F_LOWER
-                )
-            else:  # lensed
-                sp_, _, _ = compute_lensed_waveform(hp_, _, m_lens, y_lens)
-
-            # standardise length / dt
-            tlen = max(len(hp_), len(sp_))
-            hp_.resize(tlen)
-            sp_.resize(tlen)
-            sp_ = pycbc.types.TimeSeries(sp_.data,
-                                         delta_t=hp_.delta_t,
-                                         epoch=hp_.start_time)
-
-            # PSD & ln B
-            duration = hp_.duration
-            flen     = tlen // 2 + 1
-
-            if key.name == 'E1' or key.name == 'E2' or key.name == 'E3':
-                psd = pycbc.psd.EinsteinTelescopeP1600143(flen, 1/duration, F_LOWER)
-            elif key.name == 'C1':
-                psd = pycbc.psd.CosmicExplorerP1600143(flen, 1/duration, F_LOWER)
-            elif key.name == 'L1' or key.name == 'H1' or key.name == 'V1' or key.name == 'A1':
-                psd = pycbc.psd.aLIGOZeroDetHighPower(flen, 1/duration, F_LOWER)
-
-            m = pycbc.filter.match(hp_, sp_, psd=psd, low_frequency_cutoff=F_LOWER)[0]
-            ln_B = 0.5 * (1 - m**2) * signal_snr**2
-            compute_q = ln_B >= np.log(10)
 
         # --- Q‑transform & stack ------------------------------------------------
-        if compute_q:
-            ts = TimeSeries.from_pycbc(ts_raw)
-            q  = ts.q_transform(logf=True, norm='median',
-                                frange=(F_LOWER, 512),
-                                whiten=True, qrange=(4, 64))
-            # stacked_q.append(np.abs(q.data)) # OLD ONE
-            stacked_q.append(np.abs(q.data).T)
-        else:
-            # print(f"{category}: {key.name} failed ln_B test – skipping Q-transform.")
-            return False
 
-    # Find the maximum shape across all detectors
+        ts = TimeSeries.from_pycbc(ts_raw)
+        q  = ts.q_transform(logf=True, norm='median',
+                            frange=(F_LOWER, 512),
+                            whiten=True, qrange=(4, 64))
+        stacked_q.append(np.abs(q.data).T)
+
     max_shape = (
         max(q.shape[0] for q in stacked_q),
         max(q.shape[1] for q in stacked_q)
     )
     
-    # Pad all arrays to the same shape, then normalize
     padded_q = [pad_to_shape(q, max_shape) for q in stacked_q]
     normed = [Normalize()(q) for q in padded_q]
 
     stacked = np.stack(normed, axis=0)              # (C, H, W)
-    # stacked_img = np.transpose(stacked, (1, 2, 0))  # (H, W, C)
 
     out_path = str(path)
     if out_path.endswith('.png'):
         out_path = out_path.replace('.png', '.npy')
     np.save(out_path, np.asarray(stacked))
-    # np.save(out_path, np.asarray(stacked_img))
     
     return True
 
