@@ -2,7 +2,7 @@
 
 A machine learning toolkit to classify gravitational wave (GW) signals — eccentric, lensed, and non-eccentric — using CNN and Transformer models. This project involves generation, preprocessing, training, and evaluation of GW signals using Q-transform spectrograms.
 
-To install the package just: `bash install.sh`
+To install the package just run: `bash install.sh`
 
 # A guide to File Structure
 
@@ -13,18 +13,15 @@ To install the package just: `bash install.sh`
 ├── pyproject.toml
 ├── gwtorch
 │   ├── inference
-│   │   ├── __pycache__
 │   │   ├── cnn_eval.py
 │   │   └── transformer_eval.py
 │   ├── modules
-│   │   ├── __pycache__
 │   │   ├── constants.py
 │   │   ├── general_utils.py
 │   │   ├── gw_utils.py
 │   │   ├── ml_utils.py
 │   │   └── neural_net.py
 │   ├── training
-│   │   ├── __pycache__
 │   │   ├── binary_cnn_classifier.py
 │   │   ├── binary_transformer_classifier.py
 │   │   ├── cnn.py
@@ -34,8 +31,7 @@ To install the package just: `bash install.sh`
 │       ├── gen_ln_B.py
 │       ├── gen.py
 │       ├── exp_gen.py
-│       ├── Prior_Files
-│       └── __pycache__
+│       └── Prior_Files
 └── README.md
 
 </pre>
@@ -61,12 +57,11 @@ We use `TEOBResumS` to generate signals assuming `f_lower` = 5. Two sets of data
 
 The Non-Eccentric waveform is then used to generate unlensed data as well as lensed data. Lensing is done using `GWMAT` package.
 
-The waveforms are then projected onto given set of detectors by using `ra`, `dec`, and `polarization` values sampled from the prior
+The waveforms are then projected onto given set of detectors by using `ra`, `dec`, and `polarization` values sampled from the prior.
 
 Each wave is then tapered. Then we generated noise from corresponding PSD.
 
-Next we pad each GW signal and add it to the noise such that the peak of the signal lies within 2.2 seconds to 2 seconds window before the noise ends. This is done to make the training process robust to moderate time
-translations in the signal.
+Next we pad each GW signal and add it to the noise such that the peak of the signal lies within 2.2 seconds to 2 seconds window before the noise ends. This is done to make the training process robust to moderate time translations in the signal.
 
 The signal is then cropped so that the data is of 8s duration.
 
