@@ -187,6 +187,38 @@ def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_dete
         lens_noisy = lens_noisy.crop(left=24, right=0)
         unlens_noisy = unlens_noisy.crop(left=24, right=0)
 
+        if display:
+
+            fig, axs = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
+
+            axs[0].plot(ecc_noisy.sample_times, ecc_noisy, label="Eccentric (noisy)", linestyle='-', color='C0')
+            axs[0].plot(ecc_padded.sample_times, ecc_padded, label="Eccentric (padded)", linestyle='-', color='C1')
+            # axs[0].plot(ecc.sample_times, ecc)
+            axs[0].set_ylabel("Strain")
+            axs[0].set_title("Eccentric Waveform")
+            axs[0].legend()
+            axs[0].grid(True)
+
+            axs[1].plot(lens_noisy.sample_times, lens_noisy, label="Lensed (noisy)", linestyle='-', color='C2')
+            axs[1].plot(lens_padded.sample_times, lens_padded, label="Lensed (padded)", linestyle='-', color='C3')
+            # axs[1].plot(lensed.sample_times, lensed)
+            axs[1].set_ylabel("Strain")
+            axs[1].set_title("Lensed Waveform")
+            axs[1].legend()
+            axs[1].grid(True)
+
+            axs[2].plot(unlens_noisy.sample_times, unlens_noisy, label="Unlensed (noisy)", linestyle='-', color='C4')
+            axs[2].plot(unlens_padded.sample_times, unlens_padded, label="Unlensed (padded)", linestyle='-', color='C5')
+            # axs[2].plot(unlensed.sample_times, unlensed)
+            axs[2].set_xlabel("Time [s]")
+            axs[2].set_ylabel("Strain")
+            axs[2].set_title("Unlensed Waveform")
+            axs[2].legend()
+            axs[2].grid(True)
+
+            plt.tight_layout()
+            plt.show()
+
         if check_lnB:
             tlen = max(len(hp), len(sp), len(sp_lensed))
             
