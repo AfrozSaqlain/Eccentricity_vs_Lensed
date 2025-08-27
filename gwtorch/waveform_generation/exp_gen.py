@@ -211,7 +211,8 @@ def generate_sample(args):
     try:
         waveform_dict = {}
         for detector in detector_list:
-            ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens, lens_match, ecc_match = generate_waveform(num, params, peak_window, detector=detector)
+            SEED = 42 # np.random.uniform(30, 50)
+            ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens, lens_match, ecc_match = generate_waveform(num, params, peak_window, detector=detector, SEED=SEED)
             waveform_dict[detector] = {
                 'eccentric': ecc_dict,
                 'lensed': lens_dict,
@@ -340,7 +341,10 @@ def main():
     print(f"Generating {len(samples)} samples in each class...")
     # print_memory_usage()
 
-    with Pool(args.num_workers) as pool:
+    def _init_worker(base):
+        np.random.seed((base + os.getpid()) % (2**32 - 1))
+
+    with Pool(args.num_workers) as pool: #, initializer=_init_worker, initargs=(np.random.SeedSequence().entropy,)) as pool:
         count = 0
         for i in range(0, len(samples), batch_size):
             print(f"\nStarting batch {int(i / batch_size)}")

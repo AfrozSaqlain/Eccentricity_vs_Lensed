@@ -93,7 +93,7 @@ def generate_prior(num_samples, snr_type = "powerlaw"):
         for i in range(num_samples)
     ]
 
-def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_detector, display=False, check_lnB=True):
+def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_detector, display=False, check_lnB=True, SEED=None):
     """
     Generate eccentric, unlensed, and lensed gravitational waveforms with injected noise.
 
@@ -179,9 +179,9 @@ def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_dete
 
         target_snr = params['snr']
 
-        ecc_noisy, snr_e, distance_e, ecc_padded = inject_noise_with_target_SNR(ecc, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='eccentric', peak_window=peak_window, detector=detector)
-        lens_noisy, snr_l, distance_l, lens_padded = inject_noise_with_target_SNR(lensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='lensed', peak_window=peak_window, detector=detector)
-        unlens_noisy, snr_u, distance_u, unlens_padded = inject_noise_with_target_SNR(unlensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='quasi_circular', peak_window=peak_window, detector=detector)
+        ecc_noisy, snr_e, distance_e, ecc_padded = inject_noise_with_target_SNR(ecc, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='eccentric', peak_window=peak_window, detector=detector, SEED=SEED)
+        lens_noisy, snr_l, distance_l, lens_padded = inject_noise_with_target_SNR(lensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='lensed', peak_window=peak_window, detector=detector, SEED=SEED)
+        unlens_noisy, snr_u, distance_u, unlens_padded = inject_noise_with_target_SNR(unlensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='quasi_circular', peak_window=peak_window, detector=detector, SEED=SEED)
         
         ecc_noisy = ecc_noisy.crop(left=24, right=0)
         lens_noisy = lens_noisy.crop(left=24, right=0)

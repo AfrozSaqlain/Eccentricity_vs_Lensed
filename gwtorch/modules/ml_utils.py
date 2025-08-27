@@ -153,7 +153,7 @@ def get_model(name, num_channels, device):
         return CNN_Model(input_channlels=num_channels, dropout=dropout).to(device)
     
 def train_model(model, train_loader, valid_loader, device, epochs, lr, gamma, class_weights=None):
-    optimizer = optim.Adam(model.parameters(), lr=lr)
+    optimizer = optim.AdamW(model.parameters(), lr=lr)
     scheduler = StepLR(optimizer, step_size=5, gamma=gamma)
     if class_weights is not None:
         criterion = nn.CrossEntropyLoss(weight=class_weights.to(device))
