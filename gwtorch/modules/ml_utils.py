@@ -316,12 +316,8 @@ def run_kfold_training(args, device, get_model=None, model_name=None):
         counts = Counter(train_labels_fold)
         total = sum(counts.values())
         class_weights = torch.tensor([ total/counts[i] for i in range(3) ], dtype=torch.float32)
-        print(f'Class Weights:{class_weights}')
 
         num_channels, train_loader, val_loader = create_fold_loaders(train_files_fold, val_files_fold, args.batch_size)
-
-        if fold == 0:
-            print(f"\nNumber of channels in data: {num_channels}")
         
         print(f"\n{'='*30}")
         print(f"FOLD {fold + 1}/{args.k_folds}")

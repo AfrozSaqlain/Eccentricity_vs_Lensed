@@ -72,8 +72,6 @@ def main():
         
         model = get_model(name=args.model, num_channels=num_channels, device=device)
 
-        print(f"\nNumber of channels in data: {num_channels}")
-
         if os.path.exists(f'./models/{args.model_path}'):
             print("Pretrained model found. Loading...\n")
             model.load_state_dict(torch.load(f'./models/{args.model_path}', map_location=device))
