@@ -211,7 +211,7 @@ def generate_sample(args):
     try:
         waveform_dict = {}
         for detector in detector_list:
-            SEED = 42 # np.random.uniform(30, 50)
+            SEED = np.random.randint(2**32) # 42 # https://pycbc.org/pycbc/latest/html/_modules/pycbc/noise/gaussian.html#noise_from_psd If seed is None, PyCBC creates a numpy.random.randint(2**32) and for each subprocess the random number generated is same.
             ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens, lens_match, ecc_match = generate_waveform(num, params, peak_window, detector=detector, SEED=SEED)
             waveform_dict[detector] = {
                 'eccentric': ecc_dict,
@@ -378,8 +378,7 @@ def main():
             except:
                 pass
                 
-            # 4. Optional: Force pool to restart (if memory issues persist)
-            # Uncomment these lines if memory still accumulates:
+            # Force pool to restart
             # pool.terminate()
             # pool.join()
             # pool = Pool(args.num_workers)
