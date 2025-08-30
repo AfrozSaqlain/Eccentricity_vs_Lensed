@@ -193,6 +193,7 @@ import numpy as np
 from tqdm import tqdm
 from pathlib import Path
 from multiprocessing import Pool
+from threadpoolctl import threadpool_limits
 # import psutil
 
 from gwtorch.modules.constants import *
@@ -211,7 +212,7 @@ def generate_sample(args):
     try:
         waveform_dict = {}
         for detector in detector_list:
-            SEED = np.random.randint(2**32) # 42 # https://pycbc.org/pycbc/latest/html/_modules/pycbc/noise/gaussian.html#noise_from_psd If seed is None, PyCBC creates a numpy.random.randint(2**32) and for each subprocess the random number generated is same.
+            SEED = None # np.random.randint(2**32) # 42 # https://pycbc.org/pycbc/latest/html/_modules/pycbc/noise/gaussian.html#noise_from_psd If seed is None, PyCBC creates a numpy.random.randint(2**32) and for each subprocess the random number generated is same.
             ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens, lens_match, ecc_match = generate_waveform(num, params, peak_window, detector=detector, SEED=SEED)
             waveform_dict[detector] = {
                 'eccentric': ecc_dict,
@@ -242,16 +243,18 @@ def generate_sample(args):
 
         count = {}
 
-        if lens_lnB > np.log(10):
-            count["lensed_saved"] = save_qtransform_with_checks(waveform_dict, output_path / "lensed" / f"{num}.npy")
-        else:
-            count["lens_unlensed_saved"] = save_qtransform_with_checks(waveform_dict, output_path / "unlensed" / f"{num}-1.npy")
+        # if lens_lnB > np.log(10):
+        #     count["lensed_saved"] = save_qtransform_with_checks(waveform_dict, output_path / "lensed" / f"{num}.npy")
+        # else:
+        #     count["lens_unlensed_saved"] = save_qtransform_with_checks(waveform_dict, output_path / "unlensed" / f"{num}-1.npy")
 
-        if ecc_lnB > np.log(10):
-            count['eccentric_saved'] = save_qtransform_with_checks(waveform_dict, output_path / "eccentric" / f"{num}.npy")
-        else:
-            count['ecc_unlensed_saved'] = save_qtransform_with_checks(waveform_dict, output_path / "unlensed" / f"{num}-2.npy")
+        # if ecc_lnB > np.log(10):
+        #     count['eccentric_saved'] = save_qtransform_with_checks(waveform_dict, output_path / "eccentric" / f"{num}.npy")
+        # else:
+        #     count['ecc_unlensed_saved'] = save_qtransform_with_checks(waveform_dict, output_path / "unlensed" / f"{num}-2.npy")
 
+        count['eccentric_saved'] = save_qtransform_with_checks(waveform_dict, output_path / "eccentric" / f"{num}.npy")
+        count["lensed_saved"] = save_qtransform_with_checks(waveform_dict, output_path / "lensed" / f"{num}.npy")
         count["unlensed_saved"] = save_qtransform_with_checks(waveform_dict, output_path / "unlensed" / f"{num}.npy")
 
         result = {
@@ -344,48 +347,49 @@ def main():
     def _init_worker(base):
         np.random.seed((base + os.getpid()) % (2**32 - 1))
 
-    with Pool(args.num_workers) as pool: #, initializer=_init_worker, initargs=(np.random.SeedSequence().entropy,)) as pool:
-        count = 0
-        for i in range(0, len(samples), batch_size):
-            print(f"\nStarting batch {int(i / batch_size)}")
-            # print_memory_usage()
-            
-            batch_sample = samples[i:i+batch_size]
-            
-            jump = init_jump + (count) * batch_size
-
-            print(f"Jumping {jump} files")
-
-            args_list = [(j + jump, batch_sample[j], jump, output_path) for j in range(len(batch_sample))]
-
-            results = list(tqdm(pool.imap_unordered(generate_sample, args_list), total=len(batch_sample)))
-
-            valid_results = [res for res in results if res is not None]
-            
-            n_eccentric += sum(1 for r in valid_results if r.get('eccentric_saved'))
-            n_lensed += sum(1 for r in valid_results if r.get('lensed_saved'))
-            n_unlensed += sum(1 for r in valid_results if r.get('unlensed_saved')) + sum(1 for r in valid_results if r.get('lens_unlensed_saved')) + sum(1 for r in valid_results if r.get('ecc_unlensed_saved'))
-
-            save_csv(results_dir / f"{args.path_name}_parameters.csv", valid_results)
-
-            del batch_sample, args_list, results, valid_results
-            
-            for _ in range(3):
-                gc.collect()
-            
-            try:
-                np._NoValue
-            except:
-                pass
+    with threadpool_limits(limits=1, user_api="blas"):
+        with Pool(args.num_workers) as pool: #, initializer=_init_worker, initargs=(np.random.SeedSequence().entropy,)) as pool:
+            count = 0
+            for i in range(0, len(samples), batch_size):
+                print(f"\nStarting batch {int(i / batch_size)}")
+                # print_memory_usage()
                 
-            # Force pool to restart
-            # pool.terminate()
-            # pool.join()
-            # pool = Pool(args.num_workers)
+                batch_sample = samples[i:i+batch_size]
+                
+                jump = init_jump + (count) * batch_size
 
-            count += 1
-            
-            # print_memory_usage()
+                print(f"Jumping {jump} files")
+
+                args_list = [(j + jump, batch_sample[j], jump, output_path) for j in range(len(batch_sample))]
+
+                results = list(tqdm(pool.imap_unordered(generate_sample, args_list), total=len(batch_sample)))
+
+                valid_results = [res for res in results if res is not None]
+                
+                n_eccentric += sum(1 for r in valid_results if r.get('eccentric_saved'))
+                n_lensed += sum(1 for r in valid_results if r.get('lensed_saved'))
+                n_unlensed += sum(1 for r in valid_results if r.get('unlensed_saved')) + sum(1 for r in valid_results if r.get('lens_unlensed_saved')) + sum(1 for r in valid_results if r.get('ecc_unlensed_saved'))
+
+                save_csv(results_dir / f"{args.path_name}_parameters.csv", valid_results)
+
+                del batch_sample, args_list, results, valid_results
+                
+                for _ in range(3):
+                    gc.collect()
+                
+                try:
+                    np._NoValue
+                except:
+                    pass
+                    
+                # Force pool to restart
+                # pool.terminate()
+                # pool.join()
+                # pool = Pool(args.num_workers)
+
+                count += 1
+                
+                # print_memory_usage()
 
     print(f"\nData generation complete!")
     print(f"Saved eccentric: {n_eccentric}, lensed: {n_lensed}, unlensed: {n_unlensed}")
