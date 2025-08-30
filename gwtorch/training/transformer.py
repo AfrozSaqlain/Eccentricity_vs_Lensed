@@ -85,7 +85,7 @@ def main():
             model, valid_loader, test_loader, device , model_name=args.model
         )
         plot_training_curves(train_losses, val_losses, train_accs, val_accs, 
-                           Path('./results/transformer_results'))
+                           Path(f'./results/{args.model}_results'))
 
         print("\nTraining complete. Summary:")
         print(f"Validation misclassifications: {len(val_misclassified)}")
