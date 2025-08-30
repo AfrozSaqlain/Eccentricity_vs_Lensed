@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader, Dataset
 
 import random
 import numpy as np
+import pandas as pd
 from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split, StratifiedKFold
 
@@ -51,6 +52,7 @@ class GWDataset(Dataset):
     def __init__(self, file_list, transform=None):
         self.file_list = file_list
         self.transform = transform
+        self.df = pd.read_csv('./results/data_parameters.csv')
 
     def __len__(self):
         return len(self.file_list)
@@ -72,11 +74,24 @@ class GWDataset(Dataset):
         label_str = file_path.split("/")[2].lower()
         label = {'lensed': 0, 'eccentric': 1, 'unlensed': 2}[label_str]
 
-        return arr, label, file_path
+        file_number = file_path.split('/')[-1].split('.')[0]
+        if label == 'lensed':
+            ln_B = self.df['lens_lnB'][file_number]
+        elif label == 'eccentric':
+            ln_B = self.df['ecc_lnB'][file_number]
+        else:
+            ln_B = 0
+            
+        if ln_B > 10:
+            weight = 10
+        else:
+            weight = 1
+
+        return arr, label, weight, file_path
     
 def custom_collate_fn(batch):
-    images, labels, file_paths = zip(*batch)
-    return torch.stack(images), torch.tensor(labels), file_paths
+    images, labels, weights, file_paths = zip(*batch)
+    return torch.stack(images), torch.tensor(labels), torch.tensor(weights), file_paths
 
 def load_all_data(path_name='data', seed=42, batch_size=32):
 
@@ -90,6 +105,11 @@ def load_all_data(path_name='data', seed=42, batch_size=32):
     val_files, test_files, val_labels, test_labels = train_test_split(
         temp_files, temp_labels, test_size=0.5, stratify=temp_labels, random_state=seed
     )
+
+    train_labels = filenames_to_label_indices(train_files)
+    counts = Counter(train_labels)
+    total = sum(counts.values())
+    class_weights = torch.tensor([ total/counts[i] for i in range(3) ], dtype=torch.float32)
 
     transform = transforms.Compose([
         transforms.Resize((224, 224)),
@@ -108,7 +128,7 @@ def load_all_data(path_name='data', seed=42, batch_size=32):
     test_loader  = DataLoader(test_data, batch_size=batch_size, shuffle=False,
                               num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
 
-    return num_channels, train_loader, val_loader, test_loader
+    return num_channels, train_loader, val_loader, test_loader, class_weights
 
 def prepare_kfold_data(path_name='data'):
     """Prepare data for k-fold cross validation"""
@@ -156,20 +176,24 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, gamma, cl
     optimizer = optim.AdamW(model.parameters(), lr=lr)
     scheduler = StepLR(optimizer, step_size=5, gamma=gamma)
     if class_weights is not None:
-        criterion = nn.CrossEntropyLoss(weight=class_weights.to(device))
+        criterion = nn.CrossEntropyLoss(reduction='none', weight=class_weights.to(device))
     else:
-        criterion = nn.CrossEntropyLoss()
+        criterion = nn.CrossEntropyLoss(reduction='none')
 
     train_losses, val_losses, train_accs, val_accs = [], [], [], []
 
     for epoch in range(epochs):
         model.train()
         running_loss, running_acc = 0, 0
-        for data, labels, *_ in train_loader:
-            data, labels = data.to(device), labels.to(device)
+        for data, labels, weights, *_ in train_loader:
+            data, labels, weights = data.to(device), labels.to(device), weights.to(device)
             optimizer.zero_grad()
             output = model(data)
-            loss = criterion(output, labels)
+
+            unweighted_loss = criterion(output, labels)
+            weighted_loss = unweighted_loss * weights
+            loss = weighted_loss.mean()
+            
             loss.backward()
             optimizer.step()
             acc = (output.argmax(1) == labels).float().mean()
@@ -186,6 +210,7 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, gamma, cl
                 data, labels = data.to(device), labels.to(device)
                 output = model(data)
                 loss = criterion(output, labels)
+                loss = loss.mean()
                 acc = (output.argmax(1) == labels).float().mean()
                 val_loss += loss.item()
                 val_acc += acc.item()
@@ -207,7 +232,7 @@ def evaluate_model(model, data_loader, device):
     all_file_paths = []
     
     with torch.no_grad():
-        for data, labels, file_numbers, file_paths in data_loader:
+        for data, labels, _, file_paths in data_loader:
             data, labels = data.to(device), labels.to(device)
             output = model(data)
             preds = output.argmax(1)

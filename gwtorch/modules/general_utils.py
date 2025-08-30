@@ -111,11 +111,10 @@ def compute_roc_auc_with_misclassifications(model, data_loader, device, class_na
     all_labels = []
     all_predictions = []
     all_probabilities = []
-    all_file_numbers = []
     all_img_paths = []
     
     with torch.no_grad():
-        for data, labels, img_paths in data_loader:
+        for data, labels, _, img_paths in data_loader:
             data = data.to(device)
             labels = labels.to(device)
             
