@@ -66,6 +66,22 @@ def custom_collate_fn(batch):
     images, labels, img_paths = zip(*batch)
     return torch.stack(images), torch.tensor(labels), img_paths
 
+def custom_collate_fn(batch):
+    if len(batch[0]) == 2:  # (data, label)
+        images, labels = zip(*batch)
+        img_paths = [None] * len(batch)
+        weights = None
+    elif len(batch[0]) == 3:  # (data, label, path)
+        images, labels, img_paths = zip(*batch)
+        weights = None
+    elif len(batch[0]) == 4:  # (data, label, dummy, path)
+        images, labels, weights, img_paths = zip(*batch)
+    else:
+        raise ValueError(f"Unexpected sample format: {len(batch[0])} elements")
+
+    return torch.stack(images), torch.tensor(labels), weights, img_paths
+
+
 def load_all_data(path_name='data', batch_size=32):
 
     all_files = glob.glob(f'./{path_name}/*/*.npy')
