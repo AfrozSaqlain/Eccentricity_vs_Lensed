@@ -1,6 +1,7 @@
 import os
 import glob
 from pathlib import Path
+from collections import Counter
 
 import torch
 import torch.nn as nn
@@ -286,8 +287,6 @@ def evaluate_and_plot(model, valid_loader, test_loader, device, fold=None, model
         f.write(test_report)
 
     return val_misclassified, test_misclassified, val_roc_auc, test_roc_auc
-
-from collections import Counter
 
 def filenames_to_label_indices(file_list):
     labels = []
