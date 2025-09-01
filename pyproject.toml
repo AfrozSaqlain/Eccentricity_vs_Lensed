@@ -38,9 +38,8 @@ all = [
 
 [project.scripts]
 # Waveform generation tools
-generate_waveform_gwtorch = "gwtorch.waveform_generation.gen:main"
-filtered_waveform_gen_gwtorch = "gwtorch.waveform_generation.gen_ln_B:main"
-exp_gen_gwtorch = "gwtorch.waveform_generation.exp_gen:main"
+generate_fitting_factor_dataset_gwtorch = "gwtorch.waveform_generation.fitting_factor_gen:main"
+generate_match_dataset_gwtorch = "gwtorch.waveform_generation.match_gen:main"
 
 # Training tools
 cnn_train_gwtorch = "gwtorch.training.cnn:main"
