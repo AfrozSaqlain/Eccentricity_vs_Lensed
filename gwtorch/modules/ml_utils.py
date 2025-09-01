@@ -76,6 +76,7 @@ class GWDataset(Dataset):
         label = {'lensed': 0, 'eccentric': 1, 'unlensed': 2}[label_str]
 
         file_number = file_path.split('/')[-1].split('.')[0]
+        
         if label == 'lensed':
             ln_B = self.df['lens_lnB'][file_number]
         elif label == 'eccentric':
