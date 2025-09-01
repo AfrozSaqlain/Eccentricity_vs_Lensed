@@ -64,6 +64,7 @@ result = differential_evolution(
     popsize=20,
     disp=True,
     workers=10,
+    updating='deferred'
 )
 
 best_fit_params = result.x
