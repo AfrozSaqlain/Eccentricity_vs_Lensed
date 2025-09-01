@@ -85,9 +85,11 @@ def main():
         train_losses, val_losses, train_accs, val_accs = train_model(
             model, train_loader, valid_loader, device, args.epochs, args.lr, args.gamma, class_weights=class_weights
         )
+        
         val_misclassified, test_misclassified, _, _ = evaluate_and_plot(
             model, valid_loader, test_loader, device , model_name=args.model
         )
+
         plot_training_curves(train_losses, val_losses, train_accs, val_accs, 
                            Path(f'./results/{args.model}_results'))
 
