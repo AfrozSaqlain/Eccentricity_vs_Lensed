@@ -76,7 +76,7 @@ class GWDataset(Dataset):
         label = {'lensed': 0, 'eccentric': 1, 'unlensed': 2}[label_str]
 
         file_number = file_path.split('/')[-1].split('.')[0]
-        
+
         if label == 'lensed':
             ln_B = self.df['lens_lnB'][file_number]
         elif label == 'eccentric':
@@ -104,7 +104,7 @@ def load_all_data(path_name='data', seed=42, batch_size=32):
         all_files, all_labels, test_size=0.3, stratify=all_labels, random_state=seed
     )
 
-    val_files, test_files, val_labels, test_labels = train_test_split(
+    val_files, test_files, *_ = train_test_split(
         temp_files, temp_labels, test_size=0.5, stratify=temp_labels, random_state=seed
     )
 
