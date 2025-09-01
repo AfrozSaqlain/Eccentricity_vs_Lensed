@@ -33,7 +33,7 @@ bounds = [
     (0, 2*np.pi), # coa_phase
 ]
 
-def objective_function(params_array, eccentric_signal, distance, detector_name):
+def objective_function(params_array, signal, distance, detector_name):
     chirp_mass, mass_ratio, spin1z, spin2z, coa_phase = params_array
 
     try:
@@ -45,14 +45,14 @@ def objective_function(params_array, eccentric_signal, distance, detector_name):
                                                     distance=distance, delta_t=DELTA_T,
                                                     ecc=0.0, coa_phase=coa_phase, f_lower=F_LOWER)
         
-        ecc_copy = eccentric_signal.copy()
-        temp_copy = template_hp.copy()
+        ecc_copy = signal.copy()
+        signal_copy = template_hp.copy()
 
-        target_len = max(len(ecc_copy), len(temp_copy))
+        target_len = max(len(ecc_copy), len(signal_copy))
         ecc_copy.resize(target_len)
-        temp_copy.resize(target_len)
+        signal_copy.resize(target_len)
 
-        duration = temp_copy.duration
+        duration = signal_copy.duration
         flen     = target_len // 2 + 1
 
         if detector_name == 'E1' or detector_name == 'E2' or detector_name == 'E3':
@@ -62,7 +62,7 @@ def objective_function(params_array, eccentric_signal, distance, detector_name):
         elif detector_name == 'L1' or detector_name == 'H1' or detector_name == 'V1' or detector_name == 'A1':
             psd = pycbc.psd.aLIGOZeroDetHighPower(flen, 1/duration, F_LOWER)
         
-        match_value, _ = pycbc.filter.match(ecc_copy, temp_copy, psd=psd, low_frequency_cutoff=F_LOWER)
+        match_value, _ = pycbc.filter.match(ecc_copy, signal_copy, psd=psd, low_frequency_cutoff=F_LOWER)
 
         return 1.0 - match_value
     except Exception as e:
