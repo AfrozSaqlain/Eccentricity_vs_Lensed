@@ -59,16 +59,6 @@ def generate_sample(args):
 
         count = {}
 
-        # if lens_lnB > np.log(10):
-        #     count["lensed_saved"] = save_qtransform_with_checks(waveform_dict, output_path / "lensed" / f"{num}.npy")
-        # else:
-        #     count["lens_unlensed_saved"] = save_qtransform_with_checks(waveform_dict, output_path / "unlensed" / f"{num}-1.npy")
-
-        # if ecc_lnB > np.log(10):
-        #     count['eccentric_saved'] = save_qtransform_with_checks(waveform_dict, output_path / "eccentric" / f"{num}.npy")
-        # else:
-        #     count['ecc_unlensed_saved'] = save_qtransform_with_checks(waveform_dict, output_path / "unlensed" / f"{num}-2.npy")
-
         count['eccentric_saved'] = save_qtransform_with_checks(waveform_dict, output_path / "eccentric" / f"{num}.npy")
         count["lensed_saved"] = save_qtransform_with_checks(waveform_dict, output_path / "lensed" / f"{num}.npy")
         count["unlensed_saved"] = save_qtransform_with_checks(waveform_dict, output_path / "unlensed" / f"{num}.npy")
