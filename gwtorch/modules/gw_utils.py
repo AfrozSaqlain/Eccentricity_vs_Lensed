@@ -341,8 +341,8 @@ def get_psd_type(detector=default_detector):
 
     Returns
     -------
-    str
-        The type of PSD used, which is 'aLIGO' by default.
+    (str, psd)
+        The type of PSD used, which is 'aLIGO' by default, and the PSD itself.
     """
     if detector.name == 'E1' or detector.name == 'E2' or detector.name == 'E3':
         return 'ET', einstein_psd

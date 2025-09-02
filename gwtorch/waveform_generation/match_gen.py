@@ -125,12 +125,19 @@ def main():
     init_jump = 0   
 
     if os.path.exists(directory):
-        file_pattern = os.path.join(directory, 'unlensed', '*.npy')
-        file_list = glob.glob(file_pattern)
-        files = [i.split('/')[3].split('.')[0] for i in file_list]
-        final_files = set([i.split('-')[0] if '-' in i else i for i in files])
-        init_jump = len(final_files)
-        
+        def get_existing_count(path):
+            if not os.path.exists(path):
+                return 0
+            files = glob.glob(os.path.join(path, "*.npy"))
+            ids = [os.path.basename(f).split('-')[0].split('.')[0] for f in files]
+            return len(set(ids))
+
+        eccentric_count = get_existing_count(os.path.join(directory, "eccentric"))
+        lensed_count    = get_existing_count(os.path.join(directory, "lensed"))
+        unlensed_count  = get_existing_count(os.path.join(directory, "unlensed"))
+
+        init_jump = max(eccentric_count, lensed_count, unlensed_count)
+
     output_path = Path(directory)
     eccentric_path = output_path / Path("eccentric")
     lensed_path = output_path / Path("lensed")
@@ -150,8 +157,14 @@ def main():
     print(f"Generating {len(samples)} samples in each class...")
     # print_memory_usage()
 
-    def _init_worker(base):
-        np.random.seed((base + os.getpid()) % (2**32 - 1))
+    # def _init_worker(base):
+    #     np.random.seed((base + os.getpid()) % (2**32 - 1))
+
+    # import time
+
+    # def _init_worker(_):
+    #     np.random.seed(os.getpid() % (2**32 - 1))
+
 
     with threadpool_limits(limits=1, user_api="blas"):
         with Pool(args.num_workers) as pool: #, initializer=_init_worker, initargs=(np.random.SeedSequence().entropy,)) as pool:
@@ -174,7 +187,7 @@ def main():
                 
                 n_eccentric += sum(1 for r in valid_results if r.get('eccentric_saved'))
                 n_lensed += sum(1 for r in valid_results if r.get('lensed_saved'))
-                n_unlensed += sum(1 for r in valid_results if r.get('unlensed_saved')) + sum(1 for r in valid_results if r.get('lens_unlensed_saved')) + sum(1 for r in valid_results if r.get('ecc_unlensed_saved'))
+                n_unlensed += sum(1 for r in valid_results if r.get('unlensed_saved'))
 
                 save_csv(results_dir / f"{args.path_name}_parameters.csv", valid_results)
 
