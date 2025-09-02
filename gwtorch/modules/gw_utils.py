@@ -20,9 +20,9 @@ from gwtorch.modules.constants import *
 
 delta_f = 1 / 32
 flen = int(4096 / (2 * delta_f)) + 1
-einstein_psd = pycbc.psd.EinsteinTelescopeP1600143(flen, delta_f, F_LOWER)
-aligo_psd = pycbc.psd.aLIGOZeroDetHighPower(flen, delta_f, F_LOWER)
-cosmic_psd = pycbc.psd.CosmicExplorerP1600143(flen, delta_f, F_LOWER)
+einstein_psd = pycbc.psd.EinsteinTelescopeP1600143(flen, delta_f, F_START)
+aligo_psd = pycbc.psd.aLIGOZeroDetHighPower(flen, delta_f, F_START)
+cosmic_psd = pycbc.psd.CosmicExplorerP1600143(flen, delta_f, F_START)
 
 # ------------------------------------------------
 
@@ -163,13 +163,13 @@ def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_dete
                                  lambda1=0, lambda2=0,
                                  spin1z=params['spin1z'], spin2z=params['spin2z'],
                                  distance=REFERENCE_DISTANCE, delta_t=DELTA_T,
-                                 ecc=params['eccentricity'], coa_phase=params['coa_phase'], f_lower=F_LOWER)
+                                 ecc=params['eccentricity'], coa_phase=params['coa_phase'], f_lower=F_START)
 
         sp, sc = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
                                  lambda1=0, lambda2=0,
                                  spin1z=params['spin1z'], spin2z=params['spin2z'],
                                  distance=REFERENCE_DISTANCE, delta_t=DELTA_T,
-                                 ecc=0.0, coa_phase=params['coa_phase'], f_lower=F_LOWER)
+                                 ecc=0.0, coa_phase=params['coa_phase'], f_lower=F_START)
 
         sp_lensed, sc_lensed, t_delay = compute_lensed_waveform(sp, sc, m_lens, y_lens)
 
@@ -179,9 +179,13 @@ def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_dete
 
         target_snr = params['snr']
 
-        ecc_noisy, snr_e, distance_e, ecc_padded = inject_noise_with_target_SNR(ecc, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='eccentric', peak_window=peak_window, detector=detector, SEED=SEED)
-        lens_noisy, snr_l, distance_l, lens_padded = inject_noise_with_target_SNR(lensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='lensed', peak_window=peak_window, detector=detector, SEED=SEED)
-        unlens_noisy, snr_u, distance_u, unlens_padded = inject_noise_with_target_SNR(unlensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='quasi_circular', peak_window=peak_window, detector=detector, SEED=SEED)
+        ECC_SEED = SEED['ecc_seed']
+        LENS_SEED = SEED['lens_seed']
+        UNLENS_SEED = SEED['unlens_seed']
+
+        ecc_noisy, snr_e, distance_e, ecc_padded = inject_noise_with_target_SNR(ecc, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='eccentric', peak_window=peak_window, detector=detector, SEED=ECC_SEED)
+        lens_noisy, snr_l, distance_l, lens_padded = inject_noise_with_target_SNR(lensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='lensed', peak_window=peak_window, detector=detector, SEED=LENS_SEED)
+        unlens_noisy, snr_u, distance_u, unlens_padded = inject_noise_with_target_SNR(unlensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='quasi_circular', peak_window=peak_window, detector=detector, SEED=UNLENS_SEED)
         
         ecc_noisy = ecc_noisy.crop(left=24, right=0)
         lens_noisy = lens_noisy.crop(left=24, right=0)
@@ -234,11 +238,11 @@ def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_dete
             flen     = tlen // 2 + 1
 
             if detector.name == 'E1' or detector.name == 'E2' or detector.name == 'E3':
-                psd = pycbc.psd.EinsteinTelescopeP1600143(flen, 1/duration, F_LOWER)
+                psd = pycbc.psd.EinsteinTelescopeP1600143(flen, 1/duration, F_START)
             elif detector.name == 'C1':
-                psd = pycbc.psd.CosmicExplorerP1600143(flen, 1/duration, F_LOWER)
+                psd = pycbc.psd.CosmicExplorerP1600143(flen, 1/duration, F_START)
             elif detector.name == 'L1' or detector.name == 'H1' or detector.name == 'V1' or detector.name == 'A1':
-                psd = pycbc.psd.aLIGOZeroDetHighPower(flen, 1/duration, F_LOWER)
+                psd = pycbc.psd.aLIGOZeroDetHighPower(flen, 1/duration, F_START)
 
             ecc_m = pycbc.filter.match(hp, sp, psd=psd, low_frequency_cutoff=F_LOWER)[0]
             lens_m = pycbc.filter.match(sp_lensed, sp, psd=psd, low_frequency_cutoff=F_LOWER)[0]
@@ -425,7 +429,7 @@ def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens
                                  lambda1=0, lambda2=0,
                                  spin1z=params['spin1z'], spin2z=params['spin2z'],
                                  distance=distance, delta_t=DELTA_T,
-                                 ecc=params['eccentricity'], coa_phase=params['coa_phase'], f_lower=F_LOWER)
+                                 ecc=params['eccentricity'], coa_phase=params['coa_phase'], f_lower=F_START)
         
         gw_signal = taper_timeseries(detector.project_wave(hp, hc, **{k: params[k] for k in ['ra', 'dec', 'polarization']}), tapermethod="TAPER_STARTEND", return_lal=False)
     
@@ -434,7 +438,7 @@ def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens
                                  lambda1=0, lambda2=0,
                                  spin1z=params['spin1z'], spin2z=params['spin2z'],
                                  distance=distance, delta_t=DELTA_T,
-                                 ecc=0.0, coa_phase=params['coa_phase'], f_lower=F_LOWER)
+                                 ecc=0.0, coa_phase=params['coa_phase'], f_lower=F_START)
         
         gw_signal = taper_timeseries(detector.project_wave(hp, hc, **{k: params[k] for k in ['ra', 'dec', 'polarization']}), tapermethod="TAPER_STARTEND", return_lal=False)
         
@@ -443,7 +447,7 @@ def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens
                                  lambda1=0, lambda2=0,
                                  spin1z=params['spin1z'], spin2z=params['spin2z'],
                                  distance=distance, delta_t=DELTA_T,
-                                 ecc=0.0, coa_phase=params['coa_phase'], f_lower=F_LOWER) 
+                                 ecc=0.0, coa_phase=params['coa_phase'], f_lower=F_START) 
         
         hp_lens, hc_lens, t_delay = compute_lensed_waveform(hp, hc, m_lens, y_lens)
 

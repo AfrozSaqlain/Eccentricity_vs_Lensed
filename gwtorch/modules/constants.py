@@ -3,6 +3,8 @@ from pycbc.detector.ground import Detector
 # ---------------------- Constants ---------------------- #
 
 DELTA_T = 1.0 / 4096
+F_START = 5.0
+
 F_LOWER = 5.0
 DETECTOR_NAME = 'E1'
 default_detector = Detector(DETECTOR_NAME)

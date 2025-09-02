@@ -45,7 +45,7 @@ def objective_function(params_array, args):
                                                     lambda1=0, lambda2=0,
                                                     spin1z=spin1z, spin2z=spin2z,
                                                     distance=distance, delta_t=DELTA_T,
-                                                    ecc=0.0, coa_phase=coa_phase, f_lower=F_LOWER)
+                                                    ecc=0.0, coa_phase=coa_phase, f_lower=F_START)
         
         signal_copy = signal.copy()
         temp_copy = template_hp.copy()
@@ -62,11 +62,11 @@ def objective_function(params_array, args):
         flen     = target_len // 2 + 1
 
         if detector_name == 'E1' or detector_name == 'E2' or detector_name == 'E3':
-            psd = pycbc.psd.EinsteinTelescopeP1600143(flen, 1/duration, F_LOWER)
+            psd = pycbc.psd.EinsteinTelescopeP1600143(flen, 1/duration, F_START)
         elif detector_name == 'C1':
-            psd = pycbc.psd.CosmicExplorerP1600143(flen, 1/duration, F_LOWER)
+            psd = pycbc.psd.CosmicExplorerP1600143(flen, 1/duration, F_START)
         elif detector_name == 'L1' or detector_name == 'H1' or detector_name == 'V1' or detector_name == 'A1':
-            psd = pycbc.psd.aLIGOZeroDetHighPower(flen, 1/duration, F_LOWER)
+            psd = pycbc.psd.aLIGOZeroDetHighPower(flen, 1/duration, F_START)
         
         match_value, _ = pycbc.filter.match(signal_copy, temp_copy, psd=psd, low_frequency_cutoff=F_LOWER)
 
@@ -89,13 +89,13 @@ def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_dete
                                  lambda1=0, lambda2=0,
                                  spin1z=params['spin1z'], spin2z=params['spin2z'],
                                  distance=REFERENCE_DISTANCE, delta_t=DELTA_T,
-                                 ecc=params['eccentricity'], coa_phase=params['coa_phase'], f_lower=F_LOWER)
+                                 ecc=params['eccentricity'], coa_phase=params['coa_phase'], f_lower=F_START)
 
         sp, sc = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
                                  lambda1=0, lambda2=0,
                                  spin1z=params['spin1z'], spin2z=params['spin2z'],
                                  distance=REFERENCE_DISTANCE, delta_t=DELTA_T,
-                                 ecc=0.0, coa_phase=params['coa_phase'], f_lower=F_LOWER)
+                                 ecc=0.0, coa_phase=params['coa_phase'], f_lower=F_START)
 
         sp_lensed, sc_lensed, t_delay = compute_lensed_waveform(sp, sc, m_lens, y_lens)
 
@@ -166,7 +166,12 @@ def generate_sample(args):
     try:
         waveform_dict = {}
         for detector in detector_list:
-            SEED = None # np.random.randint(2**32) # 42 # https://pycbc.org/pycbc/latest/html/_modules/pycbc/noise/gaussian.html#noise_from_psd If seed is None, PyCBC creates a numpy.random.randint(2**32) and for each subprocess the random number generated is same.
+            # SEED = None # np.random.randint(2**32) # 42 # https://pycbc.org/pycbc/latest/html/_modules/pycbc/noise/gaussian.html#noise_from_psd If seed is None, PyCBC creates a numpy.random.randint(2**32) and for each subprocess the random number generated is same.
+
+            SEED = {'ecc_seed': np.random.randint(10), 'lens_seed': np.random.randint(10), 'unlens_seed': np.random.randint(10)}
+            # SEED = {'ecc_seed': np.random.randint(2**32), 'lens_seed': np.random.randint(2**32), 'unlens_seed': np.random.randint(2**32)}
+            # SEED = {'ecc_seed': None, 'lens_seed': None, 'unlens_seed': None}
+
             ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens = generate_waveform(num, params, peak_window, detector=detector, SEED=SEED)
             waveform_dict[detector] = {
                 'eccentric': ecc_dict,
