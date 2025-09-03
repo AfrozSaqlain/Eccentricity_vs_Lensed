@@ -247,15 +247,15 @@ def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_dete
             ecc_m = pycbc.filter.match(hp, sp, psd=psd, low_frequency_cutoff=F_LOWER)[0]
             lens_m = pycbc.filter.match(sp_lensed, sp, psd=psd, low_frequency_cutoff=F_LOWER)[0]
 
-        lens_dict = {'lensed_signal': lens_noisy, 'snr_l': snr_l, 'distance_l': distance_l}
-        ecc_dict = {'ecc_signal': ecc_noisy, 'snr_e': snr_e, 'distance_e': distance_e}
+        lens_dict = {'lensed_signal': lens_noisy, 'snr_l': snr_l, 'distance_l': distance_l, 'lens_m': lens_m}
+        ecc_dict = {'ecc_signal': ecc_noisy, 'snr_e': snr_e, 'distance_e': distance_e, 'ecc_m': ecc_m}
         unlens_dict = {'unlensed_signal': unlens_noisy, 'snr_u': snr_u, 'distance_u': distance_u}
 
         del hp, hc, sp, sc, sp_lensed, sc_lensed
         del ecc, unlensed, lensed, ecc_noisy, lens_noisy, unlens_noisy, ecc_padded, lens_padded, unlens_padded
         gc.collect()
 
-        return ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens, lens_m, ecc_m
+        return ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens
         
     except Exception as e:
         print(f"[Sample {num}] Error: {e}")
@@ -650,9 +650,10 @@ def save_qtransform_with_checks(waveform_dict, path):
     )
     
     padded_q = [pad_to_shape(q, max_shape) for q in stacked_q]
-    normed = [Normalize()(q) for q in padded_q]
+    # normed = [Normalize()(q) for q in padded_q]
 
-    stacked = np.stack(normed, axis=0)              # (C, H, W)
+    # stacked = np.stack(normed, axis=0)              # (C, H, W)
+    stacked = np.stack(padded_q, axis=0)              # (C, H, W)
 
     out_path = str(path)
     if out_path.endswith('.png'):

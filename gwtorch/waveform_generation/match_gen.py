@@ -23,7 +23,7 @@ from gwtorch.modules.gw_utils import (
 )
 
 def generate_sample(args):
-    num, params, jump, output_path = args
+    num, params, output_path = args
     peak_window = (2.0, 2.2)
     try:
         waveform_dict = {}
@@ -34,7 +34,7 @@ def generate_sample(args):
             # SEED = {'ecc_seed': np.random.randint(2**32), 'lens_seed': np.random.randint(2**32), 'unlens_seed': np.random.randint(2**32)}
             # SEED = {'ecc_seed': None, 'lens_seed': None, 'unlens_seed': None}
 
-            ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens, lens_match, ecc_match = generate_waveform(num, params, peak_window, detector=detector, SEED=SEED)
+            ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens = generate_waveform(num, params, peak_window, detector=detector, SEED=SEED)
             waveform_dict[detector] = {
                 'eccentric': ecc_dict,
                 'lensed': lens_dict,
@@ -45,22 +45,33 @@ def generate_sample(args):
                 'y_lens': y_lens,
             }
 
-        snr_e_network = np.sqrt(
-            sum((waveform_dict[det]['eccentric']['snr_e'])**2 
-                for det in detector_list)
-        )
-
-        snr_l_network = np.sqrt(
-            sum((waveform_dict[det]['lensed']['snr_l'])**2 
-                for det in detector_list)
-        )
-
         snr_u_network = np.sqrt(
             sum((waveform_dict[det]['unlensed']['snr_u'])**2 for det in detector_list)
         )
 
-        ecc_lnB = 0.5 * (1 - ecc_match**2) * snr_e_network**2
-        lens_lnB = 0.5 * (1 - lens_match**2) * snr_l_network**2
+        # --- Eccentric lnB (network FF + network SNR²) ---
+        rhosq_e = []
+        match_e = []
+        for det in detector_list:
+            snr = waveform_dict[det]['eccentric']['snr_e']
+            match_ecc  = waveform_dict[det]['eccentric']['ecc_m']
+            rhosq_e.append(snr**2)
+            match_e.append(match_ecc)
+        rho_e_net_sq = np.sum(rhosq_e)
+        FF_e_net = np.dot(rhosq_e, match_e) / rho_e_net_sq
+        ecc_lnB = 0.5 * rho_e_net_sq * (1.0 - FF_e_net**2)
+
+        # --- Lensed lnB (network FF + network SNR²) ---
+        rhosq_l = []
+        match_l = []
+        for det in detector_list:
+            snr = waveform_dict[det]['lensed']['snr_l']
+            match_lens  = waveform_dict[det]['lensed']['lens_m']
+            rhosq_l.append(snr**2)
+            match_l.append(match_lens)
+        rho_l_net_sq = np.sum(rhosq_l)
+        FF_l_net = np.dot(rhosq_l, match_l) / rho_l_net_sq
+        lens_lnB = 0.5 * rho_l_net_sq * (1.0 - FF_l_net**2)
 
         count = {}
 
@@ -77,7 +88,7 @@ def generate_sample(args):
             'ra': float(params['ra']), 'dec': float(params['dec']),
             'polarization': float(params['polarization']),
             'm_lens': float(m_lens), 'y_lens': float(y_lens),
-            'eccentric_snr': snr_e_network, 'lensed_snr': snr_l_network, 'unlensed_snr': snr_u_network,
+            'eccentric_snr': np.sqrt(rho_e_net_sq), 'lensed_snr': np.sqrt(rho_l_net_sq), 'unlensed_snr': snr_u_network,
             'ecc_lnB': ecc_lnB, 'lens_lnB': lens_lnB,
             **count
         }
@@ -184,7 +195,7 @@ def main():
 
                 print(f"Jumping {jump} files")
 
-                args_list = [(j + jump, batch_sample[j], jump, output_path) for j in range(len(batch_sample))]
+                args_list = [(j + jump, batch_sample[j], output_path) for j in range(len(batch_sample))]
 
                 results = list(tqdm(pool.imap_unordered(generate_sample, args_list), total=len(batch_sample)))
 
