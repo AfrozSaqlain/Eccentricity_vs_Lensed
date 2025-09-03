@@ -1,8 +1,9 @@
+import gc
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
+from scipy.optimize import differential_evolution
 
-import gc
 import gwmat
 import pycbc
 import bilby
@@ -93,64 +94,210 @@ def generate_prior(num_samples, snr_type = "powerlaw"):
         for i in range(num_samples)
     ]
 
-def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_detector, display=False, check_lnB=True, SEED=None):
+bounds = [
+    (10, 100), # Chirp Mass
+    (0.1, 1), # Mass Ratio
+    (-0.9, 0.9), # spin1z
+    (-0.9, 0.9), # spin2z
+    (0, 2*np.pi), # coa_phase
+]
+
+def objective_function(params_array, args):
+    """
+    Compute the mismatch (1 - match) between a target gravitational-wave signal 
+    and a template waveform generated with given binary parameters.
+
+    This function constructs a template waveform using the TEOBResumS approximant,
+    aligns it with the target signal, and evaluates the noise-weighted match 
+    under the detector’s power spectral density (PSD). The returned value is 
+    the mismatch, suitable for use as a minimization objective.
+
+    Parameters
+    ----------
+    params_array : array-like of float
+        Model parameters in the order:
+        [chirp_mass, mass_ratio, spin1z, spin2z, coa_phase].
+        - chirp_mass : float
+            The chirp mass of the binary (in solar masses).
+        - mass_ratio : float
+            The mass ratio q = m2/m1 (with m1 ≥ m2).
+        - spin1z : float
+            Dimensionless aligned spin component of the primary mass.
+        - spin2z : float
+            Dimensionless aligned spin component of the secondary mass.
+        - coa_phase : float
+            Coalescence phase in radians.
+
+    args : tuple
+        Additional arguments (signal, distance, detector_name):
+        - signal : pycbc.types.TimeSeries
+            The target gravitational-wave signal time series.
+        - distance : float
+            Luminosity distance to the source (in Mpc).
+        - detector_name : str
+            Name of the detector ('E1', 'E2', 'E3', 'C1', 'L1', 'H1', 'V1', or 'A1'),
+            which determines the PSD model to use.
+
+    Returns
+    -------
+    float
+        The mismatch (1 - match_value) between the signal and the template.
+        A smaller value indicates a better match. If an error occurs, returns 1.0.
+
+    Notes
+    -----
+    - The template waveform is generated using the `teobresums` approximant 
+      with zero tidal deformabilities and zero eccentricity.
+    - The PSD is chosen based on the detector:
+        * 'E1', 'E2', 'E3' → Einstein Telescope PSD (ET-D)
+        * 'C1'             → Cosmic Explorer PSD
+        * 'L1', 'H1', 'V1', 'A1' → aLIGO Zero-Detuned High Power PSD
+    - Both the signal and template are resized to the maximum of their lengths
+      before computing the match.
+    - The objective function is designed for use in parameter estimation 
+      or optimization routines, where minimizing the mismatch corresponds 
+      to maximizing the similarity between the template and the target signal.
+    """
+    chirp_mass, mass_ratio, spin1z, spin2z, coa_phase = params_array
+    signal, distance, detector_name = args
+    try:
+        mass1, mass2 = bilby.gw.conversion.chirp_mass_and_mass_ratio_to_component_masses(chirp_mass=chirp_mass, mass_ratio=mass_ratio)
+
+        template_hp, template_hc = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
+                                                    lambda1=0, lambda2=0,
+                                                    spin1z=spin1z, spin2z=spin2z,
+                                                    distance=distance, delta_t=DELTA_T,
+                                                    ecc=0.0, coa_phase=coa_phase, f_lower=F_START)
+        
+        signal_copy = signal.copy()
+        temp_copy = template_hp.copy()
+
+        target_len = max(len(signal_copy), len(temp_copy))
+        signal_copy.resize(target_len)
+        temp_copy.resize(target_len)
+
+        signal_copy = pycbc.types.TimeSeries(signal_copy.data,
+                                             delta_t=temp_copy.delta_t,
+                                             epoch=temp_copy.start_time)
+
+        duration = temp_copy.duration
+        flen     = target_len // 2 + 1
+
+        if detector_name == 'E1' or detector_name == 'E2' or detector_name == 'E3':
+            psd = pycbc.psd.EinsteinTelescopeP1600143(flen, 1/duration, F_START)
+        elif detector_name == 'C1':
+            psd = pycbc.psd.CosmicExplorerP1600143(flen, 1/duration, F_START)
+        elif detector_name == 'L1' or detector_name == 'H1' or detector_name == 'V1' or detector_name == 'A1':
+            psd = pycbc.psd.aLIGOZeroDetHighPower(flen, 1/duration, F_START)
+        
+        match_value, _ = pycbc.filter.match(signal_copy, temp_copy, psd=psd, low_frequency_cutoff=F_LOWER)
+
+        return 1.0 - match_value
+    except Exception as e:
+        print(f"Error in objective function: {e}")
+        return 1.0
+
+def generate_waveform(num, params, peak_window=(2.0, 2.2), detector=default_detector,
+                      display=False, compute_lnB_based_on_match=False, 
+                      compute_lnB_based_on_FF=False, SEED=None):
     """
     Generate eccentric, unlensed, and lensed gravitational waveforms with injected noise.
 
-    This function constructs three types of gravitational waveforms using the `TEOBResumS` approximant:
+    This function constructs three types of gravitational waveforms using the 
+    `TEOBResumS` approximant:
     1. An eccentric waveform (`ecc_noisy`),
     2. A quasi-circular (unlensed) waveform (`unlens_noisy`),
-    3. A lensed version of the quasi-circular waveform (`lens_noisy`),
-    each projected onto a detector frame, tapered, and injected into Gaussian noise to achieve a 
-    target signal-to-noise ratio (SNR).
+    3. A lensed version of the quasi-circular waveform (`lens_noisy`).
+
+    Each waveform is projected onto a detector, tapered to reduce spectral leakage,
+    and injected into Gaussian noise to achieve a specified target signal-to-noise ratio (SNR).
+    Optionally, waveform matches or fitting factors can be computed for Bayesian evidence estimation.
 
     Parameters
     ----------
     num : int
-        Sample index used for logging and file-specific identification.
-    
+        Sample index used for logging and identification.
+
     params : dict
         Dictionary of source and lens parameters. Expected keys include:
-        - 'chirp_mass': Chirp mass of the binary system (in solar masses).
-        - 'mass_ratio': Mass ratio (m2/m1), where 0 < q <= 1.
-        - 'spin1z', 'spin2z': Dimensionless aligned spin components of the two bodies.
-        - 'eccentricity': Initial eccentricity of the binary.
-        - 'coa_phase': Coalescence phase (in radians).
-        - 'polarization': Polarization angle (in radians).
-        - 'ra', 'dec': Right ascension and declination of the source (in radians).
-        - 'Log_Mlz': Log10 of the lens mass in solar masses.
-        - 'yl': Dimensionless lensing impact parameter (source-lens alignment).
-        - 'snr': Target signal-to-noise ratio for all waveform types (float).
+        - 'chirp_mass' : float
+            Chirp mass of the binary system (solar masses).
+        - 'mass_ratio' : float
+            Mass ratio q = m2/m1 (0 < q ≤ 1).
+        - 'spin1z', 'spin2z' : float
+            Dimensionless aligned spin components of the two bodies.
+        - 'eccentricity' : float
+            Initial eccentricity of the binary.
+        - 'coa_phase' : float
+            Coalescence phase (radians).
+        - 'polarization' : float
+            Polarization angle (radians).
+        - 'ra', 'dec' : float
+            Right ascension and declination of the source (radians).
+        - 'Log_Mlz' : float
+            Log10 of the lens mass (solar masses).
+        - 'yl' : float
+            Dimensionless lensing impact parameter.
+        - 'snr' : float
+            Target signal-to-noise ratio for noise injection.
 
-    peak_window : tuple (float, float)
-        Time window (in seconds) before the end of the noise where the signal peak should be injected.
+    peak_window : tuple of (float, float), optional
+        Time window (in seconds, relative to the end of the timeseries) in which 
+        the signal peak is injected. Default is (2.0, 2.2).
 
-    display " str, optional
-        Whether to display the TimeSeries data or not. Default is False.
+    detector : Detector object, optional
+        Detector instance (e.g., `bilby.gw.detector.Interferometer`).
+        Determines antenna response and PSD. Default is `default_detector`.
+
+    display : bool, optional
+        If True, plots noisy and padded versions of the three waveforms.
+        Default is False.
+
+    compute_lnB_based_on_match : bool, optional
+        If True, computes match values (overlap integrals) between waveforms
+        to build evidence-related quantities. Default is True.
+
+    compute_lnB_based_on_FF : bool, optional
+        If True, computes fitting factors by performing parameter optimization 
+        using `scipy.optimize.differential_evolution`. Default is False.
+
+    SEED : dict, optional
+        Dictionary of random seeds for reproducible noise injection, with keys:
+        - 'ecc_seed', 'lens_seed', 'unlens_seed'.
 
     Returns
     -------
     tuple or None
-        Returns a tuple of three `TimeSeries` objects:
-        - ecc_noisy : Eccentric waveform injected into noise.
-        - lens_noisy : Lensed quasi-circular waveform injected into noise.
-        - unlens_noisy : Unlensed quasi-circular waveform injected into noise.
+        On success, returns:
+        - ecc_dict : dict
+            Contains noisy eccentric waveform, SNR, distance, and optionally match/FF.
+        - lens_dict : dict
+            Contains noisy lensed waveform, SNR, distance, and optionally match/FF.
+        - unlens_dict : dict
+            Contains noisy unlensed waveform, SNR, distance.
+        - mass1 : float
+            Primary mass (solar masses).
+        - mass2 : float
+            Secondary mass (solar masses).
+        - m_lens : float
+            Lens mass (solar masses).
+        - y_lens : float
+            Lensing impact parameter.
 
-        Returns `None` if an error occurs during waveform generation or projection.
+        Returns `None` if waveform generation or noise injection fails.
 
     Notes
     -----
-    - Waveforms are generated using the `get_td_waveform` function from `lalsimulation` via PyCBC.
-    - All waveforms are projected onto the detector using `detector.project_wave(...)`.
-    - Tapering is applied at both ends to reduce spectral leakage.
-    - `inject_noise_with_target_SNR` scales each waveform to match the specified SNR.
-    - The returned waveforms are cropped from the left to remove early-time artifacts (24 samples).
-    - The input dictionary is mutated by popping the 'snr' key internally.
-
-    Exceptions
-    ----------
-    If any step fails (e.g., waveform generation, projection, or noise injection), the function prints
-    an error message including the sample number and returns `None`.
+    - Waveforms are generated using `pycbc.waveform.get_td_waveform` with the
+      `teobresums` approximant, zero tidal deformabilities, and specified eccentricity.
+    - The lensing effect is computed using `compute_lensed_waveform`.
+    - Noise injection and SNR scaling are performed by `inject_noise_with_target_SNR`.
+    - Waveforms are cropped from the left (24 samples) to remove startup artifacts.
+    - PSDs are selected based on the detector name:
+        * 'E1', 'E2', 'E3' → Einstein Telescope
+        * 'C1' → Cosmic Explorer
+        * 'L1', 'H1', 'V1', 'A1' → aLIGO Zero-Detuned High Power
+    - Setting `compute_lnB_based_on_FF=True` can be computationally expensive.
     """
     try:
         mass1, mass2 = bilby.gw.conversion.chirp_mass_and_mass_ratio_to_component_masses(
@@ -223,7 +370,7 @@ def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_dete
             plt.tight_layout()
             plt.show()
 
-        if check_lnB:
+        if compute_lnB_based_on_match:
             tlen = max(len(hp), len(sp), len(sp_lensed))
             
             hp.resize(tlen)
@@ -247,9 +394,47 @@ def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_dete
             ecc_m = pycbc.filter.match(hp, sp, psd=psd, low_frequency_cutoff=F_LOWER)[0]
             lens_m = pycbc.filter.match(sp_lensed, sp, psd=psd, low_frequency_cutoff=F_LOWER)[0]
 
-        lens_dict = {'lensed_signal': lens_noisy, 'snr_l': snr_l, 'distance_l': distance_l, 'lens_m': lens_m}
-        ecc_dict = {'ecc_signal': ecc_noisy, 'snr_e': snr_e, 'distance_e': distance_e, 'ecc_m': ecc_m}
-        unlens_dict = {'unlensed_signal': unlens_noisy, 'snr_u': snr_u, 'distance_u': distance_u}
+            lens_dict = {'lensed_signal': lens_noisy, 'snr_l': snr_l, 'distance_l': distance_l, 'lens_m': lens_m}
+            ecc_dict = {'ecc_signal': ecc_noisy, 'snr_e': snr_e, 'distance_e': distance_e, 'ecc_m': ecc_m}
+            unlens_dict = {'unlensed_signal': unlens_noisy, 'snr_u': snr_u, 'distance_u': distance_u}
+        
+        elif compute_lnB_based_on_FF:
+            ecc_args_for_optimizer = (hp, REFERENCE_DISTANCE, detector.name)
+            ecc_result = differential_evolution(
+                        func=objective_function,
+                        bounds=bounds,
+                        args=(ecc_args_for_optimizer,),
+                        strategy='best1bin',
+                        maxiter=30,
+                        popsize=15,
+                        disp=True,
+                        workers=1,
+                        updating="deferred"
+                    )
+            ecc_fitting_factor = 1.0 - ecc_result.fun
+            
+            lensed_args_for_optimizer = (sp_lensed, REFERENCE_DISTANCE, detector.name)
+            lens_result = differential_evolution(
+                        func=objective_function,
+                        bounds=bounds,
+                        args=(lensed_args_for_optimizer,),
+                        strategy='best1bin',
+                        maxiter=30,
+                        popsize=15,
+                        disp=True,
+                        workers=1,
+                        updating="deferred"
+                    )
+            lens_fitting_factor = 1.0 - lens_result.fun
+
+            lens_dict = {'lensed_signal': lens_noisy, 'snr_l': snr_l, 'distance_l': distance_l, 'lens_FF': lens_fitting_factor}
+            ecc_dict = {'ecc_signal': ecc_noisy, 'snr_e': snr_e, 'distance_e': distance_e, 'ecc_FF': ecc_fitting_factor}
+            unlens_dict = {'unlensed_signal': unlens_noisy, 'snr_u': snr_u, 'distance_u': distance_u}
+
+        else:
+            lens_dict = {'lensed_signal': lens_noisy, 'snr_l': snr_l, 'distance_l': distance_l,}
+            ecc_dict = {'ecc_signal': ecc_noisy, 'snr_e': snr_e, 'distance_e': distance_e}
+            unlens_dict = {'unlensed_signal': unlens_noisy, 'snr_u': snr_u, 'distance_u': distance_u}
 
         del hp, hc, sp, sc, sp_lensed, sc_lensed
         del ecc, unlensed, lensed, ecc_noisy, lens_noisy, unlens_noisy, ecc_padded, lens_padded, unlens_padded
@@ -265,25 +450,45 @@ def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_dete
 
 def generate_noise(time_duration=32, PSD_TYPE='aLIGO', seed=None):
     """
-    Generate a Gaussian noise realization using the O4 PSD.
+    Generate Gaussian noise using detector-specific power spectral densities (PSDs).
 
-    This function generates simulated Gaussian noise from the Advanced LIGO O4
-    design sensitivity (aLIGOZeroDetHighPower) power spectral density (PSD).
-    The generated noise is sampled at 4096 Hz over a specified duration.
+    This function produces a simulated Gaussian noise time series based on the 
+    specified detector sensitivity curve. The noise is sampled at 4096 Hz 
+    and generated via the PyCBC `noise_from_psd` routine, which ensures that 
+    the resulting noise realization follows the input PSD.
+
+    Supported PSD types:
+    - **aLIGO**: Advanced LIGO design sensitivity (O4; aLIGOZeroDetHighPower).
+    - **ET**: Einstein Telescope projected sensitivity.
+    - **CE**: Cosmic Explorer projected sensitivity.
 
     Parameters
     ----------
     time_duration : float, optional
-        Duration of the time series in seconds. Default is 32 seconds.
+        Duration of the time series in seconds. Default is 32 s.
+
+    PSD_TYPE : str, optional
+        Detector sensitivity curve to use. Must be one of:
+        ``'aLIGO'`` (default), ``'ET'``, or ``'CE'``.
+
     seed : int or None, optional
-        Seed for the random number generator, used to ensure reproducibility.
-        If None, the noise will be randomly generated without a fixed seed.
+        Random seed for reproducibility. If None (default), the noise realization
+        will vary between runs.
 
     Returns
     -------
     noise : pycbc.types.TimeSeries
-        A PyCBC TimeSeries object containing the generated noise realization.
+        A PyCBC `TimeSeries` object containing the generated Gaussian noise 
+        realization sampled at 4096 Hz.
+
+    Notes
+    -----
+    - The PSDs (`aligo_psd`, `einstein_psd`, `cosmic_psd`) must be preloaded 
+      and passed to `pycbc.noise.noise_from_psd`.
+    - The generated noise has zero mean and variance determined by the PSD.
+    - Useful for injection studies, parameter estimation, and testing waveform recovery.
     """
+
     delta_t = 1.0 / 4096
     tsamples = int(time_duration / delta_t)
 
@@ -341,12 +546,34 @@ def compute_lensed_waveform(sp, sc, m_lens, y_lens):
 
 def get_psd_type(detector=default_detector):
     """
-    Get the type of PSD used in the module.
+    Determine the PSD type and corresponding PSD object for a given detector.
+
+    This function maps the input detector to the appropriate sensitivity curve 
+    used in the module. Different ground-based interferometers are associated 
+    with specific design sensitivity PSDs.
+
+    Parameters
+    ----------
+    detector : bilby.gw.detector.Interferometer, optional
+        Detector object (default is `default_detector`).
 
     Returns
     -------
-    (str, psd)
-        The type of PSD used, which is 'aLIGO' by default, and the PSD itself.
+    tuple
+        A tuple (psd_type, psd_object), where:
+        - psd_type : str
+            Identifier of the PSD. One of:
+            ``'ET'`` (Einstein Telescope),
+            ``'CE'`` (Cosmic Explorer),
+            ``'aLIGO'`` (Advanced LIGO design sensitivity).
+        - psd_object : pycbc.types.FrequencySeries
+            PSD object corresponding to the chosen detector.
+
+    Notes
+    -----
+    - Einstein Telescope (detectors 'E1', 'E2', 'E3') → ``ET`` PSD.
+    - Cosmic Explorer (detector 'C1') → ``CE`` PSD.
+    - Advanced LIGO (detectors 'L1', 'H1', 'V1', 'A1') → ``aLIGO`` PSD.
     """
     if detector.name == 'E1' or detector.name == 'E2' or detector.name == 'E3':
         return 'ET', einstein_psd
@@ -355,53 +582,98 @@ def get_psd_type(detector=default_detector):
     elif detector.name == 'L1' or detector.name == 'H1' or detector.name == 'V1' or detector.name == 'A1':
         return 'aLIGO', aligo_psd
 
-def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens, snr_desired, num, gw_signal_type='eccentric', peak_window=(2.0, 2.2), detector=default_detector, SEED = None):
+def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens, snr_desired, num,
+                                 gw_signal_type='eccentric', peak_window=(2.0, 2.2), 
+                                 detector=default_detector, SEED=None):
     """
-    Inject a gravitational wave signal into Gaussian noise and scale it to achieve a desired SNR.
+    Inject a gravitational wave signal into Gaussian noise and scale it to a target SNR.
 
-    This function takes a gravitational wave (GW) signal and injects it into 
-    simulated Gaussian noise generated from the O4 power spectral density (PSD). 
-    It rescales the signal to achieve a target signal-to-noise ratio (SNR) by 
-    adjusting the luminosity distance. Supports eccentric, quasi-circular, and 
-    lensed waveforms.
+    This function takes a gravitational wave (GW) signal, injects it into simulated 
+    Gaussian noise drawn from a detector-specific power spectral density (PSD), and 
+    rescales the signal amplitude (via luminosity distance) so that the resulting 
+    matched-filter signal-to-noise ratio (SNR) matches the desired value. Supports 
+    eccentric, quasi-circular, and point-mass lensed waveforms.
 
     Parameters
     ----------
     gw_signal : pycbc.types.TimeSeries
-        Initial unscaled gravitational wave signal to be injected.
+        Initial gravitational wave strain time series to be injected (before rescaling).
+
     params : dict
-        Dictionary containing intrinsic and extrinsic waveform parameters, such as
-        `spin1z`, `spin2z`, `eccentricity`, `coa_phase`, `ra`, `dec`, and `polarization`.
+        Dictionary of intrinsic and extrinsic waveform parameters, including:
+        - 'spin1z', 'spin2z' : float
+            Dimensionless aligned spin components.
+        - 'eccentricity' : float
+            Orbital eccentricity at reference frequency.
+        - 'coa_phase' : float
+            Coalescence phase (radians).
+        - 'ra', 'dec' : float
+            Right ascension and declination (radians).
+        - 'polarization' : float
+            Polarization angle (radians).
+
     mass1 : float
-        Mass of the primary compact object (in solar masses).
+        Mass of the primary object (in solar masses).
+
     mass2 : float
-        Mass of the secondary compact object (in solar masses).
+        Mass of the secondary object (in solar masses).
+
     m_lens : float
-        Redshifted mass of the point mass lens (in solar masses). Used only for lensed waveforms.
+        Redshifted lens mass (in solar masses). Used only if `gw_signal_type='lensed'`.
+
     y_lens : float
-        Dimensionless impact parameter for lensing. Used only for lensed waveforms.
+        Dimensionless lensing impact parameter. Used only if `gw_signal_type='lensed'`.
+
     snr_desired : float
-        Target SNR to scale the signal to.
+        Target matched-filter SNR to which the signal is rescaled.
+
     num : int
-        Sample index, used for logging/debugging purposes.
-    gw_signal_type : str, optional
-        Type of waveform to generate. Options:
-        - 'eccentric' (default): Eccentric waveform using input parameters.
-        - 'quasi_circular': Circular waveform with zero eccentricity.
-        - 'lensed': Point-mass lensed waveform.
-    peak_window : tuple (float, float)
-        Time window (in seconds) before the end of the noise where the signal peak should be injected.
-    detector : pycbc.detector.Detector, optional
-        The detector object used to project the waveform onto the detector frame. Default is `default_detector`.
+        Sample index, used for logging/debugging.
+
+    gw_signal_type : {'eccentric', 'quasi_circular', 'lensed'}, optional
+        Type of waveform injection:
+        - ``'eccentric'`` : Generates an eccentric waveform (default).
+        - ``'quasi_circular'`` : Generates a circular (ecc=0) waveform.
+        - ``'lensed'`` : Generates a point-mass lensed waveform.
+
+    peak_window : tuple of (float, float), optional
+        Time window (in seconds, relative to the end of the timeseries) in which 
+        the signal peak is injected. Default is (2.0, 2.2).
+
+    detector : bilby.gw.detector.Interferometer, optional
+        Detector object used to project the waveform and select the PSD. 
+        Default is `default_detector`.
+
+    SEED : int or None, optional
+        Seed for Gaussian noise generation. If None (default), noise realizations 
+        differ between runs.
 
     Returns
     -------
     data : pycbc.types.TimeSeries
-        The noise + injected GW signal time series (scaled to the desired SNR).
+        The time series containing the sum of noise and the injected, rescaled GW signal.
+
     peak_snr : float
-        The peak matched-filter SNR after rescaling.
+        Measured matched-filter SNR of the injected signal after rescaling.
+
     distance : float
-        The luminosity distance (in Mpc) used to scale the waveform to the target SNR.
+        Luminosity distance (in Mpc) to which the signal was scaled in order 
+        to achieve the desired SNR.
+
+    template : pycbc.types.TimeSeries
+        The rescaled and projected GW waveform template used in the injection.
+
+    Notes
+    -----
+    - Noise is generated using `generate_noise`, with PSD chosen via `get_psd_type`.
+    - The scaling to the target SNR is achieved by adjusting the luminosity distance:
+      ``distance = REFERENCE_DISTANCE * (peak_snr_initial / snr_desired)``.
+    - Waveforms are generated with the `teobresums` approximant and tapered 
+      with `TAPER_STARTEND` to reduce spectral artifacts.
+    - For lensed injections, `compute_lensed_waveform` is used to apply 
+      point-mass lensing magnification and time delays.
+    - Injection is placed within `peak_window` seconds of the end of the 
+      noise timeseries to avoid boundary effects.
     """
     PSD_TYPE, psd = get_psd_type(detector)
 
@@ -415,8 +687,6 @@ def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens
     data = pycbc.types.TimeSeries(np.asarray(template) + np.asarray(noise), delta_t=delta_t, epoch=start_time)
     
     template = pycbc.types.TimeSeries(template, delta_t=delta_t, epoch=start_time)
-
-    ########### Add seed to matched_filter ###########
     
     snr = pycbc.filter.matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=F_LOWER)
 
@@ -491,23 +761,43 @@ def add_noise(signal_ts, detector=default_detector, SEED = None):
 
 def inject_signal_with_peak_in_window(signal_ts, noise_ts, peak_window=(2.0, 2.2)):
     """
-    Zero-pads and aligns the signal so that its peak occurs within the last `peak_window` seconds of the noise.
+    Align a gravitational wave signal within a noise timeseries by placing its peak
+    randomly inside a specified time window near the end of the noise.
+
+    This function zero-pads the input signal so that its maximum amplitude occurs
+    within the last `peak_window` seconds of the noise realization, ensuring 
+    consistent placement for injection studies.
 
     Parameters
     ----------
     signal_ts : pycbc.types.TimeSeries
-        The time-domain eccentric waveform.
+        Time-domain gravitational wave signal (strain).
+
     noise_ts : pycbc.types.TimeSeries
-        The time-domain noise waveform of the same sampling rate.
-    peak_window : tuple (float, float)
-        Time window (in seconds) before the end of the noise where the signal peak should be injected.
+        Time-domain Gaussian noise with the same sampling rate as `signal_ts`.
+
+    peak_window : tuple of (float, float), optional
+        Time window (in seconds, relative to the end of the noise) in which the 
+        signal peak will be placed. Default is (2.0, 2.2).
 
     Returns
-    ----------
+    -------
     padded_signal : np.ndarray
-        The zero-padded signal aligned with the desired peak location.
-    injection_index : int
-        The index in the array where the peak was injected.
+        The zero-padded signal array, aligned so that its peak lies within the 
+        chosen window inside the noise timeseries.
+
+    delta_t : float
+        Sampling interval (seconds) of the timeseries.
+
+    start_time : lal.LIGOTimeGPS
+        Start time of the output padded signal (same as `signal_ts.start_time`).
+
+    Notes
+    -----
+    - The signal is truncated if it does not fully fit into the noise segment.
+    - The peak location is chosen uniformly at random within the specified window.
+    - This function does not perform the actual injection; it prepares the 
+      signal alignment for later addition to the noise.
     """
     signal = np.asarray(signal_ts)
 
@@ -617,10 +907,43 @@ def _get_category_parts(path_str):
 
 def save_qtransform_with_checks(waveform_dict, path):
     """
-    Saves an multi-channeled Q‑transform image:
-      Each channels corresponds to one particular detector.
-    Category is inferred from the filename: eccentric / lensed / unlensed.
-    Returns True on success, False otherwise.
+    Compute and save multi-channel Q-transform spectrograms from waveform data.
+
+    Each channel corresponds to one detector's strain timeseries. The function
+    infers the waveform category (eccentric / lensed / unlensed) from the output 
+    filename and selects the appropriate signal for the Q-transform. The resulting 
+    spectrograms are zero-padded to match the largest shape among detectors, stacked 
+    into a N-D array (C, H, W), and saved as a `.npy` file.
+
+    Parameters
+    ----------
+    waveform_dict : dict
+        Dictionary containing waveform data for one or more detectors. Expected keys
+        include detector names (e.g., "H1", "L1") mapping to dictionaries with:
+        - 'eccentric' → {'ecc_signal': TimeSeries}
+        - 'lensed'    → {'lensed_signal': TimeSeries}
+        - 'unlensed'  → {'unlensed_signal': TimeSeries}
+    
+    path : str or pathlib.Path
+        Output file path. If it ends with `.png`, the extension will be replaced 
+        with `.npy`.
+
+    Returns
+    -------
+    success : bool
+        Returns True if the Q-transform stack is successfully computed and saved,
+        False otherwise.
+
+    Notes
+    -----
+    - Uses GWpy's `TimeSeries.q_transform` for generating spectrograms.
+    - Frequency range is fixed to `(F_LOWER, 512)` Hz with whitening and mean 
+      normalization.
+    - The output is stored as a numpy array of shape `(C, H, W)`, where:
+        - C = number of detectors,
+        - H = time bins,
+        - W = frequency bins.
+    - Padding is symmetric to center-align smaller spectrograms.
     """
     category = _get_category_parts(str(path))
     stacked_q = []
@@ -663,6 +986,27 @@ def save_qtransform_with_checks(waveform_dict, path):
     return True
 
 def pad_to_shape(arr, target_shape):
+    """
+    Zero-pad a 2D array symmetrically to match a target shape.
+
+    Parameters
+    ----------
+    arr : np.ndarray
+        Input 2D array to be padded.
+    target_shape : tuple of (int, int)
+        Desired output shape (rows, cols).
+
+    Returns
+    -------
+    padded_arr : np.ndarray
+        Padded 2D array with shape exactly equal to `target_shape`.
+
+    Notes
+    -----
+    - Padding is applied equally on both sides (top/bottom, left/right).
+    - If the difference in size is odd, the extra padding is placed on the 
+      bottom/right side.
+    """
     pad_y = target_shape[0] - arr.shape[0]
     pad_x = target_shape[1] - arr.shape[1]
     pad_y1, pad_y2 = pad_y // 2, pad_y - pad_y // 2

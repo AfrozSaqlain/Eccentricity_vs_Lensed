@@ -50,10 +50,14 @@ def setup_directories(model_name=None):
     os.makedirs(f'./results/{model_name}_results/Plots', exist_ok=True)
     
 class GWDataset(Dataset):
-    def __init__(self, file_list, transform=None):
+    def __init__(self, file_list, transform=None, meta_csv='./results/data_parameters.csv'):
         self.file_list = file_list
         self.transform = transform
-        self.df = pd.read_csv('./results/data_parameters.csv')
+        self.df = pd.read_csv(meta_csv)
+
+        # set index if sample column exists
+        if 'sample' in self.df.columns:
+            self.df = self.df.set_index('sample')
 
     def __len__(self):
         return len(self.file_list)
@@ -61,39 +65,36 @@ class GWDataset(Dataset):
     def __getitem__(self, idx):
         file_path = self.file_list[idx]
 
-        arr = np.load(file_path)  # shape: (H, W, C)
+        # load [C, H, W] array
+        arr = np.load(file_path).astype(np.float32)
+        arr = torch.from_numpy(arr)
 
-        # Transpose to (H, W, C) only if needed
-        if arr.ndim == 2:
-            arr = arr[:, :, np.newaxis]  # Convert to (H, W, 1)
-
-        arr = arr.astype(np.float32)
-        arr = torch.from_numpy(arr).float()
-        
-        arr = self.transform(arr)
+        if self.transform:
+            arr = self.transform(arr)
 
         label_str = file_path.split("/")[2].lower()
         label = {'lensed': 0, 'eccentric': 1, 'unlensed': 2}[label_str]
 
-        file_number = file_path.split('/')[-1].split('.')[0]
+        file_number = int(file_path.split('/')[-1].split('.')[0])
 
-        if label == 'lensed':
-            ln_B = self.df['lens_lnB'][file_number]
-        elif label == 'eccentric':
-            ln_B = self.df['ecc_lnB'][file_number]
-        else:
-            ln_B = 0
-            
-        if ln_B > 10:
-            weight = 10
-        else:
-            weight = 1
+        ln_B = 0.0
+        if file_number in self.df.index:
+            if label_str == 'lensed' and 'lens_lnB' in self.df.columns:
+                ln_B = self.df.loc[file_number, 'lens_lnB']
+            elif label_str == 'eccentric' and 'ecc_lnB' in self.df.columns:
+                ln_B = self.df.loc[file_number, 'ecc_lnB']
+            else:
+                ln_B = 0
+
+        # weight = 10.0 if ln_B > 10 else 1.0
+        weight = 1.0
 
         return arr, label, weight, file_path
+
     
 def custom_collate_fn(batch):
     images, labels, weights, file_paths = zip(*batch)
-    return torch.stack(images), torch.tensor(labels), torch.tensor(weights), file_paths
+    return torch.stack(images), torch.tensor(labels), torch.tensor(weights, dtype=torch.float32), file_paths
 
 def load_all_data(path_name='data', seed=42, batch_size=32):
 

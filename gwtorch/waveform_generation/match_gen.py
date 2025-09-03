@@ -17,9 +17,9 @@ from gwtorch.modules.constants import *
 from gwtorch.modules.general_utils import save_csv
 
 from gwtorch.modules.gw_utils import (
+    generate_prior,
     generate_waveform,
-    save_qtransform_with_checks,
-    generate_prior
+    save_qtransform_with_checks
 )
 
 def generate_sample(args):
@@ -34,7 +34,7 @@ def generate_sample(args):
             # SEED = {'ecc_seed': np.random.randint(2**32), 'lens_seed': np.random.randint(2**32), 'unlens_seed': np.random.randint(2**32)}
             # SEED = {'ecc_seed': None, 'lens_seed': None, 'unlens_seed': None}
 
-            ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens = generate_waveform(num, params, peak_window, detector=detector, SEED=SEED)
+            ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens = generate_waveform(num, params, peak_window, detector=detector, compute_lnB_based_on_match=True, SEED=SEED)
             waveform_dict[detector] = {
                 'eccentric': ecc_dict,
                 'lensed': lens_dict,
@@ -93,10 +93,7 @@ def generate_sample(args):
             **count
         }
 
-        del ecc_dict, lens_dict, unlens_dict, waveform_dict
-        del mass1, mass2, m_lens, y_lens, lens_match, ecc_match
-        del snr_e_network, snr_l_network, snr_u_network
-        del ecc_lnB, lens_lnB, count
+        del ecc_dict, lens_dict, unlens_dict, waveform_dict, mass1, mass2, m_lens, y_lens, ecc_lnB, lens_lnB, count, snr_u_network
         gc.collect()
 
         return result

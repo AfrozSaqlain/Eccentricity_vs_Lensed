@@ -10,7 +10,6 @@ from tqdm import tqdm
 from pathlib import Path
 from multiprocessing import Pool
 from threadpoolctl import threadpool_limits
-from scipy.optimize import differential_evolution
 
 import pycbc
 import bilby
@@ -21,144 +20,11 @@ from gwtorch.modules.constants import *
 from gwtorch.modules.general_utils import save_csv
 
 from gwtorch.modules.gw_utils import (
-    save_qtransform_with_checks,
     generate_prior,
-    compute_lensed_waveform,
-    inject_noise_with_target_SNR
+    generate_waveform,
+    save_qtransform_with_checks
 )
 
-bounds = [
-    (10, 100), # Chirp Mass
-    (0.1, 1), # Mass Ratio
-    (-0.9, 0.9), # spin1z
-    (-0.9, 0.9), # spin2z
-    (0, 2*np.pi), # coa_phase
-]
-
-def objective_function(params_array, args):
-    chirp_mass, mass_ratio, spin1z, spin2z, coa_phase = params_array
-    signal, distance, detector_name = args
-    try:
-        mass1, mass2 = bilby.gw.conversion.chirp_mass_and_mass_ratio_to_component_masses(chirp_mass=chirp_mass, mass_ratio=mass_ratio)
-
-        template_hp, template_hc = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
-                                                    lambda1=0, lambda2=0,
-                                                    spin1z=spin1z, spin2z=spin2z,
-                                                    distance=distance, delta_t=DELTA_T,
-                                                    ecc=0.0, coa_phase=coa_phase, f_lower=F_START)
-        
-        signal_copy = signal.copy()
-        temp_copy = template_hp.copy()
-
-        target_len = max(len(signal_copy), len(temp_copy))
-        signal_copy.resize(target_len)
-        temp_copy.resize(target_len)
-
-        signal_copy = pycbc.types.TimeSeries(signal_copy.data,
-                                             delta_t=temp_copy.delta_t,
-                                             epoch=temp_copy.start_time)
-
-        duration = temp_copy.duration
-        flen     = target_len // 2 + 1
-
-        if detector_name == 'E1' or detector_name == 'E2' or detector_name == 'E3':
-            psd = pycbc.psd.EinsteinTelescopeP1600143(flen, 1/duration, F_START)
-        elif detector_name == 'C1':
-            psd = pycbc.psd.CosmicExplorerP1600143(flen, 1/duration, F_START)
-        elif detector_name == 'L1' or detector_name == 'H1' or detector_name == 'V1' or detector_name == 'A1':
-            psd = pycbc.psd.aLIGOZeroDetHighPower(flen, 1/duration, F_START)
-        
-        match_value, _ = pycbc.filter.match(signal_copy, temp_copy, psd=psd, low_frequency_cutoff=F_LOWER)
-
-        return 1.0 - match_value
-    except Exception as e:
-        print(f"Error in objective function: {e}")
-        return 1.0
-    
-
-
-def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_detector, compute_FF=True, SEED=None):
-    try:
-        mass1, mass2 = bilby.gw.conversion.chirp_mass_and_mass_ratio_to_component_masses(
-            params['chirp_mass'], params['mass_ratio'])
-
-        m_lens = 10 ** params["Log_Mlz"]
-        y_lens = params["yl"]
-
-        hp, hc = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
-                                 lambda1=0, lambda2=0,
-                                 spin1z=params['spin1z'], spin2z=params['spin2z'],
-                                 distance=REFERENCE_DISTANCE, delta_t=DELTA_T,
-                                 ecc=params['eccentricity'], coa_phase=params['coa_phase'], f_lower=F_START)
-
-        sp, sc = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
-                                 lambda1=0, lambda2=0,
-                                 spin1z=params['spin1z'], spin2z=params['spin2z'],
-                                 distance=REFERENCE_DISTANCE, delta_t=DELTA_T,
-                                 ecc=0.0, coa_phase=params['coa_phase'], f_lower=F_START)
-
-        sp_lensed, sc_lensed, t_delay = compute_lensed_waveform(sp, sc, m_lens, y_lens)
-
-        ecc = taper_timeseries(detector.project_wave(hp, hc, **{k: params[k] for k in ['ra', 'dec', 'polarization']}), tapermethod="TAPER_STARTEND", return_lal=False)
-        unlensed = taper_timeseries(detector.project_wave(sp, sc, **{k: params[k] for k in ['ra', 'dec', 'polarization']}), tapermethod="TAPER_STARTEND", return_lal=False)
-        lensed = taper_timeseries(detector.project_wave(sp_lensed, sc_lensed, **{k: params[k] for k in ['ra', 'dec', 'polarization']}), tapermethod="TAPER_STARTEND", return_lal=False)
-
-        target_snr = params['snr']
-
-        ecc_noisy, snr_e, distance_e, ecc_padded = inject_noise_with_target_SNR(ecc, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='eccentric', peak_window=peak_window, detector=detector, SEED=SEED)
-        lens_noisy, snr_l, distance_l, lens_padded = inject_noise_with_target_SNR(lensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='lensed', peak_window=peak_window, detector=detector, SEED=SEED)
-        unlens_noisy, snr_u, distance_u, unlens_padded = inject_noise_with_target_SNR(unlensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='quasi_circular', peak_window=peak_window, detector=detector, SEED=SEED)
-        
-        ecc_noisy = ecc_noisy.crop(left=24, right=0)
-        lens_noisy = lens_noisy.crop(left=24, right=0)
-        unlens_noisy = unlens_noisy.crop(left=24, right=0)
-
-        if compute_FF:
-            ecc_args_for_optimizer = (hp, REFERENCE_DISTANCE, detector.name)
-            ecc_result = differential_evolution(
-                        func=objective_function,
-                        bounds=bounds,
-                        args=(ecc_args_for_optimizer,),
-                        strategy='best1bin',
-                        maxiter=30,
-                        popsize=15,
-                        disp=True,
-                        workers=1,
-                        updating="deferred"
-                    )
-            ecc_fitting_factor = 1.0 - ecc_result.fun
-            
-            lensed_args_for_optimizer = (sp_lensed, REFERENCE_DISTANCE, detector.name)
-            lens_result = differential_evolution(
-                        func=objective_function,
-                        bounds=bounds,
-                        args=(lensed_args_for_optimizer,),
-                        strategy='best1bin',
-                        maxiter=30,
-                        popsize=15,
-                        disp=True,
-                        workers=1,
-                        updating="deferred"
-                    )
-            lens_fitting_factor = 1.0 - lens_result.fun
-        else:
-            ecc_fitting_factor, lens_fitting_factor = None, None
-
-        lens_dict = {'lensed_signal': lens_noisy, 'snr_l': snr_l, 'distance_l': distance_l, 'lens_FF': lens_fitting_factor}
-        ecc_dict = {'ecc_signal': ecc_noisy, 'snr_e': snr_e, 'distance_e': distance_e, 'ecc_FF': ecc_fitting_factor}
-        unlens_dict = {'unlensed_signal': unlens_noisy, 'snr_u': snr_u, 'distance_u': distance_u}
-
-        del hp, hc, sp, sc, sp_lensed, sc_lensed
-        del ecc, unlensed, lensed, ecc_noisy, lens_noisy, unlens_noisy, ecc_padded, lens_padded, unlens_padded
-        gc.collect()
-
-        return ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens
-        
-    except Exception as e:
-        print(f"[Sample {num}] Error: {e}")
-        import traceback
-        traceback.print_exc()
-        return None
 
 def generate_sample(args):
     num, params, jump, output_path = args
@@ -172,7 +38,7 @@ def generate_sample(args):
             # SEED = {'ecc_seed': np.random.randint(2**32), 'lens_seed': np.random.randint(2**32), 'unlens_seed': np.random.randint(2**32)}
             # SEED = {'ecc_seed': None, 'lens_seed': None, 'unlens_seed': None}
 
-            ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens = generate_waveform(num, params, peak_window, detector=detector, SEED=SEED)
+            ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens = generate_waveform(num, params, peak_window, detector=detector, compute_lnB_based_on_FF=True, SEED=SEED)
             waveform_dict[detector] = {
                 'eccentric': ecc_dict,
                 'lensed': lens_dict,
