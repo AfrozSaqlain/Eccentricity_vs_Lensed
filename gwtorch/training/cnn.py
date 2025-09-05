@@ -59,7 +59,7 @@ def main():
         print(f"\nK-fold cross validation completed!")
     else:
         print("\nRunning single train/validation/test split...")
-        num_channels, train_loader, valid_loader, test_loader,class_weights = load_all_data(path_name=args.path_name, seed=args.seed, batch_size=args.batch_size)
+        num_channels, train_loader, valid_loader, test_loader, class_weights = load_all_data(path_name=args.path_name, seed=args.seed, batch_size=args.batch_size)
 
         model = get_model(name=args.model, num_channels=num_channels, device=device)
 
@@ -78,11 +78,13 @@ def main():
         train_losses, val_losses, train_accs, val_accs = train_model(
             model, train_loader, valid_loader, device, args.epochs, args.lr, args.gamma, class_weights=class_weights
         )
+
         val_misclassified, test_misclassified, _, _ = evaluate_and_plot(
             model, valid_loader, test_loader, device , model_name=args.model
         )
+        
         plot_training_curves(train_losses, val_losses, train_accs, val_accs, 
-                           Path('./results/cnn_results'))
+                           Path(f'./results/{args.model}_results'))
 
         print("\nTraining complete. Summary:")
         print(f"Validation misclassifications: {len(val_misclassified)}")
