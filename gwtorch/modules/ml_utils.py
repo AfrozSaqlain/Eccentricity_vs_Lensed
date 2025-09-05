@@ -86,8 +86,8 @@ class GWDataset(Dataset):
             else:
                 ln_B = 0
 
-        # weight = 10.0 if ln_B > 10 else 1.0
-        weight = 1.0
+        weight = 10.0 if ln_B > 10 else 1.0
+        # weight = 1.0
 
         return arr, label, weight, file_path
 
