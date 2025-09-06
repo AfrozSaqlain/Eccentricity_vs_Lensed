@@ -20,6 +20,10 @@ from gwtorch.modules.general_utils import (
     save_misclassified_files_to_txt,
 )
 
+from gwtorch.modules.ml_utils import (
+    seed_everything,
+)
+
 def setup_directories(results_dir, model_name='CNN'):
     os.makedirs(f'./{results_dir}/{model_name}_results/Plots', exist_ok=True)
 
@@ -124,7 +128,8 @@ def evaluate_and_plot(model, test_loader, device, results_dir, model_name='CNN')
 def main():
     args = parse_args()
     setup_directories(results_dir=args.results_dir)
-    
+    seed_everything(42)
+
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     print(f"Using device: {device}")

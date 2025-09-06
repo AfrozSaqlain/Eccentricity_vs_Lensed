@@ -83,8 +83,8 @@ class GWDataset(Dataset):
                 ln_B = self.df.loc[file_number, 'lens_lnB']
             elif label_str == 'eccentric' and 'ecc_lnB' in self.df.columns:
                 ln_B = self.df.loc[file_number, 'ecc_lnB']
-            else:
-                ln_B = 0
+            elif label_str == 'unlensed':
+                ln_B = 100
 
         weight = 10.0 if ln_B > 10 else 1.0
         # weight = 1.0
