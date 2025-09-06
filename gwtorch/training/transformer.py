@@ -1,16 +1,8 @@
 import os
-import glob
 import argparse
 from pathlib import Path
 
 import torch
-
-import random
-import numpy as np
-
-from linformer import Linformer
-from vit_pytorch.efficient import ViT
-from vit_pytorch.cvt import CvT
 
 from gwtorch.modules.general_utils import (
     plot_training_curves,
@@ -62,13 +54,13 @@ def main():
     
     if args.use_kfold:
 
-        fold_results = run_kfold_training(args, device, get_model=get_model, model_name=args.model)
+        run_kfold_training(args, device, get_model=get_model, model_name=args.model)
         print(f"\nK-fold cross validation completed!")
         
     else:
 
         print("\nRunning single train/validation/test split...")
-        num_channels, train_loader, valid_loader, test_loader, class_weights = load_all_data(args.path_name, args.seed, args.batch_size)
+        num_channels, train_loader, valid_loader, test_loader, class_weights = load_all_data(path_name=args.path_name, seed=args.seed, batch_size=args.batch_size)
         
         model = get_model(name=args.model, num_channels=num_channels, device=device)
 
@@ -83,11 +75,11 @@ def main():
             print(f"Found all class samples to be equal. Setting class weights to {class_weights}")
 
         train_losses, val_losses, train_accs, val_accs = train_model(
-            model, train_loader, valid_loader, device, args.epochs, args.lr, args.gamma, class_weights=class_weights
+            model=model, train_loader=train_loader, valid_loader=valid_loader, device=device, epochs=args.epochs, lr=args.lr, gamma=args.gamma, class_weights=class_weights
         )
         
         val_misclassified, test_misclassified, _, _ = evaluate_and_plot(
-            model, valid_loader, test_loader, device , model_name=args.model
+            model=model, valid_loader=valid_loader, test_loader=test_loader, device=device , model_name=args.model
         )
 
         plot_training_curves(train_losses, val_losses, train_accs, val_accs, 
