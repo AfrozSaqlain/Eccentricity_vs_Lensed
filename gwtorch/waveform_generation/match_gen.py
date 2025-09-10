@@ -35,8 +35,6 @@ def generate_sample(args):
                 'lens_seed': rng.integers(2**32),
                 'unlens_seed': rng.integers(2**32)
             }
-            # SEED = {'ecc_seed': np.random.randint(2**32), 'lens_seed': np.random.randint(2**32), 'unlens_seed': np.random.randint(2**32)}
-            # SEED = {'ecc_seed': None, 'lens_seed': None, 'unlens_seed': None}
 
             ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens = generate_waveform(num, params, peak_window, detector=detector, compute_lnB_based_on_match=True, SEED=SEED)
             waveform_dict[detector] = {
@@ -98,7 +96,7 @@ def generate_sample(args):
             **count
         }
 
-        del ecc_dict, lens_dict, unlens_dict, waveform_dict, mass1, mass2, m_lens, y_lens, ecc_lnB, lens_lnB, count, snr_u_network
+        del ecc_dict, lens_dict, unlens_dict, waveform_dict, mass1, mass2, m_lens, y_lens, snr_u_network, ecc_lnB, lens_lnB, count
 
         return result
     
@@ -167,8 +165,6 @@ def main():
     master_seed = 42
     master_rng = np.random.default_rng(master_seed)
 
-    # 2. Generate a unique, high-entropy seed for each sample
-    # This is the crucial step for preventing data leakage.
     num_samples_to_generate = len(samples)
     task_seeds = master_rng.integers(low=0, high=2**32, size=num_samples_to_generate)
 
@@ -181,12 +177,11 @@ def main():
                 print(f"\nStarting batch {int(i / batch_size)}")
 
                 batch_sample = samples[i:i+batch_size]
-                batch_seeds = task_seeds[i:i+batch_size] # Get the seeds for this batch
+                batch_seeds = task_seeds[i:i+batch_size]
 
                 jump = init_jump + (count) * batch_size
                 print(f"Jumping {jump} files")
 
-                # 3. Pass the unique seed with other arguments to each worker
                 args_list = [
                     (j + jump, batch_sample[j], output_path, batch_seeds[j])
                     for j in range(len(batch_sample))

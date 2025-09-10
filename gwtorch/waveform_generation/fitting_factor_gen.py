@@ -27,14 +27,19 @@ from gwtorch.modules.gw_utils import (
 
 
 def generate_sample(args):
-    num, params, jump, output_path = args
+    num, params, output_path, seed = args
     peak_window = (2.0, 2.2)
     try:
+        rng = np.random.default_rng(seed)
+
         waveform_dict = {}
         for detector in detector_list:
-            # SEED = None # np.random.randint(2**32) # 42 # https://pycbc.org/pycbc/latest/html/_modules/pycbc/noise/gaussian.html#noise_from_psd If seed is None, PyCBC creates a numpy.random.randint(2**32) and for each subprocess the random number generated is same.
-
-            SEED = {'ecc_seed': np.random.randint(10), 'lens_seed': np.random.randint(10), 'unlens_seed': np.random.randint(10)}
+            
+            SEED = {
+                'ecc_seed': rng.integers(2**32),
+                'lens_seed': rng.integers(2**32),
+                'unlens_seed': rng.integers(2**32)
+            }
             # SEED = {'ecc_seed': np.random.randint(2**32), 'lens_seed': np.random.randint(2**32), 'unlens_seed': np.random.randint(2**32)}
             # SEED = {'ecc_seed': None, 'lens_seed': None, 'unlens_seed': None}
 
@@ -49,21 +54,12 @@ def generate_sample(args):
                 'y_lens': y_lens,
             }
 
-        # snr_e_network = np.sqrt(
-        #     sum((waveform_dict[det]['eccentric']['snr_e'])**2 
-        #         for det in detector_list)
-        # )
-
-        # snr_l_network = np.sqrt(
-        #     sum((waveform_dict[det]['lensed']['snr_l'])**2 
-        #         for det in detector_list)
-        # )
-
+        # --- Quasi-Circular Unlensed lnB ---
         snr_u_network = np.sqrt(
             sum((waveform_dict[det]['unlensed']['snr_u'])**2 for det in detector_list)
         )
 
-        # --- Eccentric lnB (network FF + network SNR²) ---
+        # --- Eccentric lnB ---
         rhosq_e = []
         ff_e = []
         for det in detector_list:
@@ -75,7 +71,7 @@ def generate_sample(args):
         FF_e_net = np.dot(rhosq_e, ff_e) / rho_e_net_sq
         ecc_lnB = 0.5 * rho_e_net_sq * (1.0 - FF_e_net**2)
 
-        # --- Lensed lnB (network FF + network SNR²) ---
+        # --- Lensed lnB ---
         rhosq_l = []
         ff_l = []
         for det in detector_list:
@@ -107,11 +103,7 @@ def generate_sample(args):
             **count
         }
 
-        del ecc_dict, lens_dict, unlens_dict, waveform_dict
-        del mass1, mass2, m_lens, y_lens
-        del snr_u_network
-        del ecc_lnB, lens_lnB, count
-        gc.collect()
+        del ecc_dict, lens_dict, unlens_dict, waveform_dict, mass1, mass2, m_lens, y_lens, snr_u_network, ecc_lnB, lens_lnB, count
 
         return result
     
@@ -170,24 +162,33 @@ def main():
 
     samples = generate_prior(num_samples=num_samples, snr_type=snr_prior)
 
-    print(f"Generating {len(samples)} samples in each class...")
+    master_seed = 42
+    master_rng = np.random.default_rng(master_seed)
 
-    def _init_worker(base):
-        np.random.seed((base + os.getpid()) % (2**32 - 1))
+    # 2. Generate a unique, high-entropy seed for each sample
+    # This is the crucial step for preventing data leakage.
+    num_samples_to_generate = len(samples)
+    task_seeds = master_rng.integers(low=0, high=2**32, size=num_samples_to_generate)
+
+    print(f"Generating {num_samples_to_generate} samples in each class...")
 
     with threadpool_limits(limits=1, user_api="blas"):
-        with Pool(args.num_workers) as pool: #, initializer=_init_worker, initargs=(np.random.SeedSequence().entropy,)) as pool:
+        with Pool(args.num_workers) as pool:
             count = 0
-            for i in range(0, len(samples), batch_size):
+            for i in range(0, num_samples_to_generate, batch_size):
                 print(f"\nStarting batch {int(i / batch_size)}")
-                
-                batch_sample = samples[i:i+batch_size]
-                
-                jump = init_jump + (count) * batch_size
 
+                batch_sample = samples[i:i+batch_size]
+                batch_seeds = task_seeds[i:i+batch_size] # Get the seeds for this batch
+
+                jump = init_jump + (count) * batch_size
                 print(f"Jumping {jump} files")
 
-                args_list = [(j + jump, batch_sample[j], jump, output_path) for j in range(len(batch_sample))]
+                # 3. Pass the unique seed with other arguments to each worker
+                args_list = [
+                    (j + jump, batch_sample[j], output_path, batch_seeds[j])
+                    for j in range(len(batch_sample))
+                ]
 
                 results = list(tqdm(pool.imap_unordered(generate_sample, args_list), total=len(batch_sample)))
 
@@ -201,8 +202,7 @@ def main():
 
                 del batch_sample, args_list, results, valid_results
                 
-                for _ in range(3):
-                    gc.collect()
+                gc.collect()
                 
                 try:
                     np._NoValue
