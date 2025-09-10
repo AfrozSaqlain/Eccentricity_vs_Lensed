@@ -16,19 +16,26 @@ from gwtorch.modules.constants import *
 from gwtorch.modules.general_utils import save_csv
 
 from gwtorch.modules.gw_utils import (
+    # load_prior,
     generate_prior,
     generate_waveform,
     save_qtransform_with_checks
 )
 
 def generate_sample(args):
-    num, params, output_path = args
+    num, params, output_path, seed = args
     peak_window = (2.0, 2.2)
     try:
+        rng = np.random.default_rng(seed)
+
         waveform_dict = {}
         for detector in detector_list:
-
-            SEED = {'ecc_seed': np.random.randint(1000), 'lens_seed': np.random.randint(1000), 'unlens_seed': np.random.randint(1000)}
+            
+            SEED = {
+                'ecc_seed': rng.integers(2**32),
+                'lens_seed': rng.integers(2**32),
+                'unlens_seed': rng.integers(2**32)
+            }
             # SEED = {'ecc_seed': np.random.randint(2**32), 'lens_seed': np.random.randint(2**32), 'unlens_seed': np.random.randint(2**32)}
             # SEED = {'ecc_seed': None, 'lens_seed': None, 'unlens_seed': None}
 
@@ -157,26 +164,35 @@ def main():
         results_dir.mkdir(exist_ok=True)
 
     samples = generate_prior(num_samples=num_samples, snr_type=snr_prior)
+    # samples = load_prior()
 
-    print(f"Generating {len(samples)} samples in each class...")
+    master_seed = 42
+    master_rng = np.random.default_rng(master_seed)
 
-    # def _init_worker(base):
-    #     np.random.seed((base + os.getpid()) % (2**32 - 1))
+    # 2. Generate a unique, high-entropy seed for each sample
+    # This is the crucial step for preventing data leakage.
+    num_samples_to_generate = len(samples)
+    task_seeds = master_rng.integers(low=0, high=2**32, size=num_samples_to_generate)
 
+    print(f"Generating {num_samples_to_generate} samples in each class...")
 
     with threadpool_limits(limits=1, user_api="blas"):
-        with Pool(args.num_workers) as pool: #, initializer=_init_worker, initargs=(np.random.SeedSequence().entropy,)) as pool:
+        with Pool(args.num_workers) as pool:
             count = 0
-            for i in range(0, len(samples), batch_size):
+            for i in range(0, num_samples_to_generate, batch_size):
                 print(f"\nStarting batch {int(i / batch_size)}")
-                
-                batch_sample = samples[i:i+batch_size]
-                
-                jump = init_jump + (count) * batch_size
 
+                batch_sample = samples[i:i+batch_size]
+                batch_seeds = task_seeds[i:i+batch_size] # Get the seeds for this batch
+
+                jump = init_jump + (count) * batch_size
                 print(f"Jumping {jump} files")
 
-                args_list = [(j + jump, batch_sample[j], output_path) for j in range(len(batch_sample))]
+                # 3. Pass the unique seed with other arguments to each worker
+                args_list = [
+                    (j + jump, batch_sample[j], output_path, batch_seeds[j])
+                    for j in range(len(batch_sample))
+                ]
 
                 results = list(tqdm(pool.imap_unordered(generate_sample, args_list), total=len(batch_sample)))
 
@@ -197,11 +213,6 @@ def main():
                     np._NoValue
                 except:
                     pass
-                    
-                # Force pool to restart
-                # pool.terminate()
-                # pool.join()
-                # pool = Pool(args.num_workers)
 
                 count += 1
                 
