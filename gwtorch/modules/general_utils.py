@@ -73,6 +73,7 @@ def save_csv(path, rows):
     - If the CSV file exists, the function reads the last 'sample' value and offsets all new
       'sample' values to avoid duplication.
     - Assumes that the 'sample' key exists and is an integer.
+    - Keys ending in "_saved" are ignored (not written to CSV).
     """
     if not rows:
         return
@@ -84,21 +85,38 @@ def save_csv(path, rows):
         with open(path, 'r', newline='') as f:
             reader = csv.DictReader(f)
             try:
-                existing_samples = [int(row['sample']) for row in reader if 'sample' in row and row['sample'].isdigit()]
+                existing_samples = [
+                    int(row['sample'])
+                    for row in reader
+                    if 'sample' in row and row['sample'].isdigit()
+                ]
                 if existing_samples:
                     sample_offset = max(existing_samples) + 1
             except KeyError:
                 pass  # 'sample' column not found
 
-    # Update sample index in new rows
+    # Update sample index in new rows + strip *_saved keys
+    cleaned_rows = []
     for i, row in enumerate(rows):
+        row = {
+            k: v for k, v in row.items()
+            if not k.endswith("_saved")  # drop bookkeeping flags
+        }
         row['sample'] = i + sample_offset
+        cleaned_rows.append(row)
+
+    # Build fieldnames while preserving order
+    fieldnames = list(cleaned_rows[0].keys())
+    for row in cleaned_rows[1:]:
+        for key in row.keys():
+            if key not in fieldnames:
+                fieldnames.append(key)
 
     with open(path, 'a', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
         if not file_exists:
             writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows(cleaned_rows)
 
 
 def compute_roc_auc_with_misclassifications(model, data_loader, device, class_names=['Lensed', 'Eccentric', 'Unlensed']):
@@ -110,11 +128,10 @@ def compute_roc_auc_with_misclassifications(model, data_loader, device, class_na
     all_labels = []
     all_predictions = []
     all_probabilities = []
-    all_file_numbers = []
     all_img_paths = []
     
     with torch.no_grad():
-        for data, labels, file_numbers, img_paths in data_loader:
+        for data, labels, _, img_paths in data_loader:
             data = data.to(device)
             labels = labels.to(device)
             
@@ -125,7 +142,6 @@ def compute_roc_auc_with_misclassifications(model, data_loader, device, class_na
             all_labels.extend(labels.cpu().numpy())
             all_predictions.extend(predictions.cpu().numpy())
             all_probabilities.extend(probabilities.cpu().numpy())
-            all_file_numbers.extend(file_numbers)
             all_img_paths.extend(img_paths)
     
     all_labels = np.array(all_labels)
@@ -139,7 +155,6 @@ def compute_roc_auc_with_misclassifications(model, data_loader, device, class_na
     misclassified_info = []
     for idx in misclassified_indices:
         info = {
-            'file_number': all_file_numbers[idx],
             'file_path': all_img_paths[idx],
             'true_label': all_labels[idx],
             'predicted_label': all_predictions[idx],
@@ -210,7 +225,6 @@ def print_misclassified_files(misclassified_info, dataset_name):
         print(f"{'-'*40}")
         
         for info in files:
-            print(f"File Number: {info['file_number']}")
             print(f"File Path: {info['file_path']}")
             print(f"Predicted as: {info['predicted_class']}")
             print(f"Prediction Probabilities: {info['prediction_probabilities']}")
@@ -244,7 +258,6 @@ def save_misclassified_files_to_txt(misclassified_info, dataset_name, filename):
             f.write(f"{'-'*40}\n")
             
             for info in files:
-                f.write(f"File Number: {info['file_number']}\n")
                 f.write(f"File Path: {info['file_path']}\n")
                 f.write(f"Predicted as: {info['predicted_class']}\n")
                 f.write(f"Prediction Probabilities: {info['prediction_probabilities']}\n")

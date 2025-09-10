@@ -1,33 +1,22 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.colors import Normalize
 
 import gc
 import gwmat
 import pycbc
 import bilby
 import pycbc.psd
+import pycbc.types
 from gwmat import point_lens
 from gwpy.timeseries import TimeSeries
 from pycbc.types import FrequencySeries
 from bilby.gw.prior import BBHPriorDict
+from scipy.optimize import differential_evolution
 from pycbc.filter.matchedfilter import matched_filter
 from pycbc.waveform import get_td_waveform, taper_timeseries
-from matplotlib.colors import Normalize
 
 from gwtorch.modules.constants import *
-
-
-import warnings
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-
-import os
-import glob
-import argparse
-from tqdm import tqdm
-from pathlib import Path
-from multiprocessing import Pool
-
-from gwtorch.modules.general_utils import save_csv
 
 # ------------ Predifined Constant ---------------
 
@@ -90,7 +79,7 @@ def generate_prior(num_samples, snr_type = "powerlaw"):
     priors['mass_ratio'] = bilby.gw.prior.UniformInComponentsMassRatio(name='mass_ratio', minimum=0.1, maximum=1)
     priors['spin1z'] = bilby.core.prior.Uniform(name='spin1z', minimum=-0.9, maximum=0.9)
     priors['spin2z'] = bilby.core.prior.Uniform(name='spin2z', minimum=-0.9, maximum=0.9)
-    priors['eccentricity'] = bilby.core.prior.Uniform(name='eccentricity', minimum=0.1, maximum=0.6)
+    priors['eccentricity'] = bilby.core.prior.Uniform(name='eccentricity', minimum=1e-4, maximum=0.6)
     priors['coa_phase'] = bilby.core.prior.Uniform(name='coa_phase', minimum=0.0, maximum=2 * np.pi)
     priors['polarization'] = bilby.core.prior.Uniform(minimum=0., maximum=np.pi, boundary="periodic")
     priors['Log_Mlz'] = bilby.core.prior.Uniform(minimum=1, maximum=5)
@@ -106,7 +95,57 @@ def generate_prior(num_samples, snr_type = "powerlaw"):
         for i in range(num_samples)
     ]
 
-def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_detector, display=False, check_lnB=True):
+bounds = [
+    (10, 100), # Chirp Mass
+    (0.1, 1), # Mass Ratio
+    (-0.9, 0.9), # spin1z
+    (-0.9, 0.9), # spin2z
+    (0, 2*np.pi), # coa_phase
+]
+
+def objective_function(params_array, args):
+    chirp_mass, mass_ratio, spin1z, spin2z, coa_phase = params_array
+    signal, distance, detector_name = args
+    try:
+        mass1, mass2 = bilby.gw.conversion.chirp_mass_and_mass_ratio_to_component_masses(chirp_mass=chirp_mass, mass_ratio=mass_ratio)
+
+        template_hp, template_hc = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
+                                                    lambda1=0, lambda2=0,
+                                                    spin1z=spin1z, spin2z=spin2z,
+                                                    distance=distance, delta_t=DELTA_T,
+                                                    ecc=0.0, coa_phase=coa_phase, f_lower=F_LOWER)
+        
+        signal_copy = signal.copy()
+        temp_copy = template_hp.copy()
+
+        target_len = max(len(signal_copy), len(temp_copy))
+        signal_copy.resize(target_len)
+        temp_copy.resize(target_len)
+
+        signal_copy = pycbc.types.TimeSeries(signal_copy.data,
+                                             delta_t=temp_copy.delta_t,
+                                             epoch=temp_copy.start_time)
+
+        duration = temp_copy.duration
+        flen     = target_len // 2 + 1
+
+        if detector_name == 'E1' or detector_name == 'E2' or detector_name == 'E3':
+            psd = pycbc.psd.EinsteinTelescopeP1600143(flen, 1/duration, F_LOWER)
+        elif detector_name == 'C1':
+            psd = pycbc.psd.CosmicExplorerP1600143(flen, 1/duration, F_LOWER)
+        elif detector_name == 'L1' or detector_name == 'H1' or detector_name == 'V1' or detector_name == 'A1':
+            psd = pycbc.psd.aLIGOZeroDetHighPower(flen, 1/duration, F_LOWER)
+        
+        match_value, _ = pycbc.filter.match(signal_copy, temp_copy, psd=psd, low_frequency_cutoff=F_LOWER)
+
+        return 1.0 - match_value
+    except Exception as e:
+        print(f"Error in objective function: {e}")
+        return 1.0
+    
+
+
+def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_detector, display=False, compute_FF=True, SEED=None):
     """
     Generate eccentric, unlensed, and lensed gravitational waveforms with injected noise.
 
@@ -192,57 +231,86 @@ def generate_waveform(num ,params, peak_window=(2.0, 2.2), detector=default_dete
 
         target_snr = params['snr']
 
-        ecc_noisy, snr_e, distance_e, ecc_padded = inject_noise_with_target_SNR(ecc, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='eccentric', peak_window=peak_window, detector=detector)
-        lens_noisy, snr_l, distance_l, lens_padded = inject_noise_with_target_SNR(lensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='lensed', peak_window=peak_window, detector=detector)
-        unlens_noisy, snr_u, distance_u, unlens_padded = inject_noise_with_target_SNR(unlensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='quasi_circular', peak_window=peak_window, detector=detector)
-
-        if check_lnB:
-            tlen = max(len(hp), len(sp), len(sp_lensed))
-            
-            hp.resize(tlen)
-            sp.resize(tlen)
-            sp_lensed.resize(tlen)
-
-            sp_lensed = pycbc.types.TimeSeries(sp_lensed.data,
-                                         delta_t=hp.delta_t,
-                                         epoch=hp.start_time)
-            
-            duration = hp.duration
-            flen     = tlen // 2 + 1
-
-            if detector.name == 'E1' or detector.name == 'E2' or detector.name == 'E3':
-                psd = pycbc.psd.EinsteinTelescopeP1600143(flen, 1/duration, F_LOWER)
-            elif detector.name == 'C1':
-                psd = pycbc.psd.CosmicExplorerP1600143(flen, 1/duration, F_LOWER)
-            elif detector.name == 'L1' or detector.name == 'H1' or detector.name == 'V1' or detector.name == 'A1':
-                psd = pycbc.psd.aLIGOZeroDetHighPower(flen, 1/duration, F_LOWER)
-
-            ecc_m = pycbc.filter.match(hp, sp, psd=psd, low_frequency_cutoff=F_LOWER)[0]
-            lens_m = pycbc.filter.match(sp_lensed, sp, psd=psd, low_frequency_cutoff=F_LOWER)[0]
-
-            ecc_lnB = 0.5 * (1 - ecc_m**2) * snr_e**2
-            lens_lnB = 0.5 * (1 - lens_m**2) * snr_l**2
-
-        if ecc_lnB > np.log(10):
-            ecc_noisy = ecc_noisy.crop(left=24, right=0)
-            ecc_dict = {'ecc_signal': ecc_noisy, 'snr_e': snr_e, 'distance_e': distance_e}
-        else:
-            ecc_dict = {'ecc_signal': None}
-
-        if lens_lnB > np.log(10):
-            lens_noisy = lens_noisy.crop(left=24, right=0)
-            lens_dict = {'lensed_signal': lens_noisy, 'snr_l': snr_l, 'distance_l': distance_l}
-        else:
-            lens_dict = {'lensed_signal': None}
+        ecc_noisy, snr_e, distance_e, ecc_padded = inject_noise_with_target_SNR(ecc, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='eccentric', peak_window=peak_window, detector=detector, SEED=SEED)
+        lens_noisy, snr_l, distance_l, lens_padded = inject_noise_with_target_SNR(lensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='lensed', peak_window=peak_window, detector=detector, SEED=SEED)
+        unlens_noisy, snr_u, distance_u, unlens_padded = inject_noise_with_target_SNR(unlensed, params, mass1, mass2, m_lens, y_lens, target_snr, num, gw_signal_type='quasi_circular', peak_window=peak_window, detector=detector, SEED=SEED)
         
+        ecc_noisy = ecc_noisy.crop(left=24, right=0)
+        lens_noisy = lens_noisy.crop(left=24, right=0)
         unlens_noisy = unlens_noisy.crop(left=24, right=0)
+
+        if display:
+
+            fig, axs = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
+
+            axs[0].plot(ecc_noisy.sample_times, ecc_noisy, label="Eccentric (noisy)", linestyle='-', color='C0')
+            axs[0].plot(ecc_padded.sample_times, ecc_padded, label="Eccentric (padded)", linestyle='-', color='C1')
+            # axs[0].plot(ecc.sample_times, ecc)
+            axs[0].set_ylabel("Strain")
+            axs[0].set_title("Eccentric Waveform")
+            axs[0].legend()
+            axs[0].grid(True)
+
+            axs[1].plot(lens_noisy.sample_times, lens_noisy, label="Lensed (noisy)", linestyle='-', color='C2')
+            axs[1].plot(lens_padded.sample_times, lens_padded, label="Lensed (padded)", linestyle='-', color='C3')
+            # axs[1].plot(lensed.sample_times, lensed)
+            axs[1].set_ylabel("Strain")
+            axs[1].set_title("Lensed Waveform")
+            axs[1].legend()
+            axs[1].grid(True)
+
+            axs[2].plot(unlens_noisy.sample_times, unlens_noisy, label="Unlensed (noisy)", linestyle='-', color='C4')
+            axs[2].plot(unlens_padded.sample_times, unlens_padded, label="Unlensed (padded)", linestyle='-', color='C5')
+            # axs[2].plot(unlensed.sample_times, unlensed)
+            axs[2].set_xlabel("Time [s]")
+            axs[2].set_ylabel("Strain")
+            axs[2].set_title("Unlensed Waveform")
+            axs[2].legend()
+            axs[2].grid(True)
+
+            plt.tight_layout()
+            plt.show()
+
+        if compute_FF:
+            ecc_args_for_optimizer = (hp, REFERENCE_DISTANCE, detector.name)
+            ecc_result = differential_evolution(
+                        func=objective_function,
+                        bounds=bounds,
+                        args=(ecc_args_for_optimizer,),
+                        strategy='best1bin',
+                        maxiter=30,
+                        popsize=15,
+                        disp=True,
+                        workers=1,
+                        updating="deferred"
+                    )
+            ecc_fitting_factor = 1.0 - ecc_result.fun
+            
+            lensed_args_for_optimizer = (sp_lensed, REFERENCE_DISTANCE, detector.name)
+            lens_result = differential_evolution(
+                        func=objective_function,
+                        bounds=bounds,
+                        args=(lensed_args_for_optimizer,),
+                        strategy='best1bin',
+                        maxiter=30,
+                        popsize=15,
+                        disp=True,
+                        workers=1,
+                        updating="deferred"
+                    )
+            lens_fitting_factor = 1.0 - lens_result.fun
+        else:
+            ecc_fitting_factor, lens_fitting_factor = None, None
+
+        lens_dict = {'lensed_signal': lens_noisy, 'snr_l': snr_l, 'distance_l': distance_l, 'lens_FF': lens_fitting_factor}
+        ecc_dict = {'ecc_signal': ecc_noisy, 'snr_e': snr_e, 'distance_e': distance_e, 'ecc_FF': ecc_fitting_factor}
         unlens_dict = {'unlensed_signal': unlens_noisy, 'snr_u': snr_u, 'distance_u': distance_u}
 
         del hp, hc, sp, sc, sp_lensed, sc_lensed
         del ecc, unlensed, lensed, ecc_noisy, lens_noisy, unlens_noisy, ecc_padded, lens_padded, unlens_padded
         gc.collect()
 
-        return ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens, ecc_lnB,lens_lnB
+        return ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens
         
     except Exception as e:
         print(f"[Sample {num}] Error: {e}")
@@ -496,44 +564,37 @@ def inject_signal_with_peak_in_window(signal_ts, noise_ts, peak_window=(2.0, 2.2
     injection_index : int
         The index in the array where the peak was injected.
     """
-    # Convert to numpy arrays
     signal = np.asarray(signal_ts)
 
-    # Sampling info
     delta_t = noise_ts.delta_t
     N = len(noise_ts)
     duration = N * delta_t
 
-    # Step 1: Find peak index in the signal
     peak_index = np.argmax(np.abs(signal))
 
-    # Step 2: Choose target time for the peak
     min_offset, max_offset = peak_window
     t_peak = np.random.uniform(duration - max_offset, duration - min_offset)
     target_index = int(t_peak / delta_t)
 
-    # Step 3: Calculate start and end indices for injection
     start_index = target_index - peak_index
     end_index = start_index + len(signal)
 
-    # Step 4: Handle truncation if signal goes out of bounds
     padded_signal = np.zeros(N)
 
     if start_index < 0:
-        signal = signal[-start_index:]  # Trim the front
+        signal = signal[-start_index:]
         start_index = 0
         end_index = start_index + len(signal)
 
     if end_index > N:
-        signal = signal[:N - start_index]  # Trim the end
+        signal = signal[:N - start_index]
         end_index = start_index + len(signal)
 
-    # Step 5: Insert the signal into the padded array
     padded_signal[start_index:end_index] = signal
 
     return padded_signal, delta_t, signal_ts.start_time
 
-def save_qtransform(ts, file_name):
+def save_simple_qtransform(ts, file_name):
     """
     Compute and save the Q-transform spectrogram of a time series.
 
@@ -567,7 +628,7 @@ def save_qtransform(ts, file_name):
     plt.close()
 
 
-def display_qtransform(ts):
+def display_qtransform(ts, method='mean'):
     """
     Compute and save the Q-transform spectrogram of a time series.
 
@@ -589,10 +650,10 @@ def display_qtransform(ts):
     if not isinstance(ts, TimeSeries):
         ts = TimeSeries.from_pycbc(ts)
 
-    qt = ts.q_transform(logf=True, norm='mean', frange=(F_LOWER, 512), qrange=(4, 64), whiten=True)
+    qt = ts.q_transform(logf=True, norm=method, frange=(F_LOWER, 512), qrange=(4, 64), whiten=True)
     
     plt.figure(figsize=(12, 8), frameon=False)
-    plt.pcolormesh(qt)
+    plt.pcolormesh(np.array(qt.data).T)
     plt.axis('off')
     plt.yscale('log')
     plt.show()
@@ -601,29 +662,27 @@ def display_qtransform(ts):
 
 def _get_category_parts(path_str):
     """Return ('eccentric' | 'lensed' | 'unlensed', True/False)"""
-    if "eccentric" in path_str:
+    if "eccentric" in path_str or "-2" in path_str:
         return "eccentric"
-    if "lensed"    in path_str and "unlensed" not in path_str:
+    if "lensed" in path_str and "unlensed" not in path_str and "-1" not in path_str:
+        return "lensed"
+    if "-1" in path_str:
         return "lensed"
     return "unlensed"
 
-def save_qtransform_with_checks(waveform_dict, params, path):
+def save_qtransform_with_checks(waveform_dict, path):
     """
-    Saves an RGB‑stacked Q‑transform image:
-      R = detector‑0 spectrogram
-      G = detector‑1 spectrogram
-      B = detector‑2 spectrogram
+    Saves an multi-channeled Q‑transform image:
+      Each channels corresponds to one particular detector.
     Category is inferred from the filename: eccentric / lensed / unlensed.
     Returns True on success, False otherwise.
     """
     category = _get_category_parts(str(path))
     stacked_q = []
 
-    # --- iterate over detectors ------------------------------------------------
     for key in waveform_dict:
         wf = waveform_dict[key]
 
-        # pick fields that differ by category
         if category == "eccentric":
             ts_raw     = wf['eccentric']['ecc_signal']
         elif category == "lensed":
@@ -631,31 +690,24 @@ def save_qtransform_with_checks(waveform_dict, params, path):
         else:  # unlensed
             ts_raw     = wf['unlensed']['unlensed_signal']
 
-        # ------------------------------------------------------------------------
 
-        
         # --- Q‑transform & stack ------------------------------------------------
-        if ts_raw is not None:
-            ts = TimeSeries.from_pycbc(ts_raw)
-            q  = ts.q_transform(logf=True, norm='median',
-                                frange=(F_LOWER, 512),
-                                whiten=True, qrange=(4, 64))
-            stacked_q.append(np.abs(q.data).T)
-        else:
-            return False
 
-    # Find the maximum shape across all detectors
+        ts = TimeSeries.from_pycbc(ts_raw)
+        q  = ts.q_transform(logf=True, norm='mean',
+                            frange=(F_LOWER, 512),
+                            whiten=True, qrange=(4, 64))
+        stacked_q.append(np.array(q.data).T)
+
     max_shape = (
         max(q.shape[0] for q in stacked_q),
         max(q.shape[1] for q in stacked_q)
     )
     
-    # Pad all arrays to the same shape, then normalize
     padded_q = [pad_to_shape(q, max_shape) for q in stacked_q]
     normed = [Normalize()(q) for q in padded_q]
 
     stacked = np.stack(normed, axis=0)              # (C, H, W)
-    # stacked_img = np.transpose(stacked, (1, 2, 0))  # (H, W, C)
 
     out_path = str(path)
     if out_path.endswith('.png'):
@@ -670,152 +722,3 @@ def pad_to_shape(arr, target_shape):
     pad_y1, pad_y2 = pad_y // 2, pad_y - pad_y // 2
     pad_x1, pad_x2 = pad_x // 2, pad_x - pad_x // 2
     return np.pad(arr, ((pad_y1, pad_y2), (pad_x1, pad_x2)), mode='constant')
-
-# ---------------------- Main Worker ---------------------- #
-
-# Replace the problematic section in generate_sample function (around lines 700-715)
-# with this corrected version:
-
-def generate_sample(args):
-    num, params, jump, output_path = args
-    peak_window = (2.0, 2.2)
-    try:
-        waveform_dict = {}
-        for detector in detector_list:
-            ecc_dict, lens_dict, unlens_dict, mass1, mass2, m_lens, y_lens, ecc_lnB, lens_lnB = generate_waveform(num, params, peak_window, detector=detector)
-            waveform_dict[detector] = {
-                'eccentric': ecc_dict,
-                'lensed': lens_dict,
-                'unlensed': unlens_dict,
-                'mass1': mass1,
-                'mass2': mass2,
-                'm_lens': m_lens,
-                'y_lens': y_lens,
-            }
-
-        count = {
-            'eccentric_saved': save_qtransform_with_checks(waveform_dict, params, output_path / f"eccentric_{num + jump}.npy"),
-            'lensed_saved': save_qtransform_with_checks(waveform_dict, params, output_path / f"lensed_{num + jump}.npy"),
-            'unlensed_saved': save_qtransform_with_checks(waveform_dict, params, output_path / f"unlensed_{num + jump}.npy")
-        }
-
-        if any(waveform_dict[det]['eccentric']['ecc_signal'] is not None for det in detector_list):
-            snr_e_network = np.sqrt(
-                sum((waveform_dict[det]['eccentric']['snr_e'])**2 
-                    for det in detector_list 
-                    if waveform_dict[det]['eccentric']['ecc_signal'] is not None)
-            )
-        else:
-            snr_e_network = None
-        
-        if any(waveform_dict[det]['lensed']['lensed_signal'] is not None for det in detector_list):
-            snr_l_network = np.sqrt(    
-                sum((waveform_dict[det]['lensed']['snr_l'])**2 
-                    for det in detector_list 
-                    if waveform_dict[det]['lensed']['lensed_signal'] is not None)
-            )
-        else:
-            snr_l_network = None
-
-        snr_u_network = np.sqrt(
-            sum((waveform_dict[det]['unlensed']['snr_u'])**2 for det in detector_list)
-        )
-
-        first_detector = detector_list[0]
-        ecc_distance = (waveform_dict[first_detector]['eccentric']['distance_e'] 
-                       if waveform_dict[first_detector]['eccentric']['ecc_signal'] is not None 
-                       else None)
-        lens_distance = (waveform_dict[first_detector]['lensed']['distance_l'] 
-                        if waveform_dict[first_detector]['lensed']['lensed_signal'] is not None 
-                        else None)
-        unlens_distance = waveform_dict[first_detector]['unlensed']['distance_u']
-
-        result = {
-            'sample': num,
-            'mass1': float(mass1), 'mass2': float(mass2),
-            'spin1z': float(params['spin1z']), 'spin2z': float(params['spin2z']),
-            'eccentricity': float(params['eccentricity']),
-            'coa_phase': float(params['coa_phase']),
-            'eccentric_distance': float(ecc_distance) if ecc_distance is not None else None,
-            'lensed_distance': float(lens_distance) if lens_distance is not None else None,
-            'unlensed_distance': float(unlens_distance),
-            'ra': float(params['ra']), 'dec': float(params['dec']),
-            'polarization': float(params['polarization']),
-            'm_lens': float(m_lens), 'y_lens': float(y_lens),
-            'eccentric_snr': snr_e_network, 'lensed_snr': snr_l_network, 'unlensed_snr': snr_u_network,
-            'ecc_lnB': ecc_lnB, 'lens_lnB': lens_lnB,
-            **count
-        }
-
-        del ecc_dict, lens_dict, unlens_dict, waveform_dict, ecc_distance, lens_distance, unlens_distance
-        gc.collect()
-
-        return result
-    
-    except Exception as e:
-        print(f"[Sample {num}] Error: {e}")
-        import traceback
-        traceback.print_exc()
-        return None
-
-# ---------------------- Main Script ---------------------- #s
-
-def main():
-    parser = argparse.ArgumentParser(description="Generate Q-transform training dataset.")
-    parser.add_argument('--num-samples', type=int, required=True)
-    parser.add_argument('--num-workers', type=int, default=max(1, os.cpu_count() - 2))
-    parser.add_argument('--snr-prior', type=str, choices=['uniform', 'powerlaw'], default='powerlaw',
-                        help='Defines the prior distribution for sampling in SNR. Default is PowerLaw.')
-    parser.add_argument('--path-name', type=str, default='data',
-                        help='Path to save the generated data. Default is "data".')
-    
-    args = parser.parse_args()
-
-    num_samples = args.num_samples
-    snr_prior = args.snr_prior
-
-    jump = 0   
-    
-    directory = f"./{args.path_name}"
-
-    if os.path.exists(directory):
-    
-        file_pattern = os.path.join(directory, 'unlensed_*')
-        jump = len([f for f in glob.glob(file_pattern) if os.path.isfile(f)])
-
-    output_path = Path(directory)
-    results_dir = Path('./results')
-    
-    if not output_path.exists():
-        output_path.mkdir(parents=True, exist_ok=True)
-    if not results_dir.exists():
-        results_dir.mkdir(exist_ok=True)
-
-    samples = generate_prior(num_samples=num_samples, snr_type=snr_prior)
-
-    print(f"Generating {len(samples)} samples in each class...")
-
-    args_list = [(i, samples[i], jump, output_path) for i in range(num_samples)]
-
-    with Pool(args.num_workers) as pool:
-        results = list(tqdm(pool.imap_unordered(generate_sample, args_list), total=num_samples))
-
-    valid_results = [res for res in results if res is not None]
-
-    save_csv(results_dir / f"{args.path_name}_parameters.csv", valid_results)
-    save_csv(results_dir / f"{args.path_name}_snr_lookup_table.csv",
-             [{'sample': r['sample'], 'eccentric_snr': r['eccentric_snr'], 'lensed_snr': r['lensed_snr'],
-               'unlensed_snr': r['unlensed_snr'], 'eccentric_distance': r['eccentric_distance'],
-               'lensed_distance': r['lensed_distance'], 'unlensed_distance': r['unlensed_distance']} for r in valid_results])
-
-    n_eccentric = sum(1 for r in valid_results if r.get('eccentric_saved'))
-    n_lensed = sum(1 for r in valid_results if r.get('lensed_saved'))
-    n_unlensed = sum(1 for r in valid_results if r.get('unlensed_saved'))
-
-    print(f"\nData generation complete!")
-    print(f"Total valid samples: {len(valid_results)} / {num_samples}")
-    print(f"Saved eccentric: {n_eccentric}, lensed: {n_lensed}, unlensed: {n_unlensed}")
-
-
-if __name__ == '__main__':
-    main()

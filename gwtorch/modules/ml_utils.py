@@ -1,6 +1,7 @@
 import os
 import glob
 from pathlib import Path
+from collections import Counter
 
 import torch
 import torch.nn as nn
@@ -11,6 +12,7 @@ from torch.utils.data import DataLoader, Dataset
 
 import random
 import numpy as np
+import pandas as pd
 from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split, StratifiedKFold
 
@@ -48,9 +50,14 @@ def setup_directories(model_name=None):
     os.makedirs(f'./results/{model_name}_results/Plots', exist_ok=True)
     
 class GWDataset(Dataset):
-    def __init__(self, file_list, transform=None):
+    def __init__(self, file_list, transform=None, meta_csv='./results/data_parameters.csv'):
         self.file_list = file_list
         self.transform = transform
+        self.df = pd.read_csv(meta_csv)
+
+        # set index if sample column exists
+        if 'sample' in self.df.columns:
+            self.df = self.df.set_index('sample')
 
     def __len__(self):
         return len(self.file_list)
@@ -58,43 +65,56 @@ class GWDataset(Dataset):
     def __getitem__(self, idx):
         file_path = self.file_list[idx]
 
-        arr = np.load(file_path)  # shape: (H, W, C)
+        # load [C, H, W] array
+        arr = np.load(file_path).astype(np.float32)
+        arr = torch.from_numpy(arr)
 
-        # Transpose to (H, W, C) only if needed
-        if arr.ndim == 2:
-            arr = arr[:, :, np.newaxis]  # Convert to (H, W, 1)
+        if self.transform:
+            arr = self.transform(arr)
 
-        arr = arr.astype(np.float32)
-        arr = torch.from_numpy(arr).float()
-        
-        arr = self.transform(arr)
-
-        label_str = file_path.split("/")[-1].split("_")[0].lower()
+        label_str = file_path.split("/")[2].lower()
         label = {'lensed': 0, 'eccentric': 1, 'unlensed': 2}[label_str]
-        file_number = file_path.split("/")[-1].split("_")[1].split(".")[0]
 
-        return arr, label, file_number, file_path
+        file_number = int(file_path.split('/')[-1].split('.')[0])
+
+        ln_B = 0.0
+        if file_number in self.df.index:
+            if label_str == 'lensed' and 'lens_lnB' in self.df.columns:
+                ln_B = self.df.loc[file_number, 'lens_lnB']
+            elif label_str == 'eccentric' and 'ecc_lnB' in self.df.columns:
+                ln_B = self.df.loc[file_number, 'ecc_lnB']
+            elif label_str == 'unlensed':
+                ln_B = 100
+
+        weight = 10.0 if ln_B > 10 else 1.0
+        # weight = 1.0
+
+        return arr, label, weight, file_path
+
     
 def custom_collate_fn(batch):
-    images, labels, file_numbers, img_paths = zip(*batch)
-    return torch.stack(images), torch.tensor(labels), file_numbers, img_paths
+    images, labels, weights, file_paths = zip(*batch)
+    return torch.stack(images), torch.tensor(labels), torch.tensor(weights, dtype=torch.float32), file_paths
 
 def load_all_data(path_name='data', seed=42, batch_size=32):
 
-    all_files = glob.glob(f'./{path_name}/*.npy')
-    all_labels = [path.split('/')[-1].split('_')[0] for path in all_files]
-
+    all_files = glob.glob(f'./{path_name}/*/*.npy')
+    all_labels = [path.split('/')[2] for path in all_files]
 
     train_files, temp_files, train_labels, temp_labels = train_test_split(
         all_files, all_labels, test_size=0.3, stratify=all_labels, random_state=seed
     )
 
-    val_files, test_files, val_labels, test_labels = train_test_split(
+    val_files, test_files, *_ = train_test_split(
         temp_files, temp_labels, test_size=0.5, stratify=temp_labels, random_state=seed
     )
 
+    train_labels = filenames_to_label_indices(train_files)
+    counts = Counter(train_labels)
+    total = sum(counts.values())
+    class_weights = torch.tensor([ total/counts[i] for i in range(3) ], dtype=torch.float32)
+
     transform = transforms.Compose([
-        # transforms.Lambda(lambda x: torch.tensor(x).permute(2, 0, 1)),
         transforms.Resize((224, 224)),
     ])
 
@@ -104,7 +124,6 @@ def load_all_data(path_name='data', seed=42, batch_size=32):
 
     num_channels = train_data[0][0].shape[0] if isinstance(train_data[0][0], torch.Tensor) else 3
 
-    # Create loaders
     train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True,
                               num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
     val_loader   = DataLoader(val_data, batch_size=batch_size, shuffle=False,
@@ -112,13 +131,13 @@ def load_all_data(path_name='data', seed=42, batch_size=32):
     test_loader  = DataLoader(test_data, batch_size=batch_size, shuffle=False,
                               num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
 
-    return num_channels, train_loader, val_loader, test_loader
+    return num_channels, train_loader, val_loader, test_loader, class_weights
 
 def prepare_kfold_data(path_name='data'):
     """Prepare data for k-fold cross validation"""
 
-    all_files = glob.glob(f'./{path_name}/*.npy')
-    all_labels = [path.split('/')[-1].split('_')[0] for path in all_files]
+    all_files = glob.glob(f'./{path_name}/*/*.npy')
+    all_labels = [path.split('/')[2] for path in all_files]
     
     return all_files, all_labels
 
@@ -126,7 +145,6 @@ def create_fold_loaders(train_files, val_files, batch_size):
     """Create data loaders for a specific fold"""
 
     transform = transforms.Compose([
-        # transforms.Lambda(lambda x: torch.tensor(x).permute(2, 0, 1)),
         transforms.Resize((224, 224)),
     ])
 
@@ -158,23 +176,27 @@ def get_model(name, num_channels, device):
         return CNN_Model(input_channlels=num_channels, dropout=dropout).to(device)
     
 def train_model(model, train_loader, valid_loader, device, epochs, lr, gamma, class_weights=None):
-    optimizer = optim.Adam(model.parameters(), lr=lr)
+    optimizer = optim.AdamW(model.parameters(), lr=lr)
     scheduler = StepLR(optimizer, step_size=5, gamma=gamma)
     if class_weights is not None:
-        criterion = nn.CrossEntropyLoss(weight=class_weights.to(device))
+        criterion = nn.CrossEntropyLoss(reduction='none', weight=class_weights.to(device))
     else:
-        criterion = nn.CrossEntropyLoss()
+        criterion = nn.CrossEntropyLoss(reduction='none')
 
     train_losses, val_losses, train_accs, val_accs = [], [], [], []
 
     for epoch in range(epochs):
         model.train()
         running_loss, running_acc = 0, 0
-        for data, labels, *_ in train_loader:
-            data, labels = data.to(device), labels.to(device)
+        for data, labels, weights, *_ in train_loader:
+            data, labels, weights = data.to(device), labels.to(device), weights.to(device)
             optimizer.zero_grad()
             output = model(data)
-            loss = criterion(output, labels)
+
+            unweighted_loss = criterion(output, labels)
+            weighted_loss = unweighted_loss * weights
+            loss = weighted_loss.mean()
+            
             loss.backward()
             optimizer.step()
             acc = (output.argmax(1) == labels).float().mean()
@@ -191,6 +213,7 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, gamma, cl
                 data, labels = data.to(device), labels.to(device)
                 output = model(data)
                 loss = criterion(output, labels)
+                loss = loss.mean()
                 acc = (output.argmax(1) == labels).float().mean()
                 val_loss += loss.item()
                 val_acc += acc.item()
@@ -212,7 +235,7 @@ def evaluate_model(model, data_loader, device):
     all_file_paths = []
     
     with torch.no_grad():
-        for data, labels, file_numbers, file_paths in data_loader:
+        for data, labels, _, file_paths in data_loader:
             data, labels = data.to(device), labels.to(device)
             output = model(data)
             preds = output.argmax(1)
@@ -267,12 +290,10 @@ def evaluate_and_plot(model, valid_loader, test_loader, device, fold=None, model
 
     return val_misclassified, test_misclassified, val_roc_auc, test_roc_auc
 
-from collections import Counter
-
 def filenames_to_label_indices(file_list):
     labels = []
     for p in file_list:
-        lab = p.split('/')[-1].split('_')[0].lower()
+        lab = p.split('/')[2].lower()
         labels.append({'lensed':0,'eccentric':1,'unlensed':2}[lab])
     return labels
 
@@ -283,7 +304,6 @@ def run_kfold_training(args, device, get_model=None, model_name=None):
     print(f"{'='*50}")
 
     model = get_model(name=args.model, num_channels=4, device=device)
-    print(f'Using model: {model}')   # Remove it later
 
     all_files, all_labels = prepare_kfold_data(path_name=args.path_name)
     
@@ -299,11 +319,11 @@ def run_kfold_training(args, device, get_model=None, model_name=None):
         'val_accs_all': [],
         'roc_data': []  # Store FPR, TPR, AUC for each fold
     }
-    
+
     train_val_files, test_files, train_val_labels, test_labels = train_test_split(
         all_files, all_labels, test_size=0.2, stratify=all_labels, random_state=args.seed
     )
-    
+
     transform = transforms.Compose([
         # transforms.Lambda(lambda x: torch.tensor(x).permute(2, 0, 1)),
         transforms.Resize((224, 224)),
@@ -322,12 +342,8 @@ def run_kfold_training(args, device, get_model=None, model_name=None):
         counts = Counter(train_labels_fold)
         total = sum(counts.values())
         class_weights = torch.tensor([ total/counts[i] for i in range(3) ], dtype=torch.float32)
-        print(f'Class Weights:{class_weights}')
 
         num_channels, train_loader, val_loader = create_fold_loaders(train_files_fold, val_files_fold, args.batch_size)
-
-        if fold == 0:
-            print(f"\nNumber of channels in data: {num_channels}")
         
         print(f"\n{'='*30}")
         print(f"FOLD {fold + 1}/{args.k_folds}")

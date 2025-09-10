@@ -1,16 +1,8 @@
 import os
-import glob
 import argparse
 from pathlib import Path
 
 import torch
-
-import random
-import numpy as np
-
-from linformer import Linformer
-from vit_pytorch.efficient import ViT
-from vit_pytorch.cvt import CvT
 
 from gwtorch.modules.general_utils import (
     plot_training_curves,
@@ -46,7 +38,7 @@ def parse_args():
     parser.add_argument('--lr', type=float, default=LR)
     parser.add_argument('--gamma', type=float, default=GAMMA)
     parser.add_argument('--seed', type=int, default=RANDOM_SEED)
-    parser.add_argument('--model-path', type=str, default='vit_model.pth', help="Model will be saved in models directory with extention as .pth")
+    parser.add_argument('--model-path', type=str, default='vit_model', help="Model will be saved in models directory with extention as .pth")
     parser.add_argument('--k-folds', type=int, default=K_FOLDS, help="Number of folds for k-fold cross validation")
     parser.add_argument('--use-kfold', action='store_true', help="Use k-fold cross validation instead of single train/val/test split")
     parser.add_argument('--path-name', type=str, default='data', help='Path to the dataset directory. Default is "data".')
@@ -62,39 +54,43 @@ def main():
     
     if args.use_kfold:
 
-        fold_results = run_kfold_training(args, device, get_model=get_model, model_name=args.model)
+        run_kfold_training(args, device, get_model=get_model, model_name=args.model)
         print(f"\nK-fold cross validation completed!")
         
     else:
 
         print("\nRunning single train/validation/test split...")
-        num_channels, train_loader, valid_loader, test_loader = load_all_data(args.path_name, args.seed, args.batch_size)
+        num_channels, train_loader, valid_loader, test_loader, class_weights = load_all_data(path_name=args.path_name, seed=args.seed, batch_size=args.batch_size)
         
         model = get_model(name=args.model, num_channels=num_channels, device=device)
 
-        print(f"\nNumber of channels in data: {num_channels}")
-
-        if os.path.exists(f'./models/{args.model_path}'):
+        if os.path.exists(f'./models/{args.model_path}.pth'):
             print("Pretrained model found. Loading...\n")
-            model.load_state_dict(torch.load(f'./models/{args.model_path}', map_location=device))
+            model.load_state_dict(torch.load(f'./models/{args.model_path}.pth', map_location=device))
         else:
             print("No pretrained model found. Training from scratch...\n")
 
+        if torch.all(class_weights == class_weights[0]):
+            class_weights = None
+            print(f"Found all class samples to be equal. Setting class weights to {class_weights}")
+
         train_losses, val_losses, train_accs, val_accs = train_model(
-            model, train_loader, valid_loader, device, args.epochs, args.lr, args.gamma
+            model=model, train_loader=train_loader, valid_loader=valid_loader, device=device, epochs=args.epochs, lr=args.lr, gamma=args.gamma, class_weights=class_weights
         )
+        
         val_misclassified, test_misclassified, _, _ = evaluate_and_plot(
-            model, valid_loader, test_loader, device , model_name=args.model
+            model=model, valid_loader=valid_loader, test_loader=test_loader, device=device , model_name=args.model
         )
+
         plot_training_curves(train_losses, val_losses, train_accs, val_accs, 
-                           Path('./results/transformer_results'))
+                           Path(f'./results/{args.model}_results'))
 
         print("\nTraining complete. Summary:")
         print(f"Validation misclassifications: {len(val_misclassified)}")
         print(f"Test misclassifications: {len(test_misclassified)}")
 
-        torch.save(model.state_dict(), f'./models/{args.model_path}')
-        print(f"Model saved to ./models/{args.model_path}")
+        torch.save(model.state_dict(), f'./models/{args.model_path}.pth')
+        print(f"Model saved to ./models/{args.model_path}.pth")
 
 if __name__ == "__main__":
     main()

@@ -22,6 +22,10 @@ from gwtorch.modules.general_utils import (
     save_misclassified_files_to_txt,
 )
 
+from gwtorch.modules.ml_utils import (
+    seed_everything,
+)
+
 def setup_directories(results_dir, model_name):
     os.makedirs(f'./{results_dir}/{model_name}_results/Plots', exist_ok=True)
 
@@ -54,23 +58,38 @@ class GWDataset(Dataset):
 
         arr = arr.astype(np.float32)
         arr = torch.from_numpy(arr).float()
-
+        
         arr = self.transform(arr)
 
-        label_str = file_path.split("/")[-1].split("_")[0].lower()
+        label_str = file_path.split("/")[2].lower()
         label = {'lensed': 0, 'eccentric': 1, 'unlensed': 2}[label_str]
-        file_number = file_path.split("/")[-1].split("_")[1].split(".")[0]
 
-        return arr, label, file_number, file_path
+        return arr, label, file_path
 
 def custom_collate_fn(batch):
-    images, labels, file_numbers, img_paths = zip(*batch)
-    return torch.stack(images), torch.tensor(labels), file_numbers, img_paths
+    images, labels, img_paths = zip(*batch)
+    return torch.stack(images), torch.tensor(labels), img_paths
+
+def custom_collate_fn(batch):
+    if len(batch[0]) == 2:  # (data, label)
+        images, labels = zip(*batch)
+        img_paths = [None] * len(batch)
+        weights = None
+    elif len(batch[0]) == 3:  # (data, label, path)
+        images, labels, img_paths = zip(*batch)
+        weights = None
+    elif len(batch[0]) == 4:  # (data, label, dummy, path)
+        images, labels, weights, img_paths = zip(*batch)
+    else:
+        raise ValueError(f"Unexpected sample format: {len(batch[0])} elements")
+
+    return torch.stack(images), torch.tensor(labels), weights, img_paths
+
 
 def load_all_data(path_name='data', batch_size=32):
 
-    all_files = glob.glob(f'./{path_name}/*.npy')
-    all_labels = [path.split('/')[-1].split('_')[0] for path in all_files]
+    all_files = glob.glob(f'./{path_name}/*/*.npy')
+    all_labels = [path.split('/')[2] for path in all_files]
 
 
     transform = transforms.Compose([
@@ -132,6 +151,7 @@ def evaluate_and_plot(model, test_loader, device, results_dir, model_name='ViT')
 def main():
     args = parse_args()
     setup_directories(results_dir=args.results_dir, model_name=args.model)
+    seed_everything(42)
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
