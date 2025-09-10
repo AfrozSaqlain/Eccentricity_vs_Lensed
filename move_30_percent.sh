@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Source and target directories
-SRC_DIR="data_2"
+SRC_DIR=$1
 DEST_DIR="test_folder"
 
 # Create destination subdirectories

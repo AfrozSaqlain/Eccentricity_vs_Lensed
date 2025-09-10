@@ -9,8 +9,6 @@ To install the package just run: `bash install.sh`
 <pre>
 .
 ├── environment.yml
-├── install.sh
-├── pyproject.toml
 ├── gwtorch
 │   ├── inference
 │   │   ├── cnn_eval.py
@@ -28,31 +26,34 @@ To install the package just run: `bash install.sh`
 │   │   ├── Meta_model.py
 │   │   └── transformer.py
 │   └── waveform_generation
-│       ├── gen_ln_B.py
-│       ├── gen.py
-│       ├── exp_gen.py
+│       ├── fitting_factor_gen.py
+│       ├── match_gen.py
 │       └── Prior_Files
+├── install.sh
+├── move_30_percent.sh
+├── pyproject.toml
 └── README.md
 
 </pre>
 
 ## 📌 Key Files Description
 
-- `exp_gen.py`: Generates Q-transform spectrograms of synthetic GW signals.
+- `match_gen.py`: Generates Q-transform spectrograms of synthetic GW signals, and computes ln B based on match.
+- `fitting_factor_gen.py`: Generates Q-transform spectrograms of synthetic GW signals, and computes ln B based on fitting factor.
 - `cnn.py`, `transformer.py`: Contain CNN and Transformer model definitions with training/testing routines.
 - `cnn_eval.py`, `transformer_eval.py`: Specifically used to evaluate trained CNN and Transformer models on test data.
 
 
 # 🖥️ Command Line Interface (CLI)
 
-- **`exp_gen_gwtorch --num-samples [int] --path-name [str] --batch-size [int]`** : Used to generate qtransform of the waveform samples.
+- **`generate_match_dataset_gwtorch --num-samples [int] --path-name [str] --batch-size [int]`** : Used to generate qtransform of the waveform samples, by invoking `match_gen.py`.
 - **`cnn_train_gwtorch --batch_size [default: 128] --epochs [default: 20] --lr [default: 3e-4] --gamma [default: 0.7] --model_path [default: cnn_model0.pth]  --k-folds [default: 5] --use-kfold [stores Truth value]`**: Train the CNN model on the data generated using previous code. The directory `models` is created if it doesn't exist.
 - **`transformer_train_gwtorch --model [default: ViT] --batch_size [default: 512] --epochs [default 20] --lr [default: 3e-5] --gamma [default: 0.7] --seed [default: 42] --k-folds [default: 5] --use-kfold [stores Truth value]`**:  Train the Transformer model on the data generated.
 
 # 🌊 How GW waveforms are generated
 
 We use `TEOBResumS` to generate signals assuming `f_lower` = 5. Two sets of data are generated: 
-- Eccentric: By giving the `eccentricity` parameter, sampled from prior assuming `Uniform` distribution in [0.1, 0.6].
+- Eccentric: By giving the `eccentricity` parameter, sampled from prior assuming `Uniform` distribution in [0.01, 0.6].
 - Non-Eccentric: By giving the `eccentricity` parameter value to be equal to 0.
 
 The Non-Eccentric waveform is then used to generate unlensed data as well as lensed data. Lensing is done using `GWMAT` package.
@@ -77,9 +78,9 @@ Then finally we generate the `q_transforms` of each signal and save them as `.np
 | `chirp_mass`    | `UniformInComponentsChirpMass`     | [10, 100]                     |
 | `spin1z`        | `Uniform`                          | [-0.9, 0.9]                    |
 | `spin2z`        | `Uniform`                          | [-0.9, 0.9]                    |
-| `eccentricity`  | `Uniform`                          | [0.1, 0.6]                    |
+| `eccentricity`  | `Uniform`                          | [0.01, 0.6]                    |
 | `coa_phase`     | `Uniform`                          | [0.0, 2π]                     |
-| `SNR`           | `PowerLaw` (`α = -4`)              | [10, 500]                   |
+| `SNR`           | `PowerLaw` (`α = -4`)              | [4, 500]                   |
 | `dec`           | `Cosine`                           | [−π/2, π/2]                   |
 | `ra`            | `Uniform` (periodic)               | [0, 2π]                       |
 | `polarization`  | `Uniform` (periodic)               | [0, π]                        |
@@ -87,4 +88,4 @@ Then finally we generate the `q_transforms` of each signal and save them as `.np
 | `yl`            | `PowerLaw` (`α = 1`)               | [0.01, 1.0]                   |
 
 
-**Note:** The `exp_gen.py` script also generates a Lookup table for parameter values corresponding to each sample and each category. Also sample `data` generated is given in `data_for_reference` folder alongwith its `Parameter Reference` in csv format.
+**Note:** The `match_gen.py` and `fitting_factor_gen` scripts also generates a Lookup table for parameter values corresponding to each sample and each category.
