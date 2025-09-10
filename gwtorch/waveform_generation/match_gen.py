@@ -10,7 +10,6 @@ from tqdm import tqdm
 from pathlib import Path
 from multiprocessing import Pool
 from threadpoolctl import threadpool_limits
-# import psutil
 
 from gwtorch.modules.constants import *
 
@@ -28,7 +27,6 @@ def generate_sample(args):
     try:
         waveform_dict = {}
         for detector in detector_list:
-            # SEED = None # np.random.randint(2**32) # 42 # https://pycbc.org/pycbc/latest/html/_modules/pycbc/noise/gaussian.html#noise_from_psd If seed is None, PyCBC creates a numpy.random.randint(2**32) and for each subprocess the random number generated is same.
 
             SEED = {'ecc_seed': np.random.randint(1000), 'lens_seed': np.random.randint(1000), 'unlens_seed': np.random.randint(1000)}
             # SEED = {'ecc_seed': np.random.randint(2**32), 'lens_seed': np.random.randint(2**32), 'unlens_seed': np.random.randint(2**32)}
@@ -45,11 +43,12 @@ def generate_sample(args):
                 'y_lens': y_lens,
             }
 
+        # --- Quasi-Circular Unlensed lnB ---
         snr_u_network = np.sqrt(
             sum((waveform_dict[det]['unlensed']['snr_u'])**2 for det in detector_list)
         )
 
-        # --- Eccentric lnB (network FF + network SNR²) ---
+        # --- Eccentric lnB ---
         rhosq_e = []
         match_e = []
         for det in detector_list:
@@ -61,7 +60,7 @@ def generate_sample(args):
         FF_e_net = np.dot(rhosq_e, match_e) / rho_e_net_sq
         ecc_lnB = 0.5 * rho_e_net_sq * (1.0 - FF_e_net**2)
 
-        # --- Lensed lnB (network FF + network SNR²) ---
+        # --- Lensed lnB ---
         rhosq_l = []
         match_l = []
         for det in detector_list:
@@ -94,7 +93,6 @@ def generate_sample(args):
         }
 
         del ecc_dict, lens_dict, unlens_dict, waveform_dict, mass1, mass2, m_lens, y_lens, ecc_lnB, lens_lnB, count, snr_u_network
-        gc.collect()
 
         return result
     
@@ -104,13 +102,6 @@ def generate_sample(args):
         traceback.print_exc()
         gc.collect()
         return None
-
-# def print_memory_usage():
-#     """Print current memory usage"""
-#     process = psutil.Process(os.getpid())
-#     memory_info = process.memory_info()
-#     memory_mb = memory_info.rss / 1024 / 1024
-#     print(f"Current memory usage: {memory_mb:.1f} MB")
 
 # ---------------------- Main Function ---------------------- #
 
@@ -168,15 +159,9 @@ def main():
     samples = generate_prior(num_samples=num_samples, snr_type=snr_prior)
 
     print(f"Generating {len(samples)} samples in each class...")
-    # print_memory_usage()
 
     # def _init_worker(base):
     #     np.random.seed((base + os.getpid()) % (2**32 - 1))
-
-    # import time
-
-    # def _init_worker(_):
-    #     np.random.seed(os.getpid() % (2**32 - 1))
 
 
     with threadpool_limits(limits=1, user_api="blas"):
@@ -184,7 +169,6 @@ def main():
             count = 0
             for i in range(0, len(samples), batch_size):
                 print(f"\nStarting batch {int(i / batch_size)}")
-                # print_memory_usage()
                 
                 batch_sample = samples[i:i+batch_size]
                 
@@ -206,8 +190,8 @@ def main():
 
                 del batch_sample, args_list, results, valid_results
                 
-                for _ in range(3):
-                    gc.collect()
+
+                gc.collect()
                 
                 try:
                     np._NoValue
@@ -221,12 +205,9 @@ def main():
 
                 count += 1
                 
-                # print_memory_usage()
 
     print(f"\nData generation complete!")
     print(f"Saved eccentric: {n_eccentric}, lensed: {n_lensed}, unlensed: {n_unlensed}")
-    # print_memory_usage()
-
 
 if __name__ == '__main__':
     main()
