@@ -1,15 +1,12 @@
 import gc
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import Normalize
-# import importlib.resources as pkg_resources
 from scipy.optimize import differential_evolution
 
 import gwmat
 import pycbc
 import bilby
 import pycbc.psd
-# import pandas as pd
 from gwmat import point_lens
 from gwpy.timeseries import TimeSeries
 from pycbc.types import FrequencySeries
@@ -18,7 +15,6 @@ from pycbc.filter.matchedfilter import matched_filter
 from pycbc.waveform import get_td_waveform, taper_timeseries
 
 from gwtorch.modules.constants import *
-# import gwtorch.waveform_generation.Prior_Files as prior_files
 
 # ------------ Predifined Constant ---------------
 
@@ -96,15 +92,6 @@ def generate_prior(num_samples, snr_type = "powerlaw"):
         {key: parameters[key][i] for key in parameters}
         for i in range(num_samples)
     ]
-
-# def load_prior():
-#     """
-#     Load the samples.feather file stored inside the gwtorch.waveform_generation.Prior_Files package.
-#     """
-#     with pkg_resources.path(prior_files, "samples.feather") as file_path:
-#         df_loaded = pd.read_feather(file_path)
-#         samples = df_loaded.to_dict(orient="records")
-#     return samples
 
 bounds = [
     (10, 100), # Chirp Mass

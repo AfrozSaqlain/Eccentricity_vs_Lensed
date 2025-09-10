@@ -16,7 +16,6 @@ from gwtorch.modules.constants import *
 from gwtorch.modules.general_utils import save_csv
 
 from gwtorch.modules.gw_utils import (
-    # load_prior,
     generate_prior,
     generate_waveform,
     save_qtransform_with_checks
@@ -164,7 +163,6 @@ def main():
         results_dir.mkdir(exist_ok=True)
 
     samples = generate_prior(num_samples=num_samples, snr_type=snr_prior)
-    # samples = load_prior()
 
     master_seed = 42
     master_rng = np.random.default_rng(master_seed)

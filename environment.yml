@@ -10,7 +10,6 @@ dependencies:
   - gsl
   - gmpy2
   - mpmath
-  - pyarrow
   - Cython
   - numpy=2.1.2
   - pandas=2.2.3
