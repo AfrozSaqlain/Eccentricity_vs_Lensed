@@ -29,7 +29,7 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train CNN model for GW classification")
-    parser.add_argument('--model', type=str, default='CNN', choices=['CNN'], help='Model to train')
+    parser.add_argument('--model', type=str, default='CNN', choices=['CNN', 'SimpleCNN'], help='Model to train')
     parser.add_argument('--batch-size', type=int, default=BATCH_SIZE)
     parser.add_argument('--epochs', type=int, default=EPOCHS)
     parser.add_argument('--lr', type=float, default=LR)

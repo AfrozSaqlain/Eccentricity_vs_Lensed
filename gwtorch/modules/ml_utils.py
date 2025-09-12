@@ -19,7 +19,7 @@ from sklearn.model_selection import train_test_split, StratifiedKFold
 from linformer import Linformer
 from vit_pytorch.efficient import ViT
 from vit_pytorch.cvt import CvT
-from gwtorch.modules.neural_net import CNN_Model
+from gwtorch.modules.neural_net import CNN_Model, SimpleCNN
 
 from gwtorch.modules.general_utils import (
     compute_roc_auc_with_misclassifications,
@@ -174,6 +174,8 @@ def get_model(name, num_channels, device):
                    transformer=transformer, channels=num_channels).to(device)
     elif name == 'CNN':
         return CNN_Model(input_channlels=num_channels, dropout=dropout).to(device)
+    elif name == 'SimpleCNN':
+        return SimpleCNN(input_channels=num_channels, dropout=dropout).to(device)
     
 def train_model(model, train_loader, valid_loader, device, epochs, lr, gamma, class_weights=None):
     optimizer = optim.AdamW(model.parameters(), lr=lr)

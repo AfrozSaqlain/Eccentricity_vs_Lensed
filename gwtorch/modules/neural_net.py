@@ -25,6 +25,25 @@ class CNN_Model(nn.Module):
         x = self.fc2(x)
         return x
     
+class SimpleCNN(nn.Module):
+    def __init__(self, input_channels=3, dropout=0.2):
+        super(SimpleCNN, self).__init__()
+        self.conv1 = nn.Conv2d(input_channels, 16, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1)
+        self.fc1 = nn.Linear(32 * 56 * 56, 64)  # <- need to calculate this
+        self.fc2 = nn.Linear(64, 3)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = F.max_pool2d(x, 2)   # 224 -> 112
+        x = F.relu(self.conv2(x))
+        x = F.max_pool2d(x, 2)   # 112 -> 56
+        x = x.view(x.size(0), -1)  # flatten
+        x = F.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = self.fc2(x)
+        return x
 
 
 class CNN_Meta_Model(nn.Module):
