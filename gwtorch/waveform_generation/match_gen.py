@@ -92,7 +92,7 @@ def generate_sample(args):
             'polarization': float(params['polarization']),
             'm_lens': float(m_lens), 'y_lens': float(y_lens),
             'eccentric_snr': np.sqrt(rho_e_net_sq), 'lensed_snr': np.sqrt(rho_l_net_sq), 'unlensed_snr': snr_u_network,
-            'ecc_lnB': ecc_lnB, 'lens_lnB': lens_lnB,
+            'ecc_lnB': ecc_lnB, 'lens_lnB': lens_lnB, 
             **count
         }
 
@@ -199,16 +199,9 @@ def main():
 
                 del batch_sample, args_list, results, valid_results
                 
-
                 gc.collect()
-                
-                try:
-                    np._NoValue
-                except:
-                    pass
 
                 count += 1
-                
 
     print(f"\nData generation complete!")
     print(f"Saved eccentric: {n_eccentric}, lensed: {n_lensed}, unlensed: {n_unlensed}")
