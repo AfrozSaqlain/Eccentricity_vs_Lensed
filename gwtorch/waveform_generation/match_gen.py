@@ -119,6 +119,8 @@ def main():
                         help='Path to save the generated data. Default is "data".')
     parser.add_argument('--batch-size', type=int, default=150,
                         help='Batch size saves RAM usage by generating waveforms in batches. Default is 150.')
+    parser.add_argument('--seed', type=int, default=42,
+                        help='Seed for the master random number generator. If not provided, the seed will be 42.')
     
     args = parser.parse_args()
 
@@ -162,7 +164,7 @@ def main():
 
     samples = generate_prior(num_samples=num_samples, snr_type=snr_prior)
 
-    master_seed = 42
+    master_seed = args.seed
     master_rng = np.random.default_rng(master_seed)
 
     num_samples_to_generate = len(samples)
