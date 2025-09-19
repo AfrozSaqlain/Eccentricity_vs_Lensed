@@ -119,8 +119,8 @@ def main():
                         help='Path to save the generated data. Default is "data".')
     parser.add_argument('--batch-size', type=int, default=150,
                         help='Batch size saves RAM usage by generating waveforms in batches. Default is 150.')
-    parser.add_argument('--seed', type=int, default=42,
-                        help='Seed for the master random number generator. If not provided, the seed will be 42.')
+    parser.add_argument('--seed', type=int, default=None,
+                        help='Seed for the master random number generator. If not provided, the seed will be None.')
     
     args = parser.parse_args()
 
