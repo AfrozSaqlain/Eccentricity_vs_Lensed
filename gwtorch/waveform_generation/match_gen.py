@@ -173,7 +173,7 @@ def main():
     print(f"Generating {num_samples_to_generate} samples in each class...")
 
     with threadpool_limits(limits=1, user_api="blas"):
-        with Pool(args.num_workers, maxtasksperchild=600) as pool:
+        with Pool(args.num_workers, maxtasksperchild=1000) as pool:
             count = 0
             for i in range(0, num_samples_to_generate, batch_size):
                 print(f"\nStarting batch {int(i / batch_size)}")

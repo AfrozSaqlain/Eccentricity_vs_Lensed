@@ -77,15 +77,16 @@ def generate_prior(num_samples, snr_type = "powerlaw"):
     priors['mass_ratio'] = bilby.gw.prior.UniformInComponentsMassRatio(name='mass_ratio', minimum=0.1, maximum=1)
     priors['spin1z'] = bilby.core.prior.Uniform(name='spin1z', minimum=-0.9, maximum=0.9)
     priors['spin2z'] = bilby.core.prior.Uniform(name='spin2z', minimum=-0.9, maximum=0.9)
-    priors['eccentricity'] = bilby.core.prior.Uniform(name='eccentricity', minimum=1e-2, maximum=0.6)
+    priors['eccentricity'] = bilby.core.prior.Uniform(name='eccentricity', minimum=0.1, maximum=0.6)
+    priors['anomaly'] = bilby.core.prior.Uniform(name='anomaly', minimum=0.0, maximum=2*np.pi, boundary="periodic")
     priors['coa_phase'] = bilby.core.prior.Uniform(name='coa_phase', minimum=0.0, maximum=2 * np.pi)
     priors['polarization'] = bilby.core.prior.Uniform(minimum=0., maximum=np.pi, boundary="periodic")
-    priors['Log_Mlz'] = bilby.core.prior.Uniform(minimum=1, maximum=5)
+    priors['Log_Mlz'] = bilby.core.prior.Uniform(minimum=3, maximum=5)
     priors['yl'] = bilby.core.prior.PowerLaw(alpha=1, minimum=0.01, maximum=1.0)
     if snr_type == "powerlaw":
-        priors['snr'] = bilby.core.prior.PowerLaw(minimum=4, maximum=2000, alpha=-4)
+        priors['snr'] = bilby.core.prior.PowerLaw(minimum=12, maximum=2000, alpha=-4)
     else:
-        priors['snr'] = bilby.core.prior.Uniform(minimum=4, maximum=100)
+        priors['snr'] = bilby.core.prior.Uniform(minimum=15, maximum=100)
 
     parameters = priors.sample(num_samples)
     return [
@@ -166,7 +167,7 @@ def objective_function(params_array, args):
                                                     lambda1=0, lambda2=0,
                                                     spin1z=spin1z, spin2z=spin2z,
                                                     distance=distance, delta_t=DELTA_T,
-                                                    ecc=0.0, coa_phase=coa_phase, f_lower=F_START)
+                                                    eccentricity=0.0, coa_phase=coa_phase, f_lower=F_START)
         
         signal_copy = signal.copy()
         temp_copy = template_hp.copy()
@@ -309,13 +310,13 @@ def generate_waveform(num, params, peak_window=(2.0, 2.2), detector=default_dete
                                  lambda1=0, lambda2=0,
                                  spin1z=params['spin1z'], spin2z=params['spin2z'],
                                  distance=REFERENCE_DISTANCE, delta_t=DELTA_T,
-                                 ecc=params['eccentricity'], coa_phase=params['coa_phase'], f_lower=F_START)
+                                 eccentricity=params['eccentricity'], mean_per_ano=params['anomaly'], coa_phase=params['coa_phase'], f_lower=F_START)
 
         sp, sc = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
                                  lambda1=0, lambda2=0,
                                  spin1z=params['spin1z'], spin2z=params['spin2z'],
                                  distance=REFERENCE_DISTANCE, delta_t=DELTA_T,
-                                 ecc=0.0, coa_phase=params['coa_phase'], f_lower=F_START)
+                                 eccentricity=0.0, coa_phase=params['coa_phase'], f_lower=F_START)
 
         sp_lensed, sc_lensed, t_delay = compute_lensed_waveform(sp, sc, m_lens, y_lens)
 
@@ -698,7 +699,7 @@ def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens
                                  lambda1=0, lambda2=0,
                                  spin1z=params['spin1z'], spin2z=params['spin2z'],
                                  distance=distance, delta_t=DELTA_T,
-                                 ecc=params['eccentricity'], coa_phase=params['coa_phase'], f_lower=F_START)
+                                 eccentricity=params['eccentricity'], mean_per_ano=params['anomaly'], coa_phase=params['coa_phase'], f_lower=F_START)
         
         gw_signal = taper_timeseries(detector.project_wave(hp, hc, **{k: params[k] for k in ['ra', 'dec', 'polarization']}), tapermethod="TAPER_STARTEND", return_lal=False)
     
@@ -707,7 +708,7 @@ def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens
                                  lambda1=0, lambda2=0,
                                  spin1z=params['spin1z'], spin2z=params['spin2z'],
                                  distance=distance, delta_t=DELTA_T,
-                                 ecc=0.0, coa_phase=params['coa_phase'], f_lower=F_START)
+                                 eccentricity=0.0, coa_phase=params['coa_phase'], f_lower=F_START)
         
         gw_signal = taper_timeseries(detector.project_wave(hp, hc, **{k: params[k] for k in ['ra', 'dec', 'polarization']}), tapermethod="TAPER_STARTEND", return_lal=False)
         
@@ -716,7 +717,7 @@ def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens
                                  lambda1=0, lambda2=0,
                                  spin1z=params['spin1z'], spin2z=params['spin2z'],
                                  distance=distance, delta_t=DELTA_T,
-                                 ecc=0.0, coa_phase=params['coa_phase'], f_lower=F_START) 
+                                 eccentricity=0.0, coa_phase=params['coa_phase'], f_lower=F_START) 
         
         hp_lens, hc_lens, t_delay = compute_lensed_waveform(hp, hc, m_lens, y_lens)
 
