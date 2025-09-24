@@ -77,11 +77,11 @@ def generate_prior(num_samples, snr_type = "powerlaw"):
     priors['mass_ratio'] = bilby.gw.prior.UniformInComponentsMassRatio(name='mass_ratio', minimum=0.1, maximum=1)
     priors['spin1z'] = bilby.core.prior.Uniform(name='spin1z', minimum=-0.9, maximum=0.9)
     priors['spin2z'] = bilby.core.prior.Uniform(name='spin2z', minimum=-0.9, maximum=0.9)
-    priors['eccentricity'] = bilby.core.prior.Uniform(name='eccentricity', minimum=0.1, maximum=0.6)
+    priors['eccentricity'] = bilby.core.prior.Uniform(name='eccentricity', minimum=0.01, maximum=0.6)
     priors['anomaly'] = bilby.core.prior.Uniform(name='anomaly', minimum=0.0, maximum=2*np.pi, boundary="periodic")
     priors['coa_phase'] = bilby.core.prior.Uniform(name='coa_phase', minimum=0.0, maximum=2 * np.pi)
     priors['polarization'] = bilby.core.prior.Uniform(minimum=0., maximum=np.pi, boundary="periodic")
-    priors['Log_Mlz'] = bilby.core.prior.Uniform(minimum=3, maximum=5)
+    priors['Log_Mlz'] = bilby.core.prior.Uniform(minimum=2, maximum=5)
     priors['yl'] = bilby.core.prior.PowerLaw(alpha=1, minimum=0.01, maximum=1.0)
     if snr_type == "powerlaw":
         priors['snr'] = bilby.core.prior.PowerLaw(minimum=10, maximum=500, alpha=-4)
