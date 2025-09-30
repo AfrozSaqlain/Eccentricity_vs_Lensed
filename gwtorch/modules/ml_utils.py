@@ -29,7 +29,9 @@ from gwtorch.modules.general_utils import (
     save_misclassified_files_to_txt,
     plot_training_curves,
     plot_kfold_roc_curves,
-    plot_average_training_curves
+    plot_average_training_curves,
+    plot_misclassification_lnB_histogram,
+    plot_misclassification_lnB_broken_axis
 )
 
 dropout = 0.4
@@ -178,7 +180,7 @@ def get_model(name, num_channels, device):
         return SimpleCNN(input_channels=num_channels, dropout=dropout).to(device)
     
 def train_model(model, train_loader, valid_loader, device, epochs, lr, gamma, class_weights=None):
-    optimizer = optim.AdamW(model.parameters(), lr=lr)
+    optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     scheduler = StepLR(optimizer, step_size=5, gamma=gamma)
     if class_weights is not None:
         criterion = nn.CrossEntropyLoss(reduction='none', weight=class_weights.to(device))
