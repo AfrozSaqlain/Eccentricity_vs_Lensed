@@ -86,7 +86,7 @@ def generate_prior(num_samples, snr_type = "powerlaw"):
     if snr_type == "powerlaw":
         priors['snr'] = bilby.core.prior.PowerLaw(minimum=10, maximum=500, alpha=-4)
     else:
-        priors['snr'] = bilby.core.prior.Uniform(minimum=15, maximum=100)
+        priors['snr'] = bilby.core.prior.Uniform(minimum=8, maximum=100)
 
     parameters = priors.sample(num_samples)
     return [

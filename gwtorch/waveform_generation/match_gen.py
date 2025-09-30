@@ -86,7 +86,7 @@ def generate_sample(args):
             'sample': num,
             'mass1': float(mass1), 'mass2': float(mass2),
             'spin1z': float(params['spin1z']), 'spin2z': float(params['spin2z']),
-            'eccentricity': float(params['eccentricity']),
+            'eccentricity': float(params['eccentricity']), 'anomaly': float(params['anomaly']),
             'coa_phase': float(params['coa_phase']),
             'ra': float(params['ra']), 'dec': float(params['dec']),
             'polarization': float(params['polarization']),
