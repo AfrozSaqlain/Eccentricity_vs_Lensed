@@ -29,9 +29,7 @@ from gwtorch.modules.general_utils import (
     save_misclassified_files_to_txt,
     plot_training_curves,
     plot_kfold_roc_curves,
-    plot_average_training_curves,
-    plot_misclassification_lnB_histogram,
-    plot_misclassification_lnB_broken_axis
+    plot_average_training_curves
 )
 
 dropout = 0.4
@@ -271,6 +269,7 @@ def evaluate_and_plot(model, valid_loader, test_loader, device, fold=None, model
     save_misclassified_files_to_txt(test_misclassified, "Test", results_dir / "misclassified_test.txt")
 
     suffix = f" Fold {fold}" if fold is not None else ""
+
     plot_roc_curves(val_fpr, val_tpr, val_roc_auc, class_names, f" (Validation Set{suffix})", results_dir)
     plot_roc_curves(test_fpr, test_tpr, test_roc_auc, class_names, f" (Test Set{suffix})", results_dir)
     plot_confusion_matrix(val_labels, val_preds, class_names, f" (Validation Set{suffix})", results_dir)
