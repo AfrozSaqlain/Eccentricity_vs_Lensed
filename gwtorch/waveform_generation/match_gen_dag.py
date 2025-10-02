@@ -200,7 +200,8 @@ def main():
                 n_lensed += sum(1 for r in valid_results if r.get('lensed_saved'))
                 n_unlensed += sum(1 for r in valid_results if r.get('unlensed_saved'))
 
-                save_csv(results_dir / f"{args.path_name}_parameters.csv", valid_results)
+                if 'test' not in args.path_name:
+                    save_csv(results_dir / "data_parameters.csv", valid_results)
 
                 del batch_sample, args_list, results, valid_results
                 
