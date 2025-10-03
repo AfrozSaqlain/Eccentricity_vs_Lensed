@@ -37,7 +37,9 @@ queue
 
 
 def generate_merge_sh(path="submit/merge.sh"):
-    """Generates the script to merge data directories."""
+    """
+    Generates the script to merge data directories and then clean them up.
+    """
     script = """#!/bin/bash
 
 # Create the central data folder and subdirectories
@@ -48,16 +50,20 @@ for dir in data_*; do
     # Check if it's a directory
     [ -d "$dir" ] || continue
 
-    # Move files from eccentric, lensed, unlensed if they exist
+    # Move files from subdirectories if they exist
     for sub in eccentric lensed unlensed; do
         if [ -d "$dir/$sub" ]; then
             echo "Moving files from $dir/$sub to data/$sub"
             mv "$dir/$sub"/* data/$sub/ 2>/dev/null
         fi
     done
+    
+    # After moving files, remove the now-empty source directory
+    echo "Removing temporary directory: $dir"
+    rm -r "$dir"
 done
 
-echo "All files have been moved."
+echo "All files have been moved and temporary directories are cleaned up."
 """
     with open(path, "w") as f:
         f.write(script)
@@ -65,7 +71,9 @@ echo "All files have been moved."
 
 
 def generate_combine_csv_sh(path="submit/combine_csv.sh"):
-    """Generates the script to combine CSV files."""
+    """
+    Generates the script to combine CSV files and then clean them up.
+    """
     script = """#!/bin/bash
 # Combine CSV files named data_{i}_parameters.csv into one file in order of i.
 
@@ -93,6 +101,11 @@ for f in $files; do
 done
 
 echo "Combined CSV written to $OUTPUT_FILE"
+
+# Clean up the individual CSV files that have been merged
+echo "Removing individual CSV files..."
+rm -f $files
+echo "Individual CSV files removed."
 """
     with open(path, "w") as f:
         f.write(script)
