@@ -44,7 +44,7 @@ To install the package just run: `bash install.sh`
 - `fitting_factor_gen.py`: Generates Q-transform spectrograms of synthetic GW signals, and computes ln B based on fitting factor.
 - `cnn.py`, `transformer.py`: Contain CNN and Transformer model definitions with training/testing routines.
 - `cnn_eval.py`, `transformer_eval.py`: Specifically used to evaluate trained CNN and Transformer models on test data.
-- `dagman.py`: Write generate_dagman_gwtorch --jobs 5 --memory 20G --disk 30G --cpu 5 --samples 20 to create a dagman workflow which you can submit to HTCondor system.
+- `dagman.py`: Using this script we can simply run `generate_dagman_gwtorch --jobs [number-of-jobs] --memory [RAM]G --disk [DISK]G --cpu [no-of-cpus] --samples [no-of-samples] to create a dagman workflow which you can submit to HTCondor system.
 
 
 # 🖥️ Command Line Interface (CLI)
