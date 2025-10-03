@@ -1,4 +1,3 @@
-
 # ==============================================================================
 # ROC CURVE AND AUC COMPUTATION WITH MISCLASSIFICATION TRACKING
 # ==============================================================================
@@ -6,6 +5,7 @@
 import os
 import csv
 import numpy as np
+import pandas as pd
 import seaborn as sns
 from pathlib import Path
 import matplotlib.pyplot as plt
@@ -118,6 +118,54 @@ def save_csv(path, rows):
             writer.writeheader()
         writer.writerows(cleaned_rows)
 
+import os
+import csv
+
+def save_csv_dag(path, rows):
+    """
+    Save a list of dictionaries to a CSV file, sorted by 'sample'.
+    Appends to an existing CSV, preserving unique samples.
+    """
+    if not rows:
+        return
+
+    # Clean rows: strip *_saved keys but keep original 'sample'
+    cleaned_rows = []
+    for row in rows:
+        row = {k: v for k, v in row.items() if not k.endswith("_saved")}
+        cleaned_rows.append(row)
+
+    # --- If file exists, load existing rows ---
+    all_rows = []
+    file_exists = os.path.exists(path)
+    if file_exists:
+        with open(path, 'r', newline='') as f:
+            reader = csv.DictReader(f)
+            for r in reader:
+                all_rows.append(r)
+
+    # Add new rows
+    all_rows.extend(cleaned_rows)
+
+    # Convert 'sample' to int for sorting (some may be str from CSV readback)
+    for r in all_rows:
+        r['sample'] = int(r['sample'])
+
+    # Sort by sample
+    all_rows.sort(key=lambda r: r['sample'])
+
+    # Build fieldnames preserving order
+    fieldnames = list(all_rows[0].keys())
+    for row in all_rows[1:]:
+        for key in row.keys():
+            if key not in fieldnames:
+                fieldnames.append(key)
+
+    # Rewrite full CSV with sorted rows
+    with open(path, 'w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(all_rows)
 
 def compute_roc_auc_with_misclassifications(model, data_loader, device, class_names=['Lensed', 'Eccentric', 'Unlensed']):
     """

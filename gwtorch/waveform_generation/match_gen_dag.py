@@ -13,7 +13,7 @@ from threadpoolctl import threadpool_limits
 
 from gwtorch.modules.constants import *
 
-from gwtorch.modules.general_utils import save_csv
+from gwtorch.modules.general_utils import save_csv_dag
 
 from gwtorch.modules.gw_utils import (
     generate_prior,
@@ -183,7 +183,7 @@ def main():
                 n_unlensed += sum(1 for r in valid_results if r.get('unlensed_saved'))
 
                 if 'test' not in args.path_name:
-                    save_csv(results_dir / f"data_{args.seed}_parameters.csv", valid_results)
+                    save_csv_dag(results_dir / f"data_{args.seed}_parameters.csv", valid_results)
 
                 del batch_sample, args_list, results, valid_results
                 
