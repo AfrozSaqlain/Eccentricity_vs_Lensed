@@ -132,15 +132,7 @@ def main():
 
     directory = f"./{args.path_name}_{args.seed}"
 
-    init_jump = 0   
-
-    count = args.seed * num_samples
-
-    eccentric_count = count
-    lensed_count = count
-    unlensed_count = count
-
-    init_jump = max(eccentric_count, lensed_count, unlensed_count)
+    init_jump = args.seed * num_samples
 
     output_path = Path(directory)
     eccentric_path = output_path / Path("eccentric")
@@ -191,7 +183,7 @@ def main():
                 n_unlensed += sum(1 for r in valid_results if r.get('unlensed_saved'))
 
                 if 'test' not in args.path_name:
-                    save_csv(results_dir / "data_parameters.csv", valid_results)
+                    save_csv(results_dir / f"data_{args.seed}_parameters.csv", valid_results)
 
                 del batch_sample, args_list, results, valid_results
                 
