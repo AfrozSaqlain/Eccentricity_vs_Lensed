@@ -132,7 +132,7 @@ def main():
 
     directory = f"./{args.path_name}_{args.seed}"
 
-    init_jump = args.seed * num_samples
+    init_jump = (args.seed - 1) * num_samples
 
     output_path = Path(directory)
     eccentric_path = output_path / Path("eccentric")
