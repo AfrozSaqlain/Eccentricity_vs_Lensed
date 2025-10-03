@@ -136,7 +136,7 @@ def main():
 
     count = 0
 
-    if os .path.exists(f'gen_log.txt'):
+    if os.path.exists(f'gen_log.txt'):
         with open(f'gen_log.txt', 'r') as f:
             lines = f.readlines()
         
