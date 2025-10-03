@@ -130,18 +130,11 @@ def main():
 
     n_eccentric, n_lensed, n_unlensed = 0, 0, 0
 
-    directory = f"./{args.path_name}"
+    directory = f"./{args.path_name}_{args.seed}"
 
     init_jump = 0   
 
-    count = 0
-
-    if os.path.exists(f'gen_log.txt'):
-        with open(f'gen_log.txt', 'r') as f:
-            lines = f.readlines()
-        
-        for line in lines:
-            count += int(line.strip())
+    count = args.seed * num_samples
 
     eccentric_count = count
     lensed_count = count
@@ -171,9 +164,6 @@ def main():
     task_seeds = master_rng.integers(low=0, high=2**32, size=num_samples_to_generate)
 
     print(f"Generating {num_samples_to_generate} samples in each class...")
-    
-    with open(f'gen_log.txt', 'a') as f:
-        f.write(str(num_samples_to_generate) + '\n')
 
     with threadpool_limits(limits=1, user_api="blas"):
         with Pool(args.num_workers, maxtasksperchild=1000) as pool:
