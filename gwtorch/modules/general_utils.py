@@ -394,10 +394,14 @@ def get_file_prefix(results_dir):
             return 'Binary_ViT'
         elif prefix1 == 'Binary_CNN' and prefix2 is None:
             return 'Binary_CNN'
+        elif prefix1 == 'Binary_CvT' and prefix2 is None:
+            return 'Binary_CvT'
         elif prefix1 == 'Binary_ViT' and prefix2 is not None:
             return f'Binary_ViT_Fold_{prefix2}'
         elif prefix1 == 'Binary_CNN' and prefix2 is not None:
             return f'Binary_CNN_Fold_{prefix2}'
+        elif prefix1 == 'Binary_CvT' and prefix2 is not None:
+            return f'Binary_CvT_Fold_{prefix2}'
 
 def plot_roc_curves(fpr, tpr, roc_auc, class_names, title_suffix="", results_dir=None, scale='linear'):
 
@@ -732,3 +736,199 @@ def plot_average_training_curves(fold_results, results_dir):
     plt.tight_layout()
     plt.savefig(results_dir / 'average_training_curves_kfold.pdf', dpi=300, bbox_inches='tight')
     plt.close()
+
+def plot_misclassification_lnB_histogram(misclassified_files, title_suffix, output_dir, meta_csv='./results/data_parameters.csv'):
+    """
+    Plots a histogram of ln(B) values for misclassified lensed and eccentric signals.
+
+    Args:
+        misclassified_files (list): A list of file paths that were misclassified.
+        title_suffix (str): A suffix to add to the plot title (e.g., ' (Validation Set)').
+        output_dir (Path or str): The directory where the plot will be saved.
+        meta_csv (str): Path to the CSV file containing metadata like ln(B) values.
+    """
+    # Try to load the metadata, return gracefully if it fails
+    try:
+        df = pd.read_csv(meta_csv)
+        if 'sample' in df.columns:
+            df = df.set_index('sample')
+    except FileNotFoundError:
+        print(f"Warning: Metadata file not found at {meta_csv}. Cannot plot ln(B) histogram.")
+        return
+
+    lensed_misclassified_lnB = []
+    eccentric_misclassified_lnB = []
+
+    # Iterate through misclassified files and extract their ln(B) values
+    for file_path in misclassified_files:
+        file_path = file_path['file_path'] # Access the path string from the dictionary
+        parts = file_path.split('/')
+        label_str = parts[2].lower()
+        file_number = int(parts[-1].split('.')[0])
+
+        ln_B = None
+        if file_number in df.index:
+            if label_str == 'lensed' and 'lens_lnB' in df.columns:
+                ln_B = df.loc[file_number, 'lens_lnB']
+            elif label_str == 'eccentric' and 'ecc_lnB' in df.columns:
+                ln_B = df.loc[file_number, 'ecc_lnB']
+        
+        if ln_B is not None:
+            if label_str == 'lensed':
+                lensed_misclassified_lnB.append(ln_B)
+            elif label_str == 'eccentric':
+                eccentric_misclassified_lnB.append(ln_B)
+
+    # Check if there is data to plot
+    if not lensed_misclassified_lnB and not eccentric_misclassified_lnB:
+        print(f"No misclassified Lensed or Eccentric signals with ln(B) values found for{title_suffix}.")
+        return
+
+    # Create the plot with two subplots
+    fig, axes = plt.subplots(1, 2, figsize=(15, 6), sharey=True)
+    fig.suptitle(f'Histogram of Misclassified Signals by ln(B) Value{title_suffix}', fontsize=16)
+
+    # Plot for Lensed signals
+    axes[0].hist(lensed_misclassified_lnB, bins=20, color='skyblue', edgecolor='black')
+    axes[0].set_title('Misclassified Lensed Signals')
+    axes[0].set_xlabel('ln(B) value')
+    axes[0].set_ylabel('Number of Misclassified Samples')
+    axes[0].grid(axis='y', alpha=0.75)
+
+    # Plot for Eccentric signals
+    axes[1].hist(eccentric_misclassified_lnB, bins=20, color='salmon', edgecolor='black')
+    axes[1].set_title('Misclassified Eccentric Signals')
+    axes[1].set_xlabel('ln(B) value')
+    axes[1].grid(axis='y', alpha=0.75)
+    
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95]) # Adjust layout to make room for suptitle
+    
+    # Sanitize the title for the filename
+    filename_suffix = title_suffix.replace(" ", "_").replace("(", "").replace(")", "")
+    plot_path = Path(output_dir) / f'misclassified_lnB_histogram{filename_suffix}.png'
+    
+    plt.savefig(plot_path)
+    plt.close(fig) # Close the figure to free up memory
+    print(f"Saved ln(B) misclassification histogram to {plot_path}")
+
+
+def plot_misclassification_lnB_broken_axis(misclassified_files, title_suffix, output_dir, meta_csv='./results/data_parameters.csv'):
+    """
+    Plots a "broken axis" histogram to show weighted percentage of misclassifications
+    in ln(B) bins instead of raw counts.
+    
+    The top row shows Lensed signals, the bottom row shows Eccentric signals.
+    Left plots are fine-binned (0-100), right plots are coarse-binned (>100).
+    """
+    try:
+        df = pd.read_csv(meta_csv)
+        if 'sample' in df.columns:
+            df = df.set_index('sample')
+    except FileNotFoundError:
+        print(f"Warning: Metadata file not found at {meta_csv}. Cannot plot this histogram.")
+        return
+
+    lensed_misclassified_lnB = []
+    eccentric_misclassified_lnB = []
+
+    for item in misclassified_files:
+        file_path = item.get('path') or item.get('file_path')
+        if not file_path:
+            continue
+
+        parts = file_path.split('/')
+        label_str = parts[2].lower()
+        file_number = int(parts[-1].split('.')[0])
+        ln_B = None
+        if file_number in df.index:
+            if label_str == 'lensed' and 'lens_lnB' in df.columns:
+                ln_B = df.loc[file_number, 'lens_lnB']
+            elif label_str == 'eccentric' and 'ecc_lnB' in df.columns:
+                ln_B = df.loc[file_number, 'ecc_lnB']
+        if ln_B is not None:
+            if label_str == 'lensed':
+                lensed_misclassified_lnB.append(ln_B)
+            elif label_str == 'eccentric':
+                eccentric_misclassified_lnB.append(ln_B)
+
+    if not lensed_misclassified_lnB and not eccentric_misclassified_lnB:
+        print(f"No misclassified Lensed or Eccentric signals with ln(B) values found for{title_suffix}.")
+        return
+
+    all_lnB = lensed_misclassified_lnB + eccentric_misclassified_lnB
+    max_val = max(all_lnB) if all_lnB else 100
+    max_val = max(201, max_val)  # Ensure at least 201 for coarse bins
+
+    # --- DEFINE BINS ---
+    fine_bins = np.arange(0, 101, 10)
+    coarse_bins = np.arange(100, max_val + 100, 100)
+
+    # --- NORMALIZATION FOR PERCENTAGES ---
+    total_lensed = len(lensed_misclassified_lnB)
+    total_eccentric = len(eccentric_misclassified_lnB)
+
+    # helper: assign weights = 100 / total
+    lensed_weights = np.ones(total_lensed) * 100.0 / total_lensed if total_lensed > 0 else None
+    eccentric_weights = np.ones(total_eccentric) * 100.0 / total_eccentric if total_eccentric > 0 else None
+
+    # --- CREATE THE 2x2 SUBPLOT GRID ---
+    fig, axes = plt.subplots(2, 2, figsize=(16, 10), sharey=True,
+                             gridspec_kw={'wspace': 0.05})
+    fig.suptitle(f'Weighted Percentage of Misclassified Signals by ln(B) Value{title_suffix}', fontsize=18)
+
+    # --- PLOT HISTOGRAMS (percentages not counts) ---
+    axes[0, 0].hist(lensed_misclassified_lnB, bins=fine_bins, weights=lensed_weights,
+                    color='skyblue', edgecolor='black')
+    axes[0, 1].hist(lensed_misclassified_lnB, bins=coarse_bins, weights=lensed_weights,
+                    color='skyblue', edgecolor='black')
+
+    axes[1, 0].hist(eccentric_misclassified_lnB, bins=fine_bins, weights=eccentric_weights,
+                    color='salmon', edgecolor='black')
+    axes[1, 1].hist(eccentric_misclassified_lnB, bins=coarse_bins, weights=eccentric_weights,
+                    color='salmon', edgecolor='black')
+
+    # --- BROKEN AXIS EFFECT ---
+    for i in range(2):
+        ax_fine, ax_coarse = axes[i, 0], axes[i, 1]
+
+        ax_fine.set_xlim(0, 100)
+        ax_coarse.set_xlim(100, max_val)
+
+        ax_fine.spines['right'].set_visible(False)
+        ax_coarse.spines['left'].set_visible(False)
+        ax_coarse.tick_params(axis='y', length=0)
+
+        d = .01
+        kwargs = dict(transform=ax_fine.transAxes, color='k', clip_on=False)
+        ax_fine.plot((1 - d, 1 + d), (-d, +d), **kwargs)
+        ax_fine.plot((1 - d, 1 + d), (1 - d, 1 + d), **kwargs)
+        kwargs.update(transform=ax_coarse.transAxes)
+        ax_coarse.plot((-d, +d), (-d, +d), **kwargs)
+        ax_coarse.plot((-d, +d), (1 - d, 1 + d), **kwargs)
+
+        ax_fine.grid(axis='y', alpha=0.75)
+        ax_coarse.grid(axis='y', alpha=0.75)
+
+        ax_fine.set_xticks(fine_bins)
+        ax_coarse.set_xticks(coarse_bins)
+        ax_fine.tick_params(axis='x', rotation=45)
+        ax_coarse.tick_params(axis='x', rotation=45)
+
+    # --- TITLES AND LABELS ---
+    axes[0, 0].set_title('Lensed Signals (Fine Bins)')
+    axes[0, 1].set_title('(Coarse Bins)')
+    axes[1, 0].set_title('Eccentric Signals (Fine Bins)')
+    axes[1, 1].set_title('(Coarse Bins)')
+
+    fig.text(0.5, 0.04, 'ln(B) value', ha='center', va='center', fontsize=14)
+    fig.text(0.06, 0.5, 'Percentage of Misclassified Samples (\%)', ha='center', va='center',
+             rotation='vertical', fontsize=14)
+
+    plt.tight_layout(rect=[0.07, 0.05, 1, 0.95])
+
+    filename_suffix = title_suffix.replace(" ", "_").replace("(", "").replace(")", "")
+    plot_path = Path(output_dir) / f'misclassified_lnB_histogram{filename_suffix}_broken_axis.pdf'
+
+    plt.savefig(plot_path, bbox_inches='tight')
+    plt.close(fig)
+    print(f"Saved broken axis ln(B) misclassification percentage histogram to {plot_path}")
