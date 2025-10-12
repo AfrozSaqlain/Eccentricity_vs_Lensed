@@ -219,10 +219,9 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Test Transformer for GW classification")
     parser.add_argument('--model', type=str, default='ViT', choices=['CvT', 'ViT'], help='Model to train')
     parser.add_argument('--batch-size', type=int, default=512)
-    parser.add_argument('--model-path', type=str, required=True, help="Path to the trained model (.pth file)")
+    parser.add_argument('--model-path', type=str, default='vit_model.pth', help="Path to the trained model (.pth file)")
     parser.add_argument('--path-name', type=str, default='data', help='Path to the dataset directory.')
     parser.add_argument('--results-dir', type=str, default='inference_results', help='Path to save inference results.')
-    # <-- NEW ARGUMENTS FOR FILTERING -->
     parser.add_argument('--meta-csv', type=str, default='./results/data_parameters.csv', help='Path to the metadata CSV file.')
     parser.add_argument('--lnB-min', type=float, default=None, help='Minimum lnB value for confusion matrix filtering.')
     parser.add_argument('--lnB-max', type=float, default=None, help='Maximum lnB value for confusion matrix filtering.')
