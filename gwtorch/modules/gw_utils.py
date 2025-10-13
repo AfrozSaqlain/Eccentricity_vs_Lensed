@@ -26,7 +26,7 @@ cosmic_psd = pycbc.psd.CosmicExplorerP1600143(flen, delta_f, F_START)
 
 # ------------------------------------------------
 
-def generate_prior(num_samples, snr_type = "powerlaw"):
+def generate_prior(num_samples, snr_type = "powerlaw", uniform_snr_tuple=(8, 100)):
     """
     Generate a list of sampled prior parameter dictionaries for binary black hole (BBH) gravitational wave signals.
 
@@ -86,7 +86,7 @@ def generate_prior(num_samples, snr_type = "powerlaw"):
     if snr_type == "powerlaw":
         priors['snr'] = bilby.core.prior.PowerLaw(minimum=10, maximum=500, alpha=-4)
     else:
-        priors['snr'] = bilby.core.prior.Uniform(minimum=8, maximum=100)
+        priors['snr'] = bilby.core.prior.Uniform(minimum=uniform_snr_tuple[0], maximum=uniform_snr_tuple[1])
 
     parameters = priors.sample(num_samples)
     return [
