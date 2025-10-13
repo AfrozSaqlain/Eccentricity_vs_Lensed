@@ -121,8 +121,10 @@ def main():
                         help='Batch size saves RAM usage by generating waveforms in batches. Default is 150.')
     parser.add_argument('--seed', type=int, default=None,
                         help='Seed for the master random number generator. If not provided, the seed will be None.')
-    parser.add_argument('--snr-range', type=float, nargs=2, metavar=('SNR_MIN', 'SNR_MAX'), default=(8, 100), 
-                        help='Range of SNR values to sample from, e.g. --snr-range 10 100.')
+    parser.add_argument('--snr-min', type=int, default=8,
+                        help='Minimum of SNR values to sample from. Default is 8.')
+    parser.add_argument('--snr-max', type=int, default=100,
+                        help='Maximum of SNR values to sample from. Default is 100.')
 
     args = parser.parse_args()
 
@@ -130,8 +132,9 @@ def main():
     snr_prior = args.snr_prior
     batch_size = args.batch_size
 
+    snr_range = (args.snr_min, args.snr_max)
     if args.snr_prior == 'uniform':
-        print(f"Using uniform SNR prior in the range {args.snr_range}.")
+        print(f"Using uniform SNR prior in the range {snr_range}.")
     else:
         pass
 
@@ -154,7 +157,7 @@ def main():
     
     results_dir.mkdir(exist_ok=True)
 
-    samples = generate_prior(num_samples=num_samples, snr_type=snr_prior, uniform_snr_tuple=args.snr_range)
+    samples = generate_prior(num_samples=num_samples, snr_type=snr_prior, uniform_snr_tuple=snr_range)
 
     master_seed = args.seed
     master_rng = np.random.default_rng(master_seed)

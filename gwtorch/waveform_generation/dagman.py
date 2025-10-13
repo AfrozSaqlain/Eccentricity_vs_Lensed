@@ -161,7 +161,7 @@ def generate_dagman(num_jobs, snr_range, path="submit/workflow.dag"):
     # 1. Define all data generation jobs
     for i, job_name in enumerate(job_names, 1):
         lines.append(f"JOB {job_name} submit/short_gen.sub")
-        lines.append(f'VARS {job_name} ARG1 = "{i}" ARG2 = "data" ARG3 = {snr_list[i-1][0]} {snr_list[i-1][1]}')
+        lines.append(f'VARS {job_name} ARG1 = "{i}" ARG2 = "data" ARG3 = "{snr_list[i-1][0]} {snr_list[i-1][1]}"')
         lines.append("")  # For readability
 
     # 2. Define the dummy synchronization job
