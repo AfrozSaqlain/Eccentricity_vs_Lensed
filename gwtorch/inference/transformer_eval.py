@@ -311,7 +311,7 @@ def get_model(name, num_channels, device):
                    s3_proj_kernel=3, s3_kv_proj_stride=2, s3_heads=4, s3_depth=10, s3_mlp_mult=4,
                    dropout=0.4).to(device)
     else: # ViT
-        transformer = Linformer(dim=128, seq_len=49, depth=12, heads=8, k=64, dropout=0.4)
+        transformer = Linformer(dim=128, seq_len=50, depth=12, heads=8, k=64, dropout=0.4)
         return ViT(dim=128, image_size=224, patch_size=32, num_classes=3,
                    transformer=transformer, channels=num_channels).to(device)
 
@@ -381,7 +381,7 @@ def plot_confusion_matrix(y_true, y_pred, class_names, title_suffix="", results_
 
     fig, ax = plt.subplots(figsize=(10, 8))
     sns.heatmap(cm_percentage, annot=annotations, fmt='', cmap='Blues', xticklabels=class_names, yticklabels=class_names, ax=ax)
-    ax.set_title(f'Confusion Matrix{title_suffix}')
+    ax.set_title(rf'Confusion Matrix{title_suffix}')
     ax.set_xlabel('Predicted Label')
     ax.set_ylabel('True Label')
     plt.tight_layout()
@@ -401,8 +401,6 @@ def evaluate_and_plot(model, test_loader, device, results_dir, model_name, args)
     test_fpr, test_tpr, test_roc_auc, test_labels, test_preds, test_misclassified, test_lnBs = \
         compute_roc_auc_with_misclassifications(model, test_loader, device, class_names)
 
-    print_misclassified_files(test_misclassified, "Test Set")
-    save_misclassified_files_to_txt(test_misclassified, "Test", results_dir / "misclassified_test.txt")
     plot_roc_curves(test_fpr, test_tpr, test_roc_auc, class_names, " (Test Set)", results_dir)
 
     # Plot unfiltered confusion matrix first
