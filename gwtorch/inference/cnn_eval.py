@@ -30,7 +30,7 @@ def setup_directories(results_dir, model_name='CNN'):
 def parse_args():
     parser = argparse.ArgumentParser(description="Test CNN for GW classification")
     parser.add_argument('--batch-size', type=int, default=512)
-    parser.add_argument('--model-path', type=str, default='model_cnn.pth', help="Model will be saved in models directory with extention as .pth")
+    parser.add_argument('--model-path', type=str, default='cnn_model.pth', help="Model will be saved in models directory with extention as .pth")
     parser.add_argument('--path-name', type=str, default='data', help='Path to the dataset directory. Default is "data".')
     parser.add_argument('--results-dir', type=str, default='inference_results', help='Path to save the results of the inference made by the model.')
     return parser.parse_args()
