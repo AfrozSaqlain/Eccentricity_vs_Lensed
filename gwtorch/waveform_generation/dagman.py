@@ -28,7 +28,7 @@ transfer_input_files = results
 when_to_transfer_output = ON_EXIT
 transfer_output_files = $(ARG2)_$(ARG1), results
 
-arguments = --num-samples {samples} --snr-prior {snr_dist} --snr-min $(ARG3) --snr-max $(ARG4) --path-name $(ARG2) --batch-size {samples / 2} --seed $(ARG1)
+arguments = --num-samples {samples} --snr-prior {snr_dist} --snr-min $(ARG3) --snr-max $(ARG4) --path-name $(ARG2) --batch-size {samples // 2} --seed $(ARG1)
 
 queue
 """
