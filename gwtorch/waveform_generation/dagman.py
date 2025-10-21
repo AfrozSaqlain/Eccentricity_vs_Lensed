@@ -28,7 +28,7 @@ transfer_input_files = results
 when_to_transfer_output = ON_EXIT
 transfer_output_files = $(ARG2)_$(ARG1), results
 
-arguments = --num-samples {samples} --snr-prior {snr_dist} --snr-range $(ARG3) --path-name $(ARG2) --batch-size {samples / 2} --seed $(ARG1)
+arguments = --num-samples {samples} --snr-prior {snr_dist} --snr-min $(ARG3) --snr-max $(ARG4) --path-name $(ARG2) --batch-size {samples / 2} --seed $(ARG1)
 
 queue
 """
@@ -161,8 +161,8 @@ def generate_dagman(num_jobs, snr_range, path="submit/workflow.dag"):
     # 1. Define all data generation jobs
     for i, job_name in enumerate(job_names, 1):
         lines.append(f"JOB {job_name} submit/short_gen.sub")
-        lines.append(f'VARS {job_name} ARG1 = "{i}" ARG2 = "data" ARG3 = "{snr_list[i-1][0]} {snr_list[i-1][1]}"')
-        lines.append("")  # For readability
+        lines.append(f'VARS {job_name} ARG1 = "{i}" ARG2 = "data" ARG3 = "{snr_list[i-1][0]}" ARG4 = "{snr_list[i-1][1]}"')
+        lines.append("")
 
     # 2. Define the dummy synchronization job
     lines.append("# Dummy job to act as a synchronization point")

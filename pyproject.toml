@@ -7,7 +7,7 @@ name = "gwtorch"
 version = "0.1.0"
 description = "Gravitational wave ML utilities and analysis"
 authors = [
-    { name = "Saqlain Afroz", email = "sa20ms230@iiserkol.ac.in" }
+    { name = "Saqlain Afroz", email = "sqn3680@gmail.com" }
 ]
 readme = "README.md"
 requires-python = ">=3.11"
