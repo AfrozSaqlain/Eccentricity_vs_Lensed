@@ -213,6 +213,7 @@ def main():
     # Create directories needed for the workflow
     os.makedirs("submit", exist_ok=True)
     os.makedirs("results", exist_ok=True)
+    os.makedirs("HTCondor_Logs", exist_ok=True)
     
     # Generate all necessary files
     generate_submit_file(
