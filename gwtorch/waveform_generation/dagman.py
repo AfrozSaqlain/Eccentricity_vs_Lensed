@@ -13,9 +13,9 @@ request_disk = {disk}
 
 getenv = True
 
-log = submit/$(job_name).log
-output = submit/$(job_name).output
-error = submit/$(job_name).error
+log = HTCondor_Logs/$(job_name).log
+output = HTCondor_Logs/$(job_name).output
+error = HTCondor_Logs/$(job_name).error
 
 stream_error = True
 stream_output = True
