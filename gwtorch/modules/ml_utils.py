@@ -50,10 +50,10 @@ def setup_directories(model_name=None):
     os.makedirs(f'./results/{model_name}_results/Plots', exist_ok=True)
     
 class GWDataset(Dataset):
-    def __init__(self, file_list, transform=None, meta_csv='./results/data_parameters.csv'):
+    def __init__(self, file_list, transform=None, meta_csv='data'):
         self.file_list = file_list
         self.transform = transform
-        self.df = pd.read_csv(meta_csv)
+        self.df = pd.read_csv('./results/' + meta_csv + '_parameters.csv')
 
         # set index if sample column exists
         if 'sample' in self.df.columns:
@@ -118,9 +118,9 @@ def load_all_data(path_name='data', seed=42, batch_size=32):
         transforms.Resize((224, 224)),
     ])
 
-    train_data = GWDataset(train_files, transform)
-    val_data   = GWDataset(val_files, transform)
-    test_data  = GWDataset(test_files, transform)
+    train_data = GWDataset(train_files, transform, meta_csv=path_name)
+    val_data   = GWDataset(val_files, transform, meta_csv=path_name)
+    test_data  = GWDataset(test_files, transform, meta_csv=path_name)
 
     num_channels = train_data[0][0].shape[0] if isinstance(train_data[0][0], torch.Tensor) else 3
 
