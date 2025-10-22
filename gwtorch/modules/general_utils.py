@@ -932,3 +932,37 @@ def plot_misclassification_lnB_broken_axis(misclassified_files, title_suffix, ou
     plt.savefig(plot_path, bbox_inches='tight')
     plt.close(fig)
     print(f"Saved broken axis ln(B) misclassification percentage histogram to {plot_path}")
+
+def plot_signal_hists(file_number=None):
+    # Read the correct CSV file
+    if file_number is not None:
+        df = pd.read_csv(f'data_{file_number}_parameters.csv')
+    else:
+        df = pd.read_csv('data_parameters.csv')
+
+    # Extract columns
+    eccentric_snr = df['eccentric_snr']
+    lensed_snr = df['lensed_snr']
+    unlensed_snr = df['unlensed_snr']
+
+    # Create figure with 3 subplots
+    fig, ax = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
+
+    # Plot histograms
+    ax[0].hist(eccentric_snr, bins=50, color='tab:blue', alpha=0.7)
+    ax[0].set_title('Eccentric SNR')
+
+    ax[1].hist(lensed_snr, bins=50, color='tab:orange', alpha=0.7)
+    ax[1].set_title('Lensed SNR')
+
+    ax[2].hist(unlensed_snr, bins=50, color='tab:green', alpha=0.7)
+    ax[2].set_title('Unlensed SNR')
+    ax[2].set_xlabel('SNR')
+
+    # Shared y-label and layout
+    for a in ax:
+        a.set_ylabel('Count')
+        a.grid(alpha=0.3)
+
+    plt.tight_layout()
+    plt.show()
