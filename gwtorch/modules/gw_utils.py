@@ -489,15 +489,14 @@ def generate_noise(time_duration=32, PSD_TYPE='aLIGO', seed=None):
     - Useful for injection studies, parameter estimation, and testing waveform recovery.
     """
 
-    delta_t = DELTA_T
-    tsamples = int(time_duration / delta_t)
+    tsamples = int(time_duration / DELTA_T)
 
     if PSD_TYPE == 'aLIGO':
-        noise = pycbc.noise.noise_from_psd(tsamples, delta_t, aligo_psd, seed=seed)
+        noise = pycbc.noise.noise_from_psd(tsamples, DELTA_T, aligo_psd, seed=seed)
     elif PSD_TYPE == 'ET':
-        noise = pycbc.noise.noise_from_psd(tsamples, delta_t, einstein_psd, seed=seed)
+        noise = pycbc.noise.noise_from_psd(tsamples, DELTA_T, einstein_psd, seed=seed)
     elif PSD_TYPE == 'CE':
-        noise = pycbc.noise.noise_from_psd(tsamples, delta_t, cosmic_psd, seed=seed)
+        noise = pycbc.noise.noise_from_psd(tsamples, DELTA_T, cosmic_psd, seed=seed)
 
     return noise
 
