@@ -489,7 +489,7 @@ def generate_noise(time_duration=32, PSD_TYPE='aLIGO', seed=None):
     - Useful for injection studies, parameter estimation, and testing waveform recovery.
     """
 
-    delta_t = 1.0 / 4096
+    delta_t = DELTA_T
     tsamples = int(time_duration / delta_t)
 
     if PSD_TYPE == 'aLIGO':
