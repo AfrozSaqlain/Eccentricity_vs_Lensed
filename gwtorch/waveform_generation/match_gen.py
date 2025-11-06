@@ -57,7 +57,7 @@ def generate_sample(args):
         match_e = []
         for det in detector_list:
             snr = waveform_dict[det]['eccentric']['snr_e']
-            match_ecc  = waveform_dict[det]['eccentric']['ecc_m']
+            match_ecc = waveform_dict[det]['eccentric']['ecc_m']
             rhosq_e.append(snr**2)
             match_e.append(match_ecc)
         rho_e_net_sq = np.sum(rhosq_e)
