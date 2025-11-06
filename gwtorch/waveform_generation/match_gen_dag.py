@@ -122,9 +122,9 @@ def main():
     parser.add_argument('--seed', type=int, default=None,
                         help='Seed for the master random number generator. If not provided, the seed will be None.')
     parser.add_argument('--snr-min', type=int, default=8,
-                        help='Minimum of SNR values to sample from. Default is 8.')
+                        help='Minimum of SNR values to sample from, when the distribution is chosen to be Uniform. Default is 8.')
     parser.add_argument('--snr-max', type=int, default=100,
-                        help='Maximum of SNR values to sample from. Default is 100.')
+                        help='Maximum of SNR values to sample from, when the distribution is chosen to be Uniform. Default is 100.')
 
     args = parser.parse_args()
 

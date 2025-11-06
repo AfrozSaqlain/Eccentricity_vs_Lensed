@@ -32,7 +32,7 @@ from gwtorch.modules.general_utils import (
     plot_average_training_curves
 )
 
-dropout = 0.4
+dropout = 0.2
 class_names = ["Lensed", "Eccentric", "Quasi-Circular Unlensed"]
 
 def seed_everything(seed):

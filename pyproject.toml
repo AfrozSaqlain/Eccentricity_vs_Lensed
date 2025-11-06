@@ -41,7 +41,9 @@ all = [
 generate_fitting_factor_dataset_gwtorch = "gwtorch.waveform_generation.fitting_factor_gen:main"
 generate_match_dataset_gwtorch = "gwtorch.waveform_generation.match_gen:main"
 generate_match_dataset_dag_gwtorch = "gwtorch.waveform_generation.match_gen_dag:main"
-generate_dagman_gwtorch = "gwtorch.waveform_generation.dagman:main"
+
+# Dagman generation tool
+generate_dagman_gwtorch = "gwtorch.dataset.dagman:main"
 
 # Training tools
 cnn_train_gwtorch = "gwtorch.training.cnn:main"
