@@ -50,6 +50,7 @@ cnn_train_gwtorch = "gwtorch.training.cnn:main"
 transformer_train_gwtorch = "gwtorch.training.transformer:main"
 binary_transformer_train_gwtorch = "gwtorch.training.binary_transformer_classifier:main"
 binary_cnn_train_gwtorch = "gwtorch.training.binary_cnn_classifier:main"
+hybrid_transformer_train_gwtorch = "gwtorch.training.hybrid_transformer:main"
 
 # Inference tools
 transformer_inference_gwtorch = "gwtorch.inference.transformer_eval:main"

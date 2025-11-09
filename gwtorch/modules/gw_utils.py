@@ -1,6 +1,7 @@
 import gc
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.colors import Normalize
 from scipy.optimize import differential_evolution
 
 import gwmat
@@ -691,47 +692,55 @@ def inject_noise_with_target_SNR(gw_signal, params, mass1, mass2, m_lens, y_lens
 
     peak_snr_0 = abs(snr).numpy().max()
 
-    distance = REFERENCE_DISTANCE * (peak_snr_0 / snr_desired) 
+    distance = REFERENCE_DISTANCE * (peak_snr_0 / snr_desired) ###### New change made from here
 
-    if gw_signal_type == 'eccentric':
-        hp, hc = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
-                                 lambda1=0, lambda2=0,
-                                 spin1z=params['spin1z'], spin2z=params['spin2z'],
-                                 distance=distance, delta_t=DELTA_T,
-                                 eccentricity=params['eccentricity'], mean_per_ano=params['anomaly'], coa_phase=params['coa_phase'], f_lower=F_START)
-        
-        gw_signal = taper_timeseries(detector.project_wave(hp, hc, **{k: params[k] for k in ['ra', 'dec', 'polarization']}), tapermethod="TAPER_STARTEND", return_lal=False)
-    
-    elif gw_signal_type == 'quasi_circular':
-        hp, hc = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
-                                 lambda1=0, lambda2=0,
-                                 spin1z=params['spin1z'], spin2z=params['spin2z'],
-                                 distance=distance, delta_t=DELTA_T,
-                                 eccentricity=0.0, coa_phase=params['coa_phase'], f_lower=F_START)
-        
-        gw_signal = taper_timeseries(detector.project_wave(hp, hc, **{k: params[k] for k in ['ra', 'dec', 'polarization']}), tapermethod="TAPER_STARTEND", return_lal=False)
-        
-    else: 
-        hp, hc = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
-                                 lambda1=0, lambda2=0,
-                                 spin1z=params['spin1z'], spin2z=params['spin2z'],
-                                 distance=distance, delta_t=DELTA_T,
-                                 eccentricity=0.0, coa_phase=params['coa_phase'], f_lower=F_START) 
-        
-        hp_lens, hc_lens, t_delay = compute_lensed_waveform(hp, hc, m_lens, y_lens)
+    template *= (snr_desired / peak_snr_0)
 
-        gw_signal = taper_timeseries(detector.project_wave(hp_lens, hc_lens, **{k: params[k] for k in ['ra', 'dec', 'polarization']}), tapermethod="TAPER_STARTEND", return_lal=False)
-
-    template, delta_t, start_time = inject_signal_with_peak_in_window(
-                                            signal_ts=gw_signal,
-                                            noise_ts=noise,
-                                            peak_window=peak_window)
-    
     data = pycbc.types.TimeSeries(np.asarray(template) + np.asarray(noise), delta_t=delta_t, epoch=start_time)
-    template = pycbc.types.TimeSeries(template, delta_t=delta_t, epoch=start_time)
-    snr = pycbc.filter.matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=F_LOWER)
 
-    peak_snr = abs(snr).numpy().max()
+    snr = pycbc.filter.matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=F_LOWER)
+    peak_snr = abs(snr).numpy().max() ####### To here
+
+    # if gw_signal_type == 'eccentric':
+    #     hp, hc = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
+    #                              lambda1=0, lambda2=0,
+    #                              spin1z=params['spin1z'], spin2z=params['spin2z'],
+    #                              distance=distance, delta_t=DELTA_T,
+    #                              eccentricity=params['eccentricity'], mean_per_ano=params['anomaly'], coa_phase=params['coa_phase'], f_lower=F_START)
+        
+    #     gw_signal = taper_timeseries(detector.project_wave(hp, hc, **{k: params[k] for k in ['ra', 'dec', 'polarization']}), tapermethod="TAPER_STARTEND", return_lal=False)
+    
+    # elif gw_signal_type == 'quasi_circular':
+    #     hp, hc = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
+    #                              lambda1=0, lambda2=0,
+    #                              spin1z=params['spin1z'], spin2z=params['spin2z'],
+    #                              distance=distance, delta_t=DELTA_T,
+    #                              eccentricity=0.0, coa_phase=params['coa_phase'], f_lower=F_START)
+        
+    #     gw_signal = taper_timeseries(detector.project_wave(hp, hc, **{k: params[k] for k in ['ra', 'dec', 'polarization']}), tapermethod="TAPER_STARTEND", return_lal=False)
+        
+    # else: 
+    #     hp, hc = get_td_waveform(approximant='teobresums', mass1=mass1, mass2=mass2,
+    #                              lambda1=0, lambda2=0,
+    #                              spin1z=params['spin1z'], spin2z=params['spin2z'],
+    #                              distance=distance, delta_t=DELTA_T,
+    #                              eccentricity=0.0, coa_phase=params['coa_phase'], f_lower=F_START) 
+        
+    #     hp_lens, hc_lens, t_delay = compute_lensed_waveform(hp, hc, m_lens, y_lens)
+
+    #     gw_signal = taper_timeseries(detector.project_wave(hp_lens, hc_lens, **{k: params[k] for k in ['ra', 'dec', 'polarization']}), tapermethod="TAPER_STARTEND", return_lal=False)
+
+    # template, delta_t, start_time = inject_signal_with_peak_in_window(
+    #                                         signal_ts=gw_signal,
+    #                                         noise_ts=noise,
+    #                                         peak_window=peak_window)
+    
+    # data = pycbc.types.TimeSeries(np.asarray(template) + np.asarray(noise), delta_t=delta_t, epoch=start_time)
+    # template = pycbc.types.TimeSeries(template, delta_t=delta_t, epoch=start_time)
+    # snr = pycbc.filter.matched_filter(template = template,  data = data, psd = psd, low_frequency_cutoff=F_LOWER)
+    # peak_snr = abs(snr).numpy().max()
+
+    # print(f"Desired SNR: {snr_desired:.2f} | SNR Obtained: {peak_snr:.2f} ")
 
     # print(f"SNR before scaling: {peak_snr_0:.2f} | SNR after scaling: {peak_snr:.2f} for sample {num} {gw_signal_type} | Distance: {distance:.2f}")
 
