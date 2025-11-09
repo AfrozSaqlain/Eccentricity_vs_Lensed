@@ -130,7 +130,7 @@ def main():
 
     n_eccentric, n_lensed, n_unlensed = 0, 0, 0
 
-    directory = f"./{args.path_name}"
+    directory = f"{args.path_name}"
 
     init_jump = 0   
 
