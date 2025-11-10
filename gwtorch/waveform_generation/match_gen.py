@@ -152,7 +152,12 @@ def main():
     eccentric_path = output_path / Path("eccentric")
     lensed_path = output_path / Path("lensed")
     unlensed_path = output_path / Path("unlensed")
-    results_dir = Path('./results')
+
+    if output_path.is_absolute():
+        parent_dir = Path(args.path_name.rsplit('/', 1)[0])
+        results_dir = Path(parent_dir / 'results')
+    else:
+        results_dir = Path('results')
     
     if not output_path.exists():
         output_path.mkdir(parents=True, exist_ok=True)
@@ -196,8 +201,8 @@ def main():
                 n_eccentric += sum(1 for r in valid_results if r.get('eccentric_saved'))
                 n_lensed += sum(1 for r in valid_results if r.get('lensed_saved'))
                 n_unlensed += sum(1 for r in valid_results if r.get('unlensed_saved'))
-
-                save_csv(results_dir / f"{args.path_name}_parameters.csv", valid_results)
+                
+                save_csv(results_dir / f"{args.path_name.rsplit('/', 1)[-1]}_parameters.csv", valid_results)
 
                 del batch_sample, args_list, results, valid_results
                 
