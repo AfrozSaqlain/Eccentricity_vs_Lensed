@@ -140,7 +140,7 @@ def main():
 
     n_eccentric, n_lensed, n_unlensed = 0, 0, 0
 
-    directory = f"{args.path_name}_{args.seed}"
+    directory = f"{args.path_name}"
 
     init_jump = (args.seed - 1) * num_samples
 
