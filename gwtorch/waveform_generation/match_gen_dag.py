@@ -140,7 +140,7 @@ def main():
 
     n_eccentric, n_lensed, n_unlensed = 0, 0, 0
 
-    directory = f"./{args.path_name}_{args.seed}"
+    directory = f"{args.path_name}_{args.seed}"
 
     init_jump = (args.seed - 1) * num_samples
 
@@ -148,7 +148,12 @@ def main():
     eccentric_path = output_path / Path("eccentric")
     lensed_path = output_path / Path("lensed")
     unlensed_path = output_path / Path("unlensed")
-    results_dir = Path('./results')
+    
+    if output_path.is_absolute():
+        parent_dir = Path(directory.rsplit('/', 1)[0])
+        results_dir = Path(parent_dir / 'results')
+    else:
+        results_dir = Path('results')
     
     output_path.mkdir(parents=True, exist_ok=True)
     eccentric_path.mkdir(parents=True, exist_ok=True)
@@ -193,7 +198,11 @@ def main():
                 n_unlensed += sum(1 for r in valid_results if r.get('unlensed_saved'))
 
                 if 'test' not in args.path_name:
-                    save_csv_dag(results_dir / f"data_{args.seed}_parameters.csv", valid_results)
+                    csv_path = results_dir / f"{directory.rsplit('/', 1)[-1]}_parameters.csv"
+                    # if csv_path.exists():
+                    #     csv_path.unlink()
+                    #     print(f"Deleted: {csv_path}")
+                    save_csv_dag(csv_path, valid_results)
 
                 del batch_sample, args_list, results, valid_results
                 

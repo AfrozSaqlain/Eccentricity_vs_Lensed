@@ -181,9 +181,9 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, gamma, cl
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     scheduler = StepLR(optimizer, step_size=5, gamma=gamma)
     if class_weights is not None:
-        criterion = nn.CrossEntropyLoss(reduction='none', weight=class_weights.to(device))
+        criterion = nn.CrossEntropyLoss(reduction='none', weight=class_weights.to(device), label_smoothing=0.1)
     else:
-        criterion = nn.CrossEntropyLoss(reduction='none')
+        criterion = nn.CrossEntropyLoss(reduction='mean', label_smoothing=0.1)
 
     train_losses, val_losses, train_accs, val_accs = [], [], [], []
 
