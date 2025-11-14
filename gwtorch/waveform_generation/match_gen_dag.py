@@ -198,7 +198,7 @@ def main():
                 n_unlensed += sum(1 for r in valid_results if r.get('unlensed_saved'))
 
                 if 'test' not in args.path_name:
-                    csv_path = results_dir / f"{directory.rsplit('/', 1)[-1]}_parameters.csv"
+                    csv_path = results_dir / f"{args.path_name.rsplit('/', 1)[-1]}_parameters.csv"
                     # if csv_path.exists():
                     #     csv_path.unlink()
                     #     print(f"Deleted: {csv_path}")
