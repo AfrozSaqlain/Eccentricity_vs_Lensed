@@ -53,7 +53,7 @@ class GWDataset(Dataset):
     def __init__(self, file_list, transform=None, meta_csv='data'):
         self.file_list = file_list
         self.transform = transform
-        self.df = pd.read_csv('./results/' + meta_csv + '_parameters.csv')
+        self.df = pd.read_csv('results/' + meta_csv + '_parameters.csv')
 
         # set index if sample column exists
         if 'sample' in self.df.columns:
@@ -72,7 +72,7 @@ class GWDataset(Dataset):
         if self.transform:
             arr = self.transform(arr)
 
-        label_str = file_path.split("/")[2].lower()
+        label_str = file_path.split("/")[-2].lower()
         label = {'lensed': 0, 'eccentric': 1, 'unlensed': 2}[label_str]
 
         file_number = int(file_path.split('/')[-1].split('.')[0])
@@ -98,8 +98,8 @@ def custom_collate_fn(batch):
 
 def load_all_data(path_name='data', seed=42, batch_size=32):
 
-    all_files = glob.glob(f'./{path_name}/*/*.npy')
-    all_labels = [path.split('/')[2] for path in all_files]
+    all_files = glob.glob(f'{path_name}/*/*.npy')
+    all_labels = [path.split('/')[-2] for path in all_files]
 
     train_files, temp_files, train_labels, temp_labels = train_test_split(
         all_files, all_labels, test_size=0.3, stratify=all_labels, random_state=seed
@@ -118,9 +118,10 @@ def load_all_data(path_name='data', seed=42, batch_size=32):
         transforms.Resize((224, 224)),
     ])
 
-    train_data = GWDataset(train_files, transform)#, meta_csv=path_name)
-    val_data   = GWDataset(val_files, transform)#, meta_csv=path_name)
-    test_data  = GWDataset(test_files, transform)#, meta_csv=path_name)
+    meta_csv_path = all_files[0].split('/')[-3]
+    train_data = GWDataset(train_files, transform, meta_csv=meta_csv_path)
+    val_data   = GWDataset(val_files, transform, meta_csv=meta_csv_path)
+    test_data  = GWDataset(test_files, transform, meta_csv=meta_csv_path)
 
     num_channels = train_data[0][0].shape[0] if isinstance(train_data[0][0], torch.Tensor) else 3
 
@@ -296,7 +297,7 @@ def evaluate_and_plot(model, valid_loader, test_loader, device, fold=None, model
 def filenames_to_label_indices(file_list):
     labels = []
     for p in file_list:
-        lab = p.split('/')[2].lower()
+        lab = p.split('/')[-2].lower()
         labels.append({'lensed':0,'eccentric':1,'unlensed':2}[lab])
     return labels
 
