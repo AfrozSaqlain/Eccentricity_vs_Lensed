@@ -118,9 +118,9 @@ def load_all_data(path_name='data', seed=42, batch_size=32):
         transforms.Resize((224, 224)),
     ])
 
-    train_data = GWDataset(train_files, transform, meta_csv=path_name)
-    val_data   = GWDataset(val_files, transform, meta_csv=path_name)
-    test_data  = GWDataset(test_files, transform, meta_csv=path_name)
+    train_data = GWDataset(train_files, transform)#, meta_csv=path_name)
+    val_data   = GWDataset(val_files, transform)#, meta_csv=path_name)
+    test_data  = GWDataset(test_files, transform)#, meta_csv=path_name)
 
     num_channels = train_data[0][0].shape[0] if isinstance(train_data[0][0], torch.Tensor) else 3
 
