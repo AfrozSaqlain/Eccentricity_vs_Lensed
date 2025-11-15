@@ -45,7 +45,7 @@ def setup_directories(model_name):
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train CNN for binary GW classification (eccentric vs lensed)")
-    parser.add_argument('--model', type=str, default='CNN', choices=['CNNT'], help='Model to train')
+    parser.add_argument('--model', type=str, default='CNN', choices=['CNN'], help='Model to train')
     parser.add_argument('--batch-size', type=int, default=512)
     parser.add_argument('--epochs', type=int, default=20)
     parser.add_argument('--lr', type=float, default=3e-5)
