@@ -56,10 +56,10 @@ def parse_args():
     return parser.parse_args()
 
 class GWDataset(Dataset):
-    def __init__(self, file_list, transform=None, meta_csv='./results/data_parameters.csv'):
+    def __init__(self, file_list, transform=None, meta_csv='data'):
         self.file_list = file_list
         self.transform = transform
-        self.df = pd.read_csv(meta_csv)
+        self.df = pd.read_csv('results/' + meta_csv + '_parameters.csv')
 
         # set index if sample column exists
         if 'sample' in self.df.columns:
@@ -78,7 +78,7 @@ class GWDataset(Dataset):
         if self.transform:
             arr = self.transform(arr)
 
-        label_str = file_path.split("/")[2].lower()
+        label_str = file_path.split("/")[-2].lower()
         label = {'lensed': 0, 'eccentric': 1}[label_str]
 
         file_number = int(file_path.split('/')[-1].split('.')[0])
@@ -104,14 +104,14 @@ def custom_collate_fn(batch):
 def filenames_to_label_indices(file_list):
     labels = []
     for p in file_list:
-        lab = p.split('/')[2].lower()
+        lab = p.split('/')[-2].lower()
         labels.append({'lensed': 0, 'eccentric': 1}[lab])
     return labels
 
 def load_all_data(path_name='data', seed=42, batch_size=32):
 
     all_files = glob.glob(f'./{path_name}/eccentric/*.npy') + glob.glob(f'./{path_name}/lensed/*.npy')
-    all_labels = [path.split('/')[2] for path in all_files]
+    all_labels = [path.split('/')[-2] for path in all_files]
 
     train_files, temp_files, train_labels, temp_labels = train_test_split(
         all_files, all_labels, test_size=0.3, stratify=all_labels, random_state=seed
@@ -149,9 +149,9 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, gamma, cl
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     scheduler = StepLR(optimizer, step_size=5, gamma=gamma)
     if class_weights is not None:
-        criterion = nn.CrossEntropyLoss(reduction='none', weight=class_weights.to(device))
+        criterion = nn.CrossEntropyLoss(reduction='none', weight=class_weights.to(device), label_smoothing=0.1)
     else:
-        criterion = nn.CrossEntropyLoss(reduction='none')
+        criterion = nn.CrossEntropyLoss(reduction='mean', label_smoothing=0.1)
 
     train_losses, val_losses, train_accs, val_accs = [], [], [], []
 

@@ -96,6 +96,13 @@ def custom_collate_fn(batch):
     images, labels, weights, file_paths = zip(*batch)
     return torch.stack(images), torch.tensor(labels), torch.tensor(weights, dtype=torch.float32), file_paths
 
+def filenames_to_label_indices(file_list):
+    labels = []
+    for p in file_list:
+        lab = p.split('/')[-2].lower()
+        labels.append({'lensed':0,'eccentric':1,'unlensed':2}[lab])
+    return labels
+
 def load_all_data(path_name='data', seed=42, batch_size=32):
 
     all_files = glob.glob(f'{path_name}/*/*.npy')
@@ -251,7 +258,7 @@ def evaluate_model(model, data_loader, device):
 
 def evaluate_and_plot(model, valid_loader, test_loader, device, fold=None, model_name=None):
     """Evaluate model on validation and test sets, plot results, and save misclassified files"""
-    results_dir = Path(f'./results/{model_name}_results')
+    results_dir = Path(f'results/{model_name}_results')
     
     if fold is not None:
         fold_dir = results_dir / f'fold_{fold}'
@@ -293,13 +300,6 @@ def evaluate_and_plot(model, valid_loader, test_loader, device, fold=None, model
         f.write(test_report)
 
     return val_misclassified, test_misclassified, val_roc_auc, test_roc_auc
-
-def filenames_to_label_indices(file_list):
-    labels = []
-    for p in file_list:
-        lab = p.split('/')[-2].lower()
-        labels.append({'lensed':0,'eccentric':1,'unlensed':2}[lab])
-    return labels
 
 def run_kfold_training(args, device, get_model=None, model_name=None):
     """Run k-fold cross validation training"""
