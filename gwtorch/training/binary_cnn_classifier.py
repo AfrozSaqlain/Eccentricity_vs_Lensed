@@ -109,8 +109,8 @@ def filenames_to_label_indices(file_list):
     return labels
 
 def load_all_data(path_name='data', seed=42, batch_size=32):
-
-    all_files = glob.glob(f'./{path_name}/eccentric/*.npy') + glob.glob(f'./{path_name}/lensed/*.npy')
+    
+    all_files = glob.glob(f'{path_name}/eccentric/*.npy') + glob.glob(f'{path_name}/lensed/*.npy')
     all_labels = [path.split('/')[-2] for path in all_files]
 
     train_files, temp_files, train_labels, temp_labels = train_test_split(
