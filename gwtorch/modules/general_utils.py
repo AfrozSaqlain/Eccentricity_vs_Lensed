@@ -599,14 +599,14 @@ def plot_kfold_roc_curves(fold_results, results_dir, class_names):
         
         # Plot mean ROC curve
         ax.plot(mean_fpr, mean_tpr, color='b', linewidth=1.5,
-                label=f'Mean ROC (AUC = {mean_auc:.3f} ± {std_auc:.3f})')
+                label=rf'Mean ROC (AUC = {mean_auc:.3f} $\pm$ {std_auc:.3f})')
         
         # Plot confidence interval
         std_tpr = np.std(tprs, axis=0)
         tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
         tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
         ax.fill_between(mean_fpr, tprs_lower, tprs_upper, color='grey', alpha=0.3,
-                        label='± 1 std. dev.')
+                        label=r'$\pm$ 1 std. dev.')
         
         # Plot diagonal line
         ax.plot([0, 1], [0, 1], 'k--', alpha=0.5)
@@ -635,7 +635,7 @@ def plot_kfold_roc_curves(fold_results, results_dir, class_names):
         mean_auc = fold_results[f'mean_auc_{class_key}']
         std_auc = fold_results[f'std_auc_{class_key}']
         summary_text += f"{class_name}:\n"
-        summary_text += f"  Mean AUC: {mean_auc:.4f} ± {std_auc:.4f}\n"
+        summary_text += rf"  Mean AUC: {mean_auc:.4f} $\pm$ {std_auc:.4f}\\"
         summary_text += f"  Individual AUCs: {[f'{auc:.3f}' for _, _, auc_dict in fold_results['roc_data'] for auc in [auc_dict[class_idx]]]}\n\n"
     
     ax.text(0.1, 0.9, summary_text, transform=ax.transAxes, fontsize=10,
@@ -672,7 +672,7 @@ def plot_kfold_roc_curves(fold_results, results_dir, class_names):
         std_auc = np.std(aucs)
         
         ax.plot(mean_fpr, mean_tpr, color=class_colors[class_idx], linewidth=1,
-                label=f'{class_name} (AUC = {mean_auc:.3f} ± {std_auc:.3f})')
+                label=rf'{class_name} (AUC = {mean_auc:.3f} $\pm$ {std_auc:.3f})')
     
     ax.plot([0, 1], [0, 1], 'k--', alpha=0.5)
     ax.set_xlim([0.0, 1.0])

@@ -64,9 +64,9 @@ def main():
         
         model = get_model(name=args.model, num_channels=num_channels, device=device)
 
-        if os.path.exists(f'./models/{args.model_path}.pth'):
+        if os.path.exists(f'models/{args.model_path}.pth'):
             print("Pretrained model found. Loading...\n")
-            model.load_state_dict(torch.load(f'./models/{args.model_path}.pth', map_location=device))
+            model.load_state_dict(torch.load(f'models/{args.model_path}.pth', map_location=device))
         else:
             print("No pretrained model found. Training from scratch...\n")
 
@@ -83,14 +83,14 @@ def main():
         )
 
         plot_training_curves(train_losses, val_losses, train_accs, val_accs, 
-                           Path(f'./results/{args.model}_results'))
+                           Path(f'results/{args.model}_results'))
 
         print("\nTraining complete. Summary:")
         print(f"Validation misclassifications: {len(val_misclassified)}")
         print(f"Test misclassifications: {len(test_misclassified)}")
 
-        torch.save(model.state_dict(), f'./models/{args.model_path}.pth')
-        print(f"Model saved to ./models/{args.model_path}.pth")
+        torch.save(model.state_dict(), f'models/{args.model_path}.pth')
+        print(f"Model saved to models/{args.model_path}.pth")
 
 if __name__ == "__main__":
     main()

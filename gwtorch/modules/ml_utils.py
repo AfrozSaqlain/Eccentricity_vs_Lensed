@@ -144,8 +144,8 @@ def load_all_data(path_name='data', seed=42, batch_size=32):
 def prepare_kfold_data(path_name='data'):
     """Prepare data for k-fold cross validation"""
 
-    all_files = glob.glob(f'./{path_name}/*/*.npy')
-    all_labels = [path.split('/')[2] for path in all_files]
+    all_files = glob.glob(f'{path_name}/*/*.npy')
+    all_labels = [path.split('/')[-2] for path in all_files]
     
     return all_files, all_labels
 
@@ -381,7 +381,7 @@ def run_kfold_training(args, device, get_model=None, model_name=None):
         fold_results['test_accuracies'].append(test_roc_auc) 
         fold_results['val_roc_aucs'].append(val_roc_auc)
 
-        fold_dir = Path(f'./results/{model_name}_results') / f'fold_{fold+1}'
+        fold_dir = Path(f'results/{model_name}_results') / f'fold_{fold+1}'
         plot_training_curves(train_losses, val_losses, train_accs, val_accs, fold_dir)
 
         model_path = f'./models/{args.model_path.split(".")[0]}_fold_{fold+1}.pth'
@@ -424,8 +424,8 @@ def run_kfold_training(args, device, get_model=None, model_name=None):
                     std_auc = fold_results[f'std_auc_{class_key}']
                     f.write(f"{class_name}: {mean_auc:.4f} ± {std_auc:.4f}\n")
 
-    plot_average_training_curves(fold_results, Path(f'./results/{model_name}_results'))
+    plot_average_training_curves(fold_results, Path(f'results/{model_name}_results'))
 
-    plot_kfold_roc_curves(fold_results, Path(f'./results/{model_name}_results'), class_names)
+    plot_kfold_roc_curves(fold_results, Path(f'results/{model_name}_results'), class_names)
     
     return fold_results
