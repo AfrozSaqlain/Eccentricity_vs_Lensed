@@ -181,7 +181,7 @@ def get_model(name, num_channels, device):
         return ViT(dim=128, image_size=224, patch_size=32, num_classes=3,
                    transformer=transformer, channels=num_channels).to(device)
     elif name == 'CNN':
-        return CNN_Model(input_channlels=num_channels, dropout=dropout).to(device)
+        return CNN_Model(input_channels=num_channels, dropout=dropout).to(device)
     elif name == 'SimpleCNN':
         return SimpleCNN(input_channels=num_channels, dropout=dropout).to(device)
     
