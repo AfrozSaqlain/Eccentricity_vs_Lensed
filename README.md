@@ -8,8 +8,11 @@ To install the package just run: `bash install.sh`
 
 <pre>
 .
+├── combine_csv.sh
 ├── environment.yml
 ├── gwtorch
+│   ├── dataset
+│   │   └── dagman.py
 │   ├── inference
 │   │   ├── cnn_eval.py
 │   │   └── transformer_eval.py
@@ -17,22 +20,24 @@ To install the package just run: `bash install.sh`
 │   │   ├── constants.py
 │   │   ├── general_utils.py
 │   │   ├── gw_utils.py
+│   │   ├── ml_utils_new.py
 │   │   ├── ml_utils.py
 │   │   └── neural_net.py
 │   ├── training
 │   │   ├── binary_cnn_classifier.py
 │   │   ├── binary_transformer_classifier.py
 │   │   ├── cnn.py
+│   │   ├── hybrid_transformer.py
 │   │   ├── Meta_model.py
 │   │   └── transformer.py
 │   └── waveform_generation
-│       ├── dagman.py
-│       ├── match_gen.py
-│       ├── match_gen_dag.py
 │       ├── fitting_factor_gen.py
-│       └── Prior_Files
+│       ├── match_gen_dag.py
+│       └── match_gen.py
 ├── install.sh
+├── merge.sh
 ├── move_30_percent.sh
+├── notebooks
 ├── pyproject.toml
 └── README.md
 
@@ -41,6 +46,7 @@ To install the package just run: `bash install.sh`
 ## 📌 Key Files Description
 
 - `match_gen.py`: Generates Q-transform spectrograms of synthetic GW signals, and computes ln B based on match.
+- `match_gen_dag.py`: This is exactly same as previous function but it's suitable to generate dataset using this function when working on an HTCondor based system.
 - `fitting_factor_gen.py`: Generates Q-transform spectrograms of synthetic GW signals, and computes ln B based on fitting factor.
 - `cnn.py`, `transformer.py`: Contain CNN and Transformer model definitions with training/testing routines.
 - `cnn_eval.py`, `transformer_eval.py`: Specifically used to evaluate trained CNN and Transformer models on test data.
@@ -49,8 +55,25 @@ To install the package just run: `bash install.sh`
 
 # 🖥️ Command Line Interface (CLI)
 
-- **`generate_match_dataset_gwtorch --num-samples [int] --path-name [str] --batch-size [int]`** : Used to generate qtransform of the waveform samples, by invoking `match_gen.py`.
+- **`generate_match_dataset_gwtorch --num-samples [int] --num-workers [int] --snr-prior [str] --path-name [str] --batch-size [int] --seed [int]`** : Used to generate qtransform of the waveform samples, by invoking `match_gen.py`. You can set `snr-prior` to be either `powerlaw` or `uniform` upon use case.
+
+- **`generate_match_dataset_dag_gwtorch --num-samples [int] --num-workers [int] --snr-prior [str] --path-name [str] --batch-size [int] --seed [int] --snr-min [int] --snr-max [int]`**: When `snr-prior` is set to `uniform` and snr ranges are  give, the program generate the samples with SNR distributed uniformly within that range. However, if `snr-prior` is set to `powerlaw`, the SNR ranges provided will be ignored.
+
+- **`generate_dagman_gwtorch --jobs [int] --memory [str] --disk [str] --samples [int] --cpu [int] --snr-dist [str] --snr-min [int] --snr-max [int]`**:  
+  Generates an **HTCondor DAGMan workflow** for parallel dataset generation using `generate_match_dataset_dag_gwtorch`. It automatically creates:
+  - Condor submit file for batched data-generation jobs  
+  - DAG file with proper job dependencies  
+  - Post-processing scripts to merge generated data directories and combine CSV parameter files  
+
+  If `snr-dist=uniform`, the SNR range [`snr-min`, `snr-max`] is evenly split across jobs.  
+  If `snr-dist=powerlaw`, the SNR range arguments are ignored.
+
+  Submit the workflow using:
+  ```bash
+  condor_submit_dag submit/workflow.dag
+
 - **`cnn_train_gwtorch --batch_size [default: 128] --epochs [default: 20] --lr [default: 3e-4] --gamma [default: 0.7] --model_path [default: cnn_model0.pth]  --k-folds [default: 5] --use-kfold [stores Truth value]`**: Train the CNN model on the data generated using previous code. The directory `models` is created if it doesn't exist.
+
 - **`transformer_train_gwtorch --model [default: ViT] --batch_size [default: 512] --epochs [default 20] --lr [default: 3e-5] --gamma [default: 0.7] --seed [default: 42] --k-folds [default: 5] --use-kfold [stores Truth value]`**:  Train the Transformer model on the data generated.
 
 # 🌊 How GW waveforms are generated
