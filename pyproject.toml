@@ -43,7 +43,8 @@ generate_match_dataset_gwtorch = "gwtorch.waveform_generation.match_gen:main"
 generate_match_dataset_dag_gwtorch = "gwtorch.waveform_generation.match_gen_dag:main"
 
 # Dagman generation tool
-generate_dagman_gwtorch = "gwtorch.dataset.dagman:main"
+generate_data_dagman_gwtorch = "gwtorch.condor.data_dagman:main"
+generate_training_condor_gwtorch = "gwtorch.condor.train_condor:main"
 
 # Training tools
 cnn_train_gwtorch = "gwtorch.training.cnn:main"

@@ -38,7 +38,7 @@ def parse_args():
     parser.add_argument('--lr', type=float, default=LR)
     parser.add_argument('--gamma', type=float, default=GAMMA)
     parser.add_argument('--seed', type=int, default=RANDOM_SEED)
-    parser.add_argument('--model-path', type=str, default='vit_model', help="Model will be saved in models directory with extention as .pth")
+    parser.add_argument('--model-file-name', type=str, default='vit_model', help="Model will be saved in models directory with extention as .pth")
     parser.add_argument('--k-folds', type=int, default=K_FOLDS, help="Number of folds for k-fold cross validation")
     parser.add_argument('--use-kfold', action='store_true', help="Use k-fold cross validation instead of single train/val/test split")
     parser.add_argument('--path-name', type=str, default='data', help='Path to the dataset directory. Default is "data".')
@@ -64,9 +64,9 @@ def main():
         
         model = get_model(name=args.model, num_channels=num_channels, device=device)
 
-        if os.path.exists(f'models/{args.model_path}.pth'):
+        if os.path.exists(f'models/{args.model_file_name}.pth'):
             print("Pretrained model found. Loading...\n")
-            model.load_state_dict(torch.load(f'models/{args.model_path}.pth', map_location=device))
+            model.load_state_dict(torch.load(f'models/{args.model_file_name}.pth', map_location=device))
         else:
             print("No pretrained model found. Training from scratch...\n")
 
@@ -89,8 +89,8 @@ def main():
         print(f"Validation misclassifications: {len(val_misclassified)}")
         print(f"Test misclassifications: {len(test_misclassified)}")
 
-        torch.save(model.state_dict(), f'models/{args.model_path}.pth')
-        print(f"Model saved to models/{args.model_path}.pth")
+        torch.save(model.state_dict(), f'models/{args.model_file_name}.pth')
+        print(f"Model saved to models/{args.model_file_name}.pth")
 
 if __name__ == "__main__":
     main()

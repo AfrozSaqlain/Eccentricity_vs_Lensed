@@ -384,7 +384,7 @@ def run_kfold_training(args, device, get_model=None, model_name=None):
         fold_dir = Path(f'results/{model_name}_results') / f'fold_{fold+1}'
         plot_training_curves(train_losses, val_losses, train_accs, val_accs, fold_dir)
 
-        model_path = f'models/{args.model_path.split(".")[0]}_fold_{fold+1}.pth'
+        model_path = f'models/{args.model_file_name.split(".")[0]}_fold_{fold+1}.pth'
         torch.save(model.state_dict(), model_path)
         print(f"Model for fold {fold+1} saved to {model_path}")
         

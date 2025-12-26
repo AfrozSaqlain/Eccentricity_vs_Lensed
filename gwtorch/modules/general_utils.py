@@ -375,12 +375,16 @@ def get_file_prefix(results_dir):
             return 'ViT'
         elif prefix1 == 'CNN' and prefix2 is None:
             return 'CNN'
+        elif prefix1 == 'SimpleCNN' and prefix2 is None:
+            return 'SimpleCNN'
         elif prefix1 == 'CvT' and prefix2 is None:
             return 'CvT'
         elif prefix1 == 'ViT' and prefix2 is not None:
             return f'ViT_Fold_{prefix2}'
         elif prefix1 == 'CNN' and prefix2 is not None:
             return f'CNN_Fold_{prefix2}'
+        elif prefix1 == 'SimpleCNN' and prefix2 is not None:
+            return f'SimpleCNN_Fold_{prefix2}'
         elif prefix1 == 'CvT' and prefix2 is not None:
             return f'CvT_Fold_{prefix2}'
 
