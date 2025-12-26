@@ -26,7 +26,10 @@ from gwtorch.modules.general_utils import (
     save_misclassified_files_to_txt,
     plot_training_curves,
 )
-from gwtorch.modules.neural_net import CNN_Model
+
+from gwtorch.modules.ml_utils import (
+    get_model,
+)
 
 
 class_names = ['lensed', 'eccentric']
@@ -255,7 +258,7 @@ def main():
     
     num_channels, train_loader, valid_loader, test_loader, class_weights = load_all_data(path_name=args.path_name, seed=args.seed, batch_size=args.batch_size)
 
-    model = CNN_Model(input_channlels=num_channels).to(device)        
+    model = get_model(name=args.model, num_channels=num_channels, device=device)
 
     if os.path.exists(f'./models/{args.model_path}.pth'):
         print("Pretrained model found. Loading...\n")
