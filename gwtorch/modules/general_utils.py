@@ -991,26 +991,78 @@ from sklearn.metrics import roc_curve, auc, confusion_matrix
 from sklearn.preprocessing import LabelBinarizer
 
 # At the top of the plotting script
-from matplotlib import rc
-rc('text', usetex=True)
-rc('font', family='serif')
-rc('font', serif='times')
-rc('mathtext', default='sf')
-rc("lines", markeredgewidth=1)
-rc("lines", linewidth=1)
-rc('axes', labelsize=20)
-rc("axes", linewidth=0.5)
-rc('xtick', labelsize=10)
-rc('ytick', labelsize=10)
-rc('legend', fontsize=10)
-rc('ytick', right=True, direction='in')
-rc('xtick', top=True, direction='in')
-rc('xtick.major', pad=15)
-rc('ytick.major', pad=15)
-rc('xtick.major', size=12)
-rc('ytick.major', size=12)
-rc('xtick.minor', size=7)
-rc('ytick.minor', size=7)
+# from matplotlib import rc
+# rc('text', usetex=True)
+# rc('font', family='serif')
+# rc('font', serif='times')
+# rc('mathtext', default='sf')
+# rc("lines", markeredgewidth=1)
+# rc("lines", linewidth=1)
+# rc('axes', labelsize=20)
+# rc("axes", linewidth=0.5)
+# rc('xtick', labelsize=10)
+# rc('ytick', labelsize=10)
+# rc('legend', fontsize=10)
+# rc('ytick', right=True, direction='in')
+# rc('xtick', top=True, direction='in')
+# rc('xtick.major', pad=15)
+# rc('ytick.major', pad=15)
+# rc('xtick.major', size=12)
+# rc('ytick.major', size=12)
+# rc('xtick.minor', size=7)
+# rc('ytick.minor', size=7)
+
+import matplotlib as mpl
+
+STYLE = {
+    # --- Text & fonts ---
+    'text.usetex': True,
+    'font.family': 'serif',
+    'font.serif': ['Computer Modern'],
+    'mathtext.default': 'sf',
+    'font.size': 20,
+
+    # --- Axes ---
+    'axes.labelsize': 20,
+    'axes.linewidth': 1.1,
+    'axes.axisbelow': True,
+
+    # --- Lines ---
+    'lines.linewidth': 1.0,
+    'lines.markeredgewidth': 1.0,
+    'lines.markersize': 10.0,
+
+    # --- Legend ---
+    'legend.fontsize': 20,
+
+    # --- Ticks: size & direction ---
+    'xtick.labelsize': 18,
+    'ytick.labelsize': 18,
+
+    'xtick.direction': 'in',
+    'ytick.direction': 'in',
+
+    'xtick.top': True,
+    'ytick.right': True,
+
+    'xtick.major.size': 12,
+    'xtick.major.width': 1.5,
+    'xtick.minor.size': 7,
+    'xtick.minor.width': 1.0,
+
+    'ytick.major.size': 12,
+    'ytick.major.width': 1.5,
+    'ytick.minor.size': 7,
+    'ytick.minor.width': 1.0,
+
+    'xtick.major.pad': 15,
+    'ytick.major.pad': 15,
+
+    # --- Figure ---
+    'figure.figsize': (7.0, 4.5),
+}
+
+mpl.rcParams.update(STYLE)
 
 def set_tick_sizes(ax, major=12, minor=7):
     for l in ax.get_xticklines() + ax.get_yticklines():
