@@ -286,7 +286,7 @@ def custom_collate_fn(batch):
 
 
 def load_all_data(path_name='data', batch_size=32, meta_csv='./results/data_parameters.csv'):
-    all_files = glob.glob(f'./{path_name}/*/*.npy')
+    all_files = glob.glob(f'{path_name}/*/*.npy')
 
     transform = transforms.Compose([
         transforms.Resize((224, 224), antialias=True),

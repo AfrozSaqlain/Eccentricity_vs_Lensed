@@ -79,7 +79,7 @@ def custom_collate_fn(batch):
 
 def load_all_data(path_name='data', batch_size=32):
 
-    all_files = glob.glob(f'./{path_name}/*/*.npy')
+    all_files = glob.glob(f'{path_name}/*/*.npy')
     all_labels = [path.split('/')[2] for path in all_files]
 
 
