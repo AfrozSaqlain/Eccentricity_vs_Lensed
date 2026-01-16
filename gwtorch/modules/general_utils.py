@@ -1489,7 +1489,7 @@ def plot_roc_curves(fpr, tpr, roc_auc, class_names, title_suffix="", results_dir
         results_dir = Path(results_dir)
         os.makedirs(results_dir / 'Plots', exist_ok=True)
         fig.savefig(results_dir / f'Plots/{prefix}_ROC_Curves_{title}.pdf', dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.close()
 
 
 def plot_confusion_matrix(y_true, y_pred, class_names, title_suffix="", results_dir=None):
@@ -1551,7 +1551,7 @@ def plot_confusion_matrix(y_true, y_pred, class_names, title_suffix="", results_
         results_dir = Path(results_dir)
         os.makedirs(results_dir / 'Plots', exist_ok=True)
         fig.savefig(results_dir / f'Plots/{prefix}_Confusion_Matrix_{title}.pdf', dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.close()
 
 
 def plot_training_curves(train_losses, val_losses, train_accuracies, val_accuracies, results_dir=None):
@@ -1595,7 +1595,7 @@ def plot_training_curves(train_losses, val_losses, train_accuracies, val_accurac
         results_dir = Path(results_dir)
         os.makedirs(results_dir / 'Plots', exist_ok=True)
         fig.savefig(results_dir / f'Plots/{prefix}_Training_curves.pdf', dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.close()
 
 def plot_kfold_roc_curves(fold_results, results_dir=None, class_names=None):
     """Plot ROC curves for all folds with mean and std"""
@@ -2037,4 +2037,4 @@ def plot_signal_hists(file_number=None):
         a.grid(alpha=0.3)
 
     plt.tight_layout()
-    plt.show()
+    plt.close()

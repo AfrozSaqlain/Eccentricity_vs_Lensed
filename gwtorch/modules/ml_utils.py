@@ -156,8 +156,10 @@ def create_fold_loaders(train_files, val_files, batch_size):
         transforms.Resize((224, 224)),
     ])
 
-    train_data = GWDataset(train_files, transform)
-    val_data   = GWDataset(val_files, transform)
+    meta_csv_path = train_files[0].split('/')[-3]
+
+    train_data = GWDataset(train_files, transform, meta_csv=meta_csv_path)
+    val_data   = GWDataset(val_files, transform, meta_csv=meta_csv_path)
 
     num_channels = train_data[0][0].shape[0] if isinstance(train_data[0][0], torch.Tensor) else 3
 
@@ -333,7 +335,9 @@ def run_kfold_training(args, device, get_model=None, model_name=None):
         transforms.Resize((224, 224)),
     ])
 
-    test_data = GWDataset(test_files, transform)
+    meta_csv_path = all_files[0].split('/')[-3]
+    
+    test_data = GWDataset(test_files, transform, meta_csv=meta_csv_path)
     test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False,
                            num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
     
