@@ -142,9 +142,8 @@ def main():
     if os.path.exists(directory):
         file_pattern = os.path.join(directory, 'unlensed', '*.npy')
         file_list = glob.glob(file_pattern)
-        files = [i.split('/')[3].split('.')[0] for i in file_list]
-        final_files = set([i.split('-')[0] if '-' in i else i for i in files])
-        init_jump = len(final_files)
+        sample_ids = {Path(i).stem.split('-')[0] for i in file_list}
+        init_jump = len(sample_ids)
         
     output_path = Path(directory)
     eccentric_path = output_path / Path("eccentric")
@@ -196,7 +195,7 @@ def main():
                 
                 n_eccentric += sum(1 for r in valid_results if r.get('eccentric_saved'))
                 n_lensed += sum(1 for r in valid_results if r.get('lensed_saved'))
-                n_unlensed += sum(1 for r in valid_results if r.get('unlensed_saved')) + sum(1 for r in valid_results if r.get('lens_unlensed_saved')) + sum(1 for r in valid_results if r.get('ecc_unlensed_saved'))
+                n_unlensed += sum(1 for r in valid_results if r.get('unlensed_saved'))
 
                 save_csv(results_dir / f"{args.path_name}_parameters.csv", valid_results)
 

@@ -1,5 +1,4 @@
 import os
-import glob
 from pathlib import Path
 from collections import Counter
 
@@ -20,6 +19,13 @@ from linformer import Linformer
 from vit_pytorch.efficient import ViT
 from vit_pytorch.cvt import CvT
 from gwtorch.modules.neural_net import CNN_Model, SimpleCNN
+from gwtorch.modules.data_loading import (
+    NpyGWDataset,
+    collate_with_weights,
+    default_transform_224,
+    safe_num_workers,
+)
+from gwtorch.modules.pathing import class_from_file_path, default_meta_csv_path, discover_npy_files
 
 from gwtorch.modules.general_utils import (
     compute_roc_auc_with_misclassifications,
@@ -51,62 +57,41 @@ def setup_directories(model_name=None):
     
 class GWDataset(Dataset):
     def __init__(self, file_list, transform=None, meta_csv='data'):
-        self.file_list = file_list
-        self.transform = transform
-        self.df = pd.read_csv('results/' + meta_csv + '_parameters.csv')
-
-        # set index if sample column exists
-        if 'sample' in self.df.columns:
-            self.df = self.df.set_index('sample')
+        meta_csv_str = str(meta_csv)
+        if Path(meta_csv_str).suffix != ".csv":
+            meta_csv_str = str(Path("results") / f"{meta_csv}_parameters.csv")
+        self.dataset = NpyGWDataset(
+            file_list=file_list,
+            label_map={'lensed': 0, 'eccentric': 1, 'unlensed': 2},
+            transform=transform,
+            meta_csv=meta_csv_str,
+            return_lnB=False,
+            weight=1.0,
+        )
 
     def __len__(self):
-        return len(self.file_list)
+        return len(self.dataset)
 
     def __getitem__(self, idx):
-        file_path = self.file_list[idx]
-
-        # load [C, H, W] array
-        arr = np.load(file_path).astype(np.float32)
-        arr = torch.from_numpy(arr)
-
-        if self.transform:
-            arr = self.transform(arr)
-
-        label_str = file_path.split("/")[-2].lower()
-        label = {'lensed': 0, 'eccentric': 1, 'unlensed': 2}[label_str]
-
-        file_number = int(file_path.split('/')[-1].split('.')[0])
-
-        ln_B = 0.0
-        if file_number in self.df.index:
-            if label_str == 'lensed' and 'lens_lnB' in self.df.columns:
-                ln_B = self.df.loc[file_number, 'lens_lnB']
-            elif label_str == 'eccentric' and 'ecc_lnB' in self.df.columns:
-                ln_B = self.df.loc[file_number, 'ecc_lnB']
-            elif label_str == 'unlensed':
-                ln_B = 100
-
-        # weight = 10.0 if ln_B > 10 else 1.0
-        weight = 1.0
-
-        return arr, label, weight, file_path
+        return self.dataset[idx]
 
     
 def custom_collate_fn(batch):
-    images, labels, weights, file_paths = zip(*batch)
-    return torch.stack(images), torch.tensor(labels), torch.tensor(weights, dtype=torch.float32), file_paths
+    return collate_with_weights(batch)
 
 def filenames_to_label_indices(file_list):
     labels = []
     for p in file_list:
-        lab = p.split('/')[-2].lower()
+        lab = class_from_file_path(p)
         labels.append({'lensed':0,'eccentric':1,'unlensed':2}[lab])
     return labels
 
 def load_all_data(path_name='data', seed=42, batch_size=32):
 
-    all_files = glob.glob(f'{path_name}/*/*.npy')
-    all_labels = [path.split('/')[-2] for path in all_files]
+    all_files = discover_npy_files(path_name)
+    if not all_files:
+        raise FileNotFoundError(f"No .npy files found under {path_name}/*/*.npy")
+    all_labels = [class_from_file_path(path) for path in all_files]
 
     train_files, temp_files, train_labels, temp_labels = train_test_split(
         all_files, all_labels, test_size=0.3, stratify=all_labels, random_state=seed
@@ -121,52 +106,53 @@ def load_all_data(path_name='data', seed=42, batch_size=32):
     total = sum(counts.values())
     class_weights = torch.tensor([ total/counts[i] for i in range(3) ], dtype=torch.float32)
 
-    transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-    ])
+    transform = default_transform_224(antialias=False)
 
-    meta_csv_path = all_files[0].split('/')[-3]
+    meta_csv_path = default_meta_csv_path(path_name)
     train_data = GWDataset(train_files, transform, meta_csv=meta_csv_path)
     val_data   = GWDataset(val_files, transform, meta_csv=meta_csv_path)
     test_data  = GWDataset(test_files, transform, meta_csv=meta_csv_path)
 
     num_channels = train_data[0][0].shape[0] if isinstance(train_data[0][0], torch.Tensor) else 3
 
+    num_workers = safe_num_workers()
     train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True,
-                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+                              num_workers=num_workers, collate_fn=custom_collate_fn)
     val_loader   = DataLoader(val_data, batch_size=batch_size, shuffle=False,
-                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+                              num_workers=num_workers, collate_fn=custom_collate_fn)
     test_loader  = DataLoader(test_data, batch_size=batch_size, shuffle=False,
-                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+                              num_workers=num_workers, collate_fn=custom_collate_fn)
 
     return num_channels, train_loader, val_loader, test_loader, class_weights
 
 def prepare_kfold_data(path_name='data'):
     """Prepare data for k-fold cross validation"""
 
-    all_files = glob.glob(f'{path_name}/*/*.npy')
-    all_labels = [path.split('/')[-2] for path in all_files]
+    all_files = discover_npy_files(path_name)
+    if not all_files:
+        raise FileNotFoundError(f"No .npy files found under {path_name}/*/*.npy")
+    all_labels = [class_from_file_path(path) for path in all_files]
     
     return all_files, all_labels
 
 def create_fold_loaders(train_files, val_files, batch_size):
     """Create data loaders for a specific fold"""
 
-    transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-    ])
+    transform = default_transform_224(antialias=False)
 
-    meta_csv_path = train_files[0].split('/')[-3]
+    dataset_root = str(Path(train_files[0]).parents[1])
+    meta_csv_path = default_meta_csv_path(dataset_root)
 
     train_data = GWDataset(train_files, transform, meta_csv=meta_csv_path)
     val_data   = GWDataset(val_files, transform, meta_csv=meta_csv_path)
 
     num_channels = train_data[0][0].shape[0] if isinstance(train_data[0][0], torch.Tensor) else 3
 
+    num_workers = safe_num_workers()
     train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True,
-                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+                              num_workers=num_workers, collate_fn=custom_collate_fn)
     val_loader   = DataLoader(val_data, batch_size=batch_size, shuffle=False,
-                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+                              num_workers=num_workers, collate_fn=custom_collate_fn)
 
     return num_channels, train_loader, val_loader
 
@@ -309,8 +295,6 @@ def run_kfold_training(args, device, get_model=None, model_name=None):
     print(f"Starting {args.k_folds}-Fold Cross Validation")
     print(f"{'='*50}")
 
-    model = get_model(name=args.model, num_channels=4, device=device)
-
     all_files, all_labels = prepare_kfold_data(path_name=args.path_name)
     
     skf = StratifiedKFold(n_splits=args.k_folds, shuffle=True, random_state=args.seed)
@@ -330,16 +314,14 @@ def run_kfold_training(args, device, get_model=None, model_name=None):
         all_files, all_labels, test_size=0.2, stratify=all_labels, random_state=args.seed
     )
 
-    transform = transforms.Compose([
-        # transforms.Lambda(lambda x: torch.tensor(x).permute(2, 0, 1)),
-        transforms.Resize((224, 224)),
-    ])
+    transform = default_transform_224(antialias=False)
 
-    meta_csv_path = all_files[0].split('/')[-3]
+    meta_csv_path = default_meta_csv_path(args.path_name)
     
     test_data = GWDataset(test_files, transform, meta_csv=meta_csv_path)
+    num_workers = safe_num_workers()
     test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False,
-                           num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+                           num_workers=num_workers, collate_fn=custom_collate_fn)
     
     for fold, (train_idx, val_idx) in enumerate(skf.split(train_val_files, train_val_labels)):
         

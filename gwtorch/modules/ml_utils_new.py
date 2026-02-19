@@ -20,6 +20,7 @@ from linformer import Linformer
 from vit_pytorch.efficient import ViT
 from vit_pytorch.cvt import CvT
 from gwtorch.modules.neural_net import CNN_Model, SimpleCNN
+from gwtorch.modules.pathing import class_from_file_path, discover_npy_files, sample_id_from_file_path
 
 from gwtorch.modules.general_utils import (
     compute_roc_auc_with_misclassifications,
@@ -105,10 +106,10 @@ class GWDataset(Dataset):
         if self.transform:
             arr = self.transform(arr)
 
-        label_str = file_path.split("/")[2].lower()
+        label_str = class_from_file_path(file_path)
         label = {'lensed': 0, 'eccentric': 1, 'unlensed': 2}[label_str]
 
-        file_number = int(file_path.split('/')[-1].split('.')[0])
+        file_number = sample_id_from_file_path(file_path)
 
         ln_B = 0.0
         if file_number in self.df.index:
@@ -131,8 +132,8 @@ def custom_collate_fn(batch):
 
 def load_all_data(path_name='data', seed=42, batch_size=32):
 
-    all_files = glob.glob(f'./{path_name}/*/*.npy')
-    all_labels = [path.split('/')[2] for path in all_files]
+    all_files = discover_npy_files(path_name)
+    all_labels = [class_from_file_path(path) for path in all_files]
 
     train_files, temp_files, train_labels, temp_labels = train_test_split(
         all_files, all_labels, test_size=0.3, stratify=all_labels, random_state=seed
@@ -172,8 +173,8 @@ def load_all_data(path_name='data', seed=42, batch_size=32):
 def prepare_kfold_data(path_name='data'):
     """Prepare data for k-fold cross validation"""
 
-    all_files = glob.glob(f'./{path_name}/*/*.npy')
-    all_labels = [path.split('/')[2] for path in all_files]
+    all_files = discover_npy_files(path_name)
+    all_labels = [class_from_file_path(path) for path in all_files]
     
     return all_files, all_labels
 
@@ -209,7 +210,7 @@ def get_model(name, num_channels, device):
         return ViT(dim=128, image_size=224, patch_size=32, num_classes=3,
                    transformer=transformer, channels=num_channels).to(device)
     elif name == 'CNN':
-        return CNN_Model(input_channlels=num_channels, dropout=dropout).to(device)
+        return CNN_Model(input_channels=num_channels, dropout=dropout).to(device)
     elif name == 'SimpleCNN':
         return SimpleCNN(input_channels=num_channels, dropout=dropout).to(device)
     

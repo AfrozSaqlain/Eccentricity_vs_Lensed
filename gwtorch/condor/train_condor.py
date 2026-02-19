@@ -12,7 +12,7 @@ def generate_submit_file(memory, disk, cpu, model, model_subtype, classification
         job_name = f"{model_subtype}_train"
 
     """Generates the HTCondor submit file for the model training."""
-    content = f"""executable = /home/saqlain.afroz/miniconda3/envs/gwtorch-env/bin/{executable}
+    content = f"""executable = {executable}
 
 job_name = {job_name}
 
@@ -94,7 +94,7 @@ def main():
         classification_scheme=args.classification_scheme,
         epochs=args.epochs,
         batch_size=args.batch_size,
-        data_file_path='data'
+        data_file_path=args.data_file_path
     )
 
     print(f"✅ Successfully generated submit file for training {args.model_subtype} model in the 'submit' directory.")

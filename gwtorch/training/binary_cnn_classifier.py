@@ -1,16 +1,12 @@
 import os
-import glob
 import random
 import argparse
-import numpy as np
-import pandas as pd
 from pathlib import Path
 from collections import Counter
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torchvision import transforms
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader, Dataset
 
@@ -27,8 +23,17 @@ from gwtorch.modules.general_utils import (
     plot_training_curves,
 )
 
-from gwtorch.modules.ml_utils import (
-    get_model,
+from gwtorch.modules.neural_net import CNNBinaryModel, SimpleCNNBinary
+from gwtorch.modules.data_loading import (
+    NpyGWDataset,
+    collate_with_weights,
+    default_transform_224,
+    safe_num_workers,
+)
+from gwtorch.modules.pathing import (
+    class_from_file_path,
+    default_meta_csv_path,
+    discover_npy_files
 )
 
 
@@ -60,61 +65,42 @@ def parse_args():
 
 class GWDataset(Dataset):
     def __init__(self, file_list, transform=None, meta_csv='data'):
-        self.file_list = file_list
-        self.transform = transform
-        self.df = pd.read_csv('results/' + meta_csv + '_parameters.csv')
-
-        # set index if sample column exists
-        if 'sample' in self.df.columns:
-            self.df = self.df.set_index('sample')
+        meta_csv_str = str(meta_csv)
+        if Path(meta_csv_str).suffix != ".csv":
+            meta_csv_str = str(Path("results") / f"{meta_csv}_parameters.csv")
+        self.dataset = NpyGWDataset(
+            file_list=file_list,
+            label_map={'lensed': 0, 'eccentric': 1},
+            transform=transform,
+            meta_csv=meta_csv_str,
+            return_lnB=False,
+            weight=1.0,
+        )
 
     def __len__(self):
-        return len(self.file_list)
+        return len(self.dataset)
 
     def __getitem__(self, idx):
-        file_path = self.file_list[idx]
-
-        # load [C, H, W] array
-        arr = np.load(file_path).astype(np.float32)
-        arr = torch.from_numpy(arr)
-
-        if self.transform:
-            arr = self.transform(arr)
-
-        label_str = file_path.split("/")[-2].lower()
-        label = {'lensed': 0, 'eccentric': 1}[label_str]
-
-        file_number = int(file_path.split('/')[-1].split('.')[0])
-
-        ln_B = 0.0
-        if file_number in self.df.index:
-            if label_str == 'lensed' and 'lens_lnB' in self.df.columns:
-                ln_B = self.df.loc[file_number, 'lens_lnB']
-            elif label_str == 'eccentric' and 'ecc_lnB' in self.df.columns:
-                ln_B = self.df.loc[file_number, 'ecc_lnB']
-            elif label_str == 'unlensed':
-                ln_B = 100
-
-        # weight = 10.0 if ln_B > 10 else 1.0
-        weight = 1.0
-
-        return arr, label, weight, file_path
+        return self.dataset[idx]
     
 def custom_collate_fn(batch):
-    images, labels, weights, file_paths = zip(*batch)
-    return torch.stack(images), torch.tensor(labels), torch.tensor(weights, dtype=torch.float32), file_paths
+    return collate_with_weights(batch)
 
 def filenames_to_label_indices(file_list):
     labels = []
     for p in file_list:
-        lab = p.split('/')[-2].lower()
+        lab = class_from_file_path(p)
         labels.append({'lensed': 0, 'eccentric': 1}[lab])
     return labels
 
 def load_all_data(path_name='data', seed=42, batch_size=32):
-    
-    all_files = glob.glob(f'{path_name}/eccentric/*.npy') + glob.glob(f'{path_name}/lensed/*.npy')
-    all_labels = [path.split('/')[-2] for path in all_files]
+    all_files = [
+        p for p in discover_npy_files(path_name)
+        if class_from_file_path(p) in {"eccentric", "lensed"}
+    ]
+    if not all_files:
+        raise FileNotFoundError(f"No eccentric/lensed .npy files found under {path_name}")
+    all_labels = [class_from_file_path(path) for path in all_files]
 
     train_files, temp_files, train_labels, temp_labels = train_test_split(
         all_files, all_labels, test_size=0.3, stratify=all_labels, random_state=seed
@@ -129,25 +115,30 @@ def load_all_data(path_name='data', seed=42, batch_size=32):
     total = sum(counts.values())
     class_weights = torch.tensor([ total/counts[i] for i in range(2) ], dtype=torch.float32)
 
-    transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-    ])
+    transform = default_transform_224(antialias=False)
 
-    meta_csv_path = all_files[0].split('/')[-3]
+    meta_csv_path = default_meta_csv_path(path_name)
     train_data = GWDataset(train_files, transform, meta_csv=meta_csv_path)
     val_data   = GWDataset(val_files, transform, meta_csv=meta_csv_path)
     test_data  = GWDataset(test_files, transform, meta_csv=meta_csv_path)
 
     num_channels = train_data[0][0].shape[0] if isinstance(train_data[0][0], torch.Tensor) else 3
 
+    num_workers = safe_num_workers()
     train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True,
-                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+                              num_workers=num_workers, collate_fn=custom_collate_fn)
     val_loader   = DataLoader(val_data, batch_size=batch_size, shuffle=False,
-                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+                              num_workers=num_workers, collate_fn=custom_collate_fn)
     test_loader  = DataLoader(test_data, batch_size=batch_size, shuffle=False,
-                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+                              num_workers=num_workers, collate_fn=custom_collate_fn)
 
     return num_channels, train_loader, val_loader, test_loader, class_weights
+
+
+def get_binary_model(name, num_channels, device):
+    if name == 'CNN':
+        return CNNBinaryModel(input_channels=num_channels, dropout=0.2).to(device)
+    return SimpleCNNBinary(input_channels=num_channels, dropout=0.2).to(device)
 
 def train_model(model, train_loader, valid_loader, device, epochs, lr, gamma, class_weights=None):
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
@@ -259,11 +250,12 @@ def main():
     
     num_channels, train_loader, valid_loader, test_loader, class_weights = load_all_data(path_name=args.path_name, seed=args.seed, batch_size=args.batch_size)
 
-    model = get_model(name=args.model, num_channels=num_channels, device=device)
+    model = get_binary_model(name=args.model, num_channels=num_channels, device=device)
 
-    if os.path.exists(f'./models/{args.model_file_name}.pth'):
+    model_path = Path(f'./models/Binary_{args.model_file_name}.pth')
+    if model_path.exists():
         print("Pretrained model found. Loading...\n")
-        model.load_state_dict(torch.load(f'./models/Binary_{args.model_file_name}.pth', map_location=device))
+        model.load_state_dict(torch.load(model_path, map_location=device))
     else:
         print("No pretrained model found. Training from scratch...\n")
 

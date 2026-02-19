@@ -3,7 +3,7 @@ import argparse
 
 def generate_submit_file(memory, disk, samples, cpu, snr_dist, path="submit/short_gen.sub"):
     """Generates the HTCondor submit file for the data generation jobs."""
-    content = f"""executable = /home/saqlain.afroz/miniconda3/envs/gwtorch-env/bin/generate_match_dataset_dag_gwtorch
+    content = f"""executable = generate_match_dataset_dag_gwtorch
 
 job_name = short_gen_batch_$(ARG1)
 

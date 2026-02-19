@@ -3,7 +3,6 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 import gc
 import os
-import glob
 import argparse
 import numpy as np
 from tqdm import tqdm
@@ -142,7 +141,10 @@ def main():
 
     directory = f"{args.path_name}"
 
-    init_jump = (args.seed - 1) * num_samples
+    if args.seed is None:
+        init_jump = 0
+    else:
+        init_jump = max(0, (args.seed - 1) * num_samples)
 
     output_path = Path(directory)
     eccentric_path = output_path / Path("eccentric")
@@ -198,10 +200,7 @@ def main():
                 n_unlensed += sum(1 for r in valid_results if r.get('unlensed_saved'))
 
                 if 'test' not in args.path_name:
-                    csv_path = results_dir / f"{args.path_name.rsplit('/', 1)[-1]}_parameters.csv"
-                    # if csv_path.exists():
-                    #     csv_path.unlink()
-                    #     print(f"Deleted: {csv_path}")
+                    csv_path = results_dir / f"{Path(args.path_name).name}_parameters.csv"
                     save_csv_dag(csv_path, valid_results)
 
                 del batch_sample, args_list, results, valid_results

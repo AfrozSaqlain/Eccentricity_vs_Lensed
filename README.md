@@ -71,6 +71,7 @@ To install the package just run: `bash install.sh`
   Submit the workflow using:
   ```bash
   condor_submit_dag submit/workflow.dag
+  ```
 
 - **`cnn_train_gwtorch --batch_size [default: 128] --epochs [default: 20] --lr [default: 3e-4] --gamma [default: 0.7] --model_path [default: cnn_model0.pth]  --k-folds [default: 5] --use-kfold [stores Truth value]`**: Train the CNN model on the data generated using previous code. The directory `models` is created if it doesn't exist.
 
@@ -115,3 +116,254 @@ Then finally we generate the `q_transforms` of each signal and save them as `.np
 
 
 **Note:** The `match_gen.py` and `fitting_factor_gen` scripts also generates a Lookup table for parameter values corresponding to each sample and each category.
+
+---
+
+# ✅ End-to-End Quick Start (Generate → Train → Test/Inference)
+
+This section is added as a practical guide so a new user can run the full GWtorch workflow without guessing missing steps.
+
+## 1) Installation
+
+You can still use:
+
+```bash
+bash install.sh
+```
+
+Or install with `pip` (from project root):
+
+```bash
+pip install -e .
+```
+
+If you need ML + GW dependencies together:
+
+```bash
+pip install -e ".[ml,gw]"
+```
+
+## 2) Dataset Generation (Local)
+
+Generate dataset with 3 classes (`eccentric`, `lensed`, `unlensed`):
+
+```bash
+generate_match_dataset_gwtorch \
+  --num-samples 1000 \
+  --num-workers 8 \
+  --snr-prior powerlaw \
+  --path-name data \
+  --batch-size 150 \
+  --seed 42
+```
+
+For uniform SNR binning on HTCondor-friendly generator:
+
+```bash
+generate_match_dataset_dag_gwtorch \
+  --num-samples 1000 \
+  --num-workers 8 \
+  --snr-prior uniform \
+  --snr-min 8 \
+  --snr-max 100 \
+  --path-name data \
+  --batch-size 150 \
+  --seed 42
+```
+
+### Generated files
+
+- Spectrograms:
+  - `data/eccentric/*.npy`
+  - `data/lensed/*.npy`
+  - `data/unlensed/*.npy`
+- Parameter lookup CSV:
+  - `results/data_parameters.csv` (if `--path-name data`)
+  - In general: `results/<dataset_name>_parameters.csv`
+
+## 3) Train Multi-Class Models
+
+### CNN
+
+```bash
+cnn_train_gwtorch \
+  --model CNN \
+  --batch-size 512 \
+  --epochs 20 \
+  --lr 3e-5 \
+  --gamma 0.7 \
+  --seed 42 \
+  --path-name data \
+  --model-file-name cnn_model
+```
+
+### Transformer (ViT or CvT)
+
+```bash
+transformer_train_gwtorch \
+  --model ViT \
+  --batch-size 512 \
+  --epochs 20 \
+  --lr 3e-5 \
+  --gamma 0.7 \
+  --seed 42 \
+  --path-name data \
+  --model-file-name vit_model
+```
+
+### Optional K-fold training
+
+Add:
+
+```bash
+--use-kfold --k-folds 5
+```
+
+## 4) Train Binary Models (Eccentric vs Lensed)
+
+### Binary CNN
+
+```bash
+binary_cnn_train_gwtorch \
+  --model CNN \
+  --batch-size 512 \
+  --epochs 20 \
+  --lr 3e-5 \
+  --gamma 0.7 \
+  --seed 42 \
+  --path-name data \
+  --model-file-name cnn_model_binary
+```
+
+### Binary Transformer
+
+```bash
+binary_transformer_train_gwtorch \
+  --model ViT \
+  --batch-size 512 \
+  --epochs 20 \
+  --lr 3e-5 \
+  --gamma 0.7 \
+  --seed 42 \
+  --path-name data \
+  --model-file-name transformer_model_binary
+```
+
+## 5) Inference / Testing
+
+### CNN inference
+
+```bash
+cnn_inference_gwtorch \
+  --model CNN \
+  --batch-size 512 \
+  --model-path cnn_model.pth \
+  --path-name data \
+  --meta-csv results/data_parameters.csv \
+  --results-dir inference_results \
+  --seed 42
+```
+
+### Transformer inference
+
+```bash
+transformer_inference_gwtorch \
+  --model ViT \
+  --batch-size 512 \
+  --model-path vit_model.pth \
+  --path-name data \
+  --meta-csv results/data_parameters.csv \
+  --results-dir inference_results \
+  --seed 42
+```
+
+Optional lnB-filtered confusion matrix for transformer inference:
+
+```bash
+--lnB-min 0 --lnB-max 10
+```
+
+## 6) Grad-CAM
+
+### CNN Grad-CAM
+
+```bash
+cnn_gradcam_gwtorch \
+  --model CNN \
+  --model-path cnn_model.pth \
+  --path-name data \
+  --results-dir inference_results
+```
+
+### Transformer Grad-CAM
+
+```bash
+transformer_gradcam_gwtorch \
+  --model ViT \
+  --model-path vit_model.pth \
+  --path-name data \
+  --results-dir inference_results
+```
+
+## 7) HTCondor Workflow
+
+Create DAG artifacts:
+
+```bash
+generate_data_dagman_gwtorch \
+  --jobs 10 \
+  --memory 20G \
+  --disk 20G \
+  --samples 100 \
+  --cpu 5 \
+  --snr-dist powerlaw
+```
+
+Submit:
+
+```bash
+condor_submit_dag submit/workflow.dag
+```
+
+Generate training submit file:
+
+```bash
+generate_training_condor_gwtorch \
+  --model transformer \
+  --model-subtype ViT \
+  --classification-scheme multi-class \
+  --epochs 20 \
+  --batch-size 512 \
+  --data-file-path data
+```
+
+## 8) Recommended Dataset Naming Convention
+
+If your dataset directory is named `X`, keep metadata file as:
+
+```text
+results/X_parameters.csv
+```
+
+This helps training/inference find lnB metadata automatically.
+
+## 9) Useful Output Locations
+
+- Trained models: `models/*.pth`
+- Training outputs: `results/<Model>_results/`
+- Inference outputs: `<results-dir>/<Model>_results/`
+- Misclassification files and reports are generated automatically in result directories.
+
+## 10) Troubleshooting
+
+- If multiprocessing fails in restricted environments, reduce workers:
+  - generation: `--num-workers 1`
+  - training/inference can still run with fewer worker processes.
+- If metadata CSV is missing, scripts can still run but lnB-dependent analysis will be limited.
+- For tiny datasets, `train_test_split(..., stratify=...)` may fail. Increase `--num-samples`.
+
+---
+
+## Keep Using Prior Settings Above
+
+Your prior distribution table in this README remains the reference for waveform generation settings. The generation scripts (`match_gen.py`, `match_gen_dag.py`, `fitting_factor_gen.py`) sample from those priors exactly as described above.

@@ -13,6 +13,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 from torch.optim.lr_scheduler import StepLR
+from gwtorch.modules.pathing import class_from_file_path, discover_npy_files
 
 from linformer import Linformer
 from vit_pytorch.efficient import ViT
@@ -75,7 +76,7 @@ class UnlensedVsOthersDataset(Dataset):
         file_path = self.file_list[idx]
         arr = torch.from_numpy(np.load(file_path).astype(np.float32))
         if self.transform: arr = self.transform(arr)
-        label_str = file_path.split("/")[2].lower()
+        label_str = class_from_file_path(file_path)
         label = 0 if label_str == "unlensed" else 1
         return arr, label, 1.0, file_path
 
@@ -92,7 +93,7 @@ class LensedVsEccentricDataset(Dataset):
         file_path = self.file_list[idx]
         arr = torch.from_numpy(np.load(file_path).astype(np.float32))
         if self.transform: arr = self.transform(arr)
-        label_str = file_path.split("/")[2].lower()
+        label_str = class_from_file_path(file_path)
         label = 0 if label_str == "lensed" else 1
         return arr, label, 1.0, file_path
 
@@ -107,7 +108,7 @@ def custom_collate_fn(batch):
 # -------------------------------------------------------------------------
 
 def make_dataloaders(stage, path_name, seed, batch_size):
-    all_files = glob.glob(f"./{path_name}/*/*.npy")
+    all_files = discover_npy_files(path_name)
 
     if stage == 1:
         files = [f for f in all_files if any(x in f for x in ["unlensed", "lensed", "eccentric"])]
@@ -116,7 +117,7 @@ def make_dataloaders(stage, path_name, seed, batch_size):
         files = [f for f in all_files if any(x in f for x in ["lensed", "eccentric"])]
         dataset_class = LensedVsEccentricDataset
 
-    labels = [f.split("/")[2] for f in files]
+    labels = [class_from_file_path(f) for f in files]
 
     train_files, temp_files, train_labels, temp_labels = train_test_split(
         files, labels, test_size=0.3, stratify=labels, random_state=seed
@@ -132,12 +133,13 @@ def make_dataloaders(stage, path_name, seed, batch_size):
     test_data = dataset_class(test_files, transform)
     num_channels = train_data[0][0].shape[0]
 
+    num_workers = max(1, min(8, os.cpu_count() or 1))
     train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True,
-                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+                              num_workers=num_workers, collate_fn=custom_collate_fn)
     val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False,
-                            num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+                            num_workers=num_workers, collate_fn=custom_collate_fn)
     test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False,
-                             num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
+                             num_workers=num_workers, collate_fn=custom_collate_fn)
 
     return num_channels, train_loader, val_loader, test_loader, test_files
 

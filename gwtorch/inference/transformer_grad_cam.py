@@ -20,14 +20,10 @@ from vit_pytorch.cvt import CvT
 from vit_pytorch.efficient import ViT
 
 # --- Grad-CAM Imports ---
-try:
-    from pytorch_grad_cam import GradCAM
-    from pytorch_grad_cam.utils.image import show_cam_on_image
-    from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
-except ImportError:
-    print("Error: 'grad-cam' library not found. Please install it using:")
-    print("pip install grad-cam")
-    sys.exit(1)
+from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam.utils.image import show_cam_on_image
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
+
 
 from gwtorch.modules.ml_utils import seed_everything
 

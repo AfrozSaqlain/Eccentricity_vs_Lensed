@@ -24,7 +24,32 @@ class CNN_Model(nn.Module):
         x = self.dropout(x)
         x = self.fc2(x)
         return x
-    
+
+
+class CNNBinaryModel(nn.Module):
+    def __init__(self, input_channels=3, dropout=0.2):
+        super(CNNBinaryModel, self).__init__()
+        self.conv1 = nn.Conv2d(input_channels, 32, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1)
+        self.fc1 = nn.Linear(128 * 28 * 28, 256)
+        self.fc2 = nn.Linear(256, 2)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = F.max_pool2d(x, 2)
+        x = F.relu(self.conv2(x))
+        x = F.max_pool2d(x, 2)
+        x = F.relu(self.conv3(x))
+        x = F.max_pool2d(x, 2)
+        x = x.view(x.size(0), -1)
+        x = F.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = self.fc2(x)
+        return x
+
+
 class SimpleCNN(nn.Module):
     def __init__(self, input_channels=3, dropout=0.2):
         super(SimpleCNN, self).__init__()
@@ -46,9 +71,30 @@ class SimpleCNN(nn.Module):
         return x
 
 
+class SimpleCNNBinary(nn.Module):
+    def __init__(self, input_channels=3, dropout=0.2):
+        super(SimpleCNNBinary, self).__init__()
+        self.conv1 = nn.Conv2d(input_channels, 16, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1)
+        self.fc1 = nn.Linear(32 * 56 * 56, 64)
+        self.fc2 = nn.Linear(64, 2)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = F.max_pool2d(x, 2)
+        x = F.relu(self.conv2(x))
+        x = F.max_pool2d(x, 2)
+        x = x.view(x.size(0), -1)
+        x = F.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = self.fc2(x)
+        return x
+
+
 class CNN_Meta_Model(nn.Module):
     def __init__(self, input_features=3, hidden_features=32, output_features=3):
-        super(CNN_Model, self).__init__()
+        super(CNN_Meta_Model, self).__init__()
         self.input_features = input_features
         self.hidden_features = hidden_features
         self.output_features = output_features
