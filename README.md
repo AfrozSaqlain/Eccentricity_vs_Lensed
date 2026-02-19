@@ -106,6 +106,7 @@ Then finally we generate the `q_transforms` of each signal and save them as `.np
 | `spin1z`        | `Uniform`                          | [-0.9, 0.9]                    |
 | `spin2z`        | `Uniform`                          | [-0.9, 0.9]                    |
 | `eccentricity`  | `Uniform`                          | [0.01, 0.6]                    |
+| `anomlay`       | `Uniform`                          | [0, 2π]                    |
 | `coa_phase`     | `Uniform`                          | [0.0, 2π]                     |
 | `SNR`           | `PowerLaw` (`α = -4`)              | [4, 500]                   |
 | `dec`           | `Cosine`                           | [−π/2, π/2]                   |
@@ -115,7 +116,7 @@ Then finally we generate the `q_transforms` of each signal and save them as `.np
 | `yl`            | `PowerLaw` (`α = 1`)               | [0.01, 1.0]                   |
 
 
-**Note:** The `match_gen.py` and `fitting_factor_gen` scripts also generates a Lookup table for parameter values corresponding to each sample and each category.
+**Note:** The `match_gen.py` d `fitting_factor_gen` scripts also generates a Lookup table for parameter values corresponding to each sample and each category.
 
 ---
 
