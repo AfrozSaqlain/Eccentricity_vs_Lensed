@@ -30,6 +30,10 @@ def generate_submit_file(
     path="submit/short_gen.sub",
 ):
     """Generates the HTCondor submit file for the data generation jobs."""
+
+    pwd = Path.cwd().resolve()
+    dataset_dir_template = f"{pwd}/$(ARG2)_$(ARG1)"
+
     content = f"""executable = {executable}
 
 job_name = short_gen_batch_$(ARG1)
@@ -39,6 +43,7 @@ request_cpus = {cpu}
 request_disk = {disk}
 
 getenv = True
+initialdir = {pwd}
 
 log = HTCondor_Logs/$(job_name).log
 output = HTCondor_Logs/$(job_name).output
@@ -50,12 +55,9 @@ stream_output = True
 accounting_group = {accounting_group}
 accounting_group_user = {accounting_group_user}
 
-should_transfer_files = yes
-transfer_input_files = results
-when_to_transfer_output = ON_EXIT
-transfer_output_files = $(ARG2)_$(ARG1), results
+should_transfer_files = NO
 
-arguments = --num-samples {samples} --snr-prior {snr_dist} --snr-min $(ARG3) --snr-max $(ARG4) --path-name $(ARG2)_$(ARG1) --batch-size {samples // 2} --seed $(ARG1)
+arguments = --num-samples {samples} --snr-prior {snr_dist} --snr-min $(ARG3) --snr-max $(ARG4) --path-name {dataset_dir_template} --batch-size {samples // 2} --seed $(ARG1)
 
 queue
 """
@@ -68,6 +70,10 @@ def generate_merge_sh(path="submit/merge.sh"):
     Generates the script to merge data directories and then clean them up.
     """
     script = """#!/bin/bash
+set -e
+
+BASE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$BASE_DIR"
 
 # Create the central data folder and subdirectories
 mkdir -p data/eccentric data/lensed data/unlensed
@@ -102,6 +108,11 @@ def generate_combine_csv_sh(path="submit/combine_csv.sh"):
     Generates the script to combine CSV files and then clean them up.
     """
     script = """#!/bin/bash
+set -e
+
+BASE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$BASE_DIR"
+
 # Combine CSV files named data_{i}_parameters.csv into one file in order of i.
 
 # Directory containing the CSV files
@@ -157,6 +168,8 @@ def generate_wrapper_sh(path="submit/run_local_scripts.sh"):
 # This script is executed on the submit node after all jobs are done.
 set -e
 
+BASE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
 echo "----------------------------------------------------"
 echo "All data generation jobs have completed successfully."
 echo "Starting post-processing on the access point..."
@@ -164,11 +177,11 @@ echo "----------------------------------------------------"
 
 # Run the first script
 echo "Executing merge.sh..."
-submit/merge.sh
+"$BASE_DIR/submit/merge.sh"
 
 # Run the second script
 echo "Executing combine_csv.sh..."
-submit/combine_csv.sh
+"$BASE_DIR/submit/combine_csv.sh"
 
 echo "----------------------------------------------------"
 echo "Post-processing complete."
