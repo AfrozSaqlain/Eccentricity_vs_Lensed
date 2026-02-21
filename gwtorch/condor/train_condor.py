@@ -1,15 +1,33 @@
 import os
 import argparse
+import shutil
+import sys
+from pathlib import Path
+
+
+def resolve_env_executable(command_name):
+    env_bin = Path(sys.executable).resolve().parent
+    env_command = env_bin / command_name
+    if env_command.exists() and os.access(env_command, os.X_OK):
+        return str(env_command)
+
+    which_command = shutil.which(command_name)
+    if which_command:
+        return which_command
+
+    return command_name
+
 
 def generate_submit_file(memory, disk, cpu, model, model_subtype, classification_scheme, epochs, batch_size, data_file_path):
     if classification_scheme == 'binary':
         path=f"submit/{classification_scheme}_{model_subtype}_train.sub"
-        executable = 'binary_' + model + '_train_gwtorch'
+        executable_name = 'binary_' + model + '_train_gwtorch'
         job_name = f"{classification_scheme}_{model_subtype}_train"
     else:
         path=f"submit/{model_subtype}_train.sub"
-        executable = model + '_train_gwtorch'
+        executable_name = model + '_train_gwtorch'
         job_name = f"{model_subtype}_train"
+    executable = resolve_env_executable(executable_name)
 
     """Generates the HTCondor submit file for the model training."""
     content = f"""executable = {executable}
@@ -43,6 +61,7 @@ queue
 """
     with open(path, "w") as f:
         f.write(content)
+    return executable
 
 def main():
     parser = argparse.ArgumentParser(
@@ -85,7 +104,7 @@ def main():
         assert args.model_subtype in ['ViT', 'ViTLinear', 'CvT'], "For transformer model, model-subtype must be 'ViT', 'ViTLinear', or 'CvT'."
     
     # Generate all necessary files
-    generate_submit_file(
+    executable = generate_submit_file(
         memory=args.memory,
         disk=args.disk,
         cpu=args.cpu,
@@ -98,6 +117,7 @@ def main():
     )
 
     print(f"✅ Successfully generated submit file for training {args.model_subtype} model in the 'submit' directory.")
+    print(f"Using executable: {executable}")
     
     if args.classification_scheme == 'binary':
         print(f"To run, execute: condor_submit submit/{args.classification_scheme}_{args.model_subtype}_train.sub")

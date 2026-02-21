@@ -1,9 +1,26 @@
 import os
 import argparse
+import shutil
+import sys
+from pathlib import Path
 
-def generate_submit_file(memory, disk, samples, cpu, snr_dist, path="submit/short_gen.sub"):
+
+def resolve_env_executable(command_name):
+    env_bin = Path(sys.executable).resolve().parent
+    env_command = env_bin / command_name
+    if env_command.exists() and os.access(env_command, os.X_OK):
+        return str(env_command)
+
+    which_command = shutil.which(command_name)
+    if which_command:
+        return which_command
+
+    return command_name
+
+
+def generate_submit_file(memory, disk, samples, cpu, snr_dist, executable, path="submit/short_gen.sub"):
     """Generates the HTCondor submit file for the data generation jobs."""
-    content = f"""executable = generate_match_dataset_dag_gwtorch
+    content = f"""executable = {executable}
 
 job_name = short_gen_batch_$(ARG1)
 
@@ -215,13 +232,16 @@ def main():
     os.makedirs("results", exist_ok=True)
     os.makedirs("HTCondor_Logs", exist_ok=True)
     
+    executable = resolve_env_executable("generate_match_dataset_dag_gwtorch")
+
     # Generate all necessary files
     generate_submit_file(
         memory=args.memory,
         disk=args.disk,
         samples=args.samples,
         cpu=args.cpu,
-        snr_dist=args.snr_dist
+        snr_dist=args.snr_dist,
+        executable=executable,
     )
     generate_merge_sh()
     generate_combine_csv_sh()
@@ -230,6 +250,7 @@ def main():
     generate_dagman(num_jobs=args.jobs, snr_range=(args.snr_min, args.snr_max))
 
     print(f"✅ Successfully generated workflow for {args.jobs} jobs in the 'submit' directory.")
+    print(f"Using executable: {executable}")
     print("To run, execute: condor_submit_dag submit/workflow.dag")
 
 
