@@ -112,7 +112,7 @@ def generate_sample(args):
 def main():
     parser = argparse.ArgumentParser(description="Generate Q-transform training dataset.")
     parser.add_argument('--num-samples', type=int, required=True)
-    parser.add_argument('--num-workers', type=int, default=max(1, os.cpu_count() - 2))
+    parser.add_argument('--num-workers', type=int, default=max(1, os.cpu_count() - 6))
     parser.add_argument('--snr-prior', type=str, choices=['uniform', 'powerlaw'], default='powerlaw',
                         help='Defines the prior distribution for sampling in SNR. Default is PowerLaw.')
     parser.add_argument('--path-name', type=str, default='data',
