@@ -12,6 +12,8 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 
 from gwtorch.modules.ml_utils import seed_everything, get_model
+from gwtorch.modules.data_loading import safe_num_workers
+from gwtorch.modules.pathing import class_from_file_path
 
 
 CLASS_NAMES = ['Lensed', 'Eccentric', 'Quasi-Circular Unlensed']
@@ -32,9 +34,9 @@ def parse_args():
     parser.add_argument('--samples-per-class', type=int, default=1, help='Number of correctly classified samples per class to generate Grad-CAM for')
     parser.add_argument('--results-dir', type=str, default='inference_results', help='Base directory for output artifacts')
     parser.add_argument('--seed', type=int, default=42, help='Random seed for reproducibility')
-    parser.add_argument('--flip-x', dest='flip_x', action='store_true', help='Flip images along x-axis before any transforms (default: enabled).')
+    parser.add_argument('--flip-x', dest='flip_x', action='store_true', help='Flip images along x-axis before any transforms.')
     parser.add_argument('--no-flip-x', dest='flip_x', action='store_false', help='Disable x-axis flip.')
-    parser.set_defaults(flip_x=True)
+    parser.set_defaults(flip_x=False)
     return parser.parse_args()
 
 
@@ -58,7 +60,7 @@ class GWDataset(Dataset):
         if self.transform:
             arr = self.transform(arr)
 
-        label_str = file_path.split('/')[-2].lower()
+        label_str = class_from_file_path(file_path).lower()
         if label_str not in LABEL_MAP:
             raise ValueError(f'Unknown class folder: {label_str} ({file_path})')
         label = LABEL_MAP[label_str]
@@ -87,7 +89,7 @@ def load_data(path_name='data', batch_size=128, flip_x=True):
         dataset,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=os.cpu_count(),
+        num_workers=safe_num_workers(),
         collate_fn=custom_collate_fn,
     )
     return num_channels, loader

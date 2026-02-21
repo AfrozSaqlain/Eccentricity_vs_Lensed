@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from gwtorch.modules.data_loading import default_transform_224, safe_num_workers
 from gwtorch.modules.ml_utils import get_model, seed_everything
-from gwtorch.modules.pathing import discover_npy_files
+from gwtorch.modules.pathing import class_from_file_path, discover_npy_files
 
 
 CLASS_NAMES = ["Lensed", "Eccentric", "Quasi-Circular Unlensed"]
@@ -30,7 +30,7 @@ def parse_args():
     parser.add_argument("--alpha", type=float, default=0.45, help="Overlay alpha in [0,1]")
     parser.add_argument("--flip-x", dest="flip_x", action="store_true", help="Flip input along x-axis before plotting")
     parser.add_argument("--no-flip-x", dest="flip_x", action="store_false", help="Disable x-axis flip")
-    parser.set_defaults(flip_x=True)
+    parser.set_defaults(flip_x=False)
     return parser.parse_args()
 
 
@@ -53,7 +53,7 @@ class GWDataset(Dataset):
         if self.transform:
             arr = self.transform(arr)
 
-        label_str = Path(file_path).parent.name.lower()
+        label_str = class_from_file_path(file_path).lower()
         if label_str not in LABEL_MAP:
             raise ValueError(f"Unknown class folder: {label_str} ({file_path})")
         label = LABEL_MAP[label_str]
@@ -240,7 +240,6 @@ def main():
                 sample_path = Path(file_paths[i])
                 sample_idx = collected[true_idx] + 1
                 output_png = output_dir / f"{CLASS_NAMES[true_idx]}_{sample_idx}_{sample_path.stem}.png"
-                output_npy = output_dir / f"{CLASS_NAMES[true_idx]}_{sample_idx}_{sample_path.stem}.npy"
 
                 save_attention_figure(
                     rgb_image=rgb_image,
@@ -252,7 +251,6 @@ def main():
                     pred_label_name=CLASS_NAMES[pred_idx],
                     confidence=float(probs[i, pred_idx].item()),
                 )
-                np.save(output_npy, heatmap)
 
                 collected[true_idx] += 1
                 print(f"Saved attention overlay: {output_png}")
