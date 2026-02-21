@@ -52,7 +52,7 @@ def main():
     # Required argument
     parser.add_argument("--model", type=str, choices=['cnn', 'transformer'],
                         help="Model type for training jobs")
-    parser.add_argument("--model-subtype", type=str, choices=['CNN', 'SimpleCNN', 'ViT', 'CvT'],
+    parser.add_argument("--model-subtype", type=str, choices=['CNN', 'SimpleCNN', 'ViT', 'ViTLinear', 'CvT'],
                         help="Model type for training jobs")
     parser.add_argument("--classification-scheme", type=str, choices=['binary', 'multi-class'],
                         help="Classification scheme for the model")
@@ -82,7 +82,7 @@ def main():
     if args.model == 'cnn':
         assert args.model_subtype in ['CNN', 'SimpleCNN'], "For CNN model, model-subtype must be 'CNN' or 'SimpleCNN'."
     elif args.model == 'transformer':
-        assert args.model_subtype in ['ViT', 'CvT'], "For transformer model, model-subtype must be 'ViT' or 'CvT'."
+        assert args.model_subtype in ['ViT', 'ViTLinear', 'CvT'], "For transformer model, model-subtype must be 'ViT', 'ViTLinear', or 'CvT'."
     
     # Generate all necessary files
     generate_submit_file(

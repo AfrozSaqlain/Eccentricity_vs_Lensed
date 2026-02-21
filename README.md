@@ -15,7 +15,9 @@ To install the package just run: `bash install.sh`
 │   │   └── dagman.py
 │   ├── inference
 │   │   ├── cnn_eval.py
-│   │   └── transformer_eval.py
+│   │   ├── transformer_attention.py
+│   │   ├── transformer_eval.py
+│   │   └── transformer_grad_cam.py
 │   ├── modules
 │   │   ├── constants.py
 │   │   ├── general_utils.py
@@ -48,8 +50,10 @@ To install the package just run: `bash install.sh`
 - `match_gen.py`: Generates Q-transform spectrograms of synthetic GW signals, and computes ln B based on match.
 - `match_gen_dag.py`: This is exactly same as previous function but it's suitable to generate dataset using this function when working on an HTCondor based system.
 - `fitting_factor_gen.py`: Generates Q-transform spectrograms of synthetic GW signals, and computes ln B based on fitting factor.
-- `cnn.py`, `transformer.py`: Contain CNN and Transformer model definitions with training/testing routines.
+- `neural_net.py`: Contains CNN models and transformer constructors (`ViT`, `ViTLinear`, `CvT`).
+- `cnn.py`, `transformer.py`: Contain CNN and Transformer training/testing routines.
 - `cnn_eval.py`, `transformer_eval.py`: Specifically used to evaluate trained CNN and Transformer models on test data.
+- `transformer_attention.py`: Generates transformer attention maps and overlay plots on GW spectrograms.
 - `dagman.py`: Using this script we can simply run `generate_dagman_gwtorch --jobs [number-of-jobs] --memory [RAM]G --disk [DISK]G --cpu [no-of-cpus] --samples [no-of-samples] to create a dagman workflow which you can submit to HTCondor system.
 
 
@@ -75,7 +79,7 @@ To install the package just run: `bash install.sh`
 
 - **`cnn_train_gwtorch --batch_size [default: 128] --epochs [default: 20] --lr [default: 3e-4] --gamma [default: 0.7] --model_path [default: cnn_model0.pth]  --k-folds [default: 5] --use-kfold [stores Truth value]`**: Train the CNN model on the data generated using previous code. The directory `models` is created if it doesn't exist.
 
-- **`transformer_train_gwtorch --model [default: ViT] --batch_size [default: 512] --epochs [default 20] --lr [default: 3e-5] --gamma [default: 0.7] --seed [default: 42] --k-folds [default: 5] --use-kfold [stores Truth value]`**:  Train the Transformer model on the data generated.
+- **`transformer_train_gwtorch --model [ViT | ViTLinear | CvT, default: ViT] --batch_size [default: 512] --epochs [default 20] --lr [default: 3e-5] --gamma [default: 0.7] --seed [default: 42] --k-folds [default: 5] --use-kfold [stores Truth value]`**:  Train the Transformer model on the data generated.
 
 # 🌊 How GW waveforms are generated
 
@@ -198,7 +202,7 @@ cnn_train_gwtorch \
   --model-file-name cnn_model
 ```
 
-### Transformer (ViT or CvT)
+### Transformer (ViT, ViTLinear, or CvT)
 
 ```bash
 transformer_train_gwtorch \
@@ -236,7 +240,7 @@ binary_cnn_train_gwtorch \
   --model-file-name cnn_model_binary
 ```
 
-### Binary Transformer
+### Binary Transformer (ViT, ViTLinear, or CvT)
 
 ```bash
 binary_transformer_train_gwtorch \
@@ -306,6 +310,17 @@ transformer_gradcam_gwtorch \
   --results-dir inference_results
 ```
 
+### Transformer Attention Overlay
+
+```bash
+transformer_attention_gwtorch \
+  --model ViT \
+  --model-path vit_model.pth \
+  --path-name data \
+  --samples-per-class 3 \
+  --results-dir inference_results
+```
+
 ## 7) HTCondor Workflow
 
 Create DAG artifacts:
@@ -331,7 +346,7 @@ Generate training submit file:
 ```bash
 generate_training_condor_gwtorch \
   --model transformer \
-  --model-subtype ViT \
+  --model-subtype ViTLinear \
   --classification-scheme multi-class \
   --epochs 20 \
   --batch-size 512 \

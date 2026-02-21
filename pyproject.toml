@@ -56,6 +56,7 @@ hybrid_transformer_train_gwtorch = "gwtorch.training.hybrid_transformer:main"
 # Inference tools
 transformer_inference_gwtorch = "gwtorch.inference.transformer_eval:main"
 transformer_gradcam_gwtorch = "gwtorch.inference.transformer_grad_cam:main"
+transformer_attention_gwtorch = "gwtorch.inference.transformer_attention:main"
 cnn_inference_gwtorch = "gwtorch.inference.cnn_eval:main"
 cnn_gradcam_gwtorch = "gwtorch.inference.cnn_grad_cam:main"
 

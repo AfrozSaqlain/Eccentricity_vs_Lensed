@@ -15,10 +15,7 @@ import pandas as pd
 from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split, StratifiedKFold
 
-from linformer import Linformer
-from vit_pytorch.efficient import ViT
-from vit_pytorch.cvt import CvT
-from gwtorch.modules.neural_net import CNN_Model, SimpleCNN
+from gwtorch.modules.neural_net import CNN_Model, SimpleCNN, create_transformer_model
 from gwtorch.modules.data_loading import (
     NpyGWDataset,
     collate_with_weights,
@@ -157,21 +154,19 @@ def create_fold_loaders(train_files, val_files, batch_size):
     return num_channels, train_loader, val_loader
 
 def get_model(name, num_channels, device):
-    if name == 'CvT':
-        return CvT(num_classes=3, channels=num_channels, s1_emb_dim=64, s1_emb_kernel=7, s1_emb_stride=4, s1_proj_kernel=3,
-                   s1_kv_proj_stride=2, s1_heads=1, s1_depth=1, s1_mlp_mult=4, s2_emb_dim=192,
-                   s2_emb_kernel=3, s2_emb_stride=2, s2_proj_kernel=3, s2_kv_proj_stride=2, s2_heads=3,
-                   s2_depth=2, s2_mlp_mult=4, s3_emb_dim=384, s3_emb_kernel=3, s3_emb_stride=2,
-                   s3_proj_kernel=3, s3_kv_proj_stride=2, s3_heads=4, s3_depth=10, s3_mlp_mult=4,
-                   dropout=dropout).to(device)
-    elif name == 'ViT':
-        transformer = Linformer(dim=128, seq_len=50, depth=12, heads=8, k=64, dropout=dropout)
-        return ViT(dim=128, image_size=224, patch_size=32, num_classes=3,
-                   transformer=transformer, channels=num_channels).to(device)
-    elif name == 'CNN':
+    if name in {'CvT', 'ViT', 'ViTLinear'}:
+        return create_transformer_model(
+            name=name,
+            num_channels=num_channels,
+            device=device,
+            num_classes=3,
+            dropout=dropout,
+        )
+    if name == 'CNN':
         return CNN_Model(input_channels=num_channels, dropout=dropout).to(device)
-    elif name == 'SimpleCNN':
+    if name == 'SimpleCNN':
         return SimpleCNN(input_channels=num_channels, dropout=dropout).to(device)
+    raise ValueError("Unknown model '{}'. Expected one of: CNN, SimpleCNN, ViT, ViTLinear, CvT.".format(name))
     
 def train_model(model, train_loader, valid_loader, device, epochs, lr, gamma, class_weights=None):
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)

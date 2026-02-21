@@ -14,10 +14,6 @@ from torch.utils.data import DataLoader, Dataset
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
 
-from linformer import Linformer
-from vit_pytorch.efficient import ViT
-from vit_pytorch.cvt import CvT
-
 from gwtorch.modules.general_utils import (
     compute_roc_auc_with_misclassifications,
     plot_roc_curves,
@@ -26,6 +22,7 @@ from gwtorch.modules.general_utils import (
     save_misclassified_files_to_txt,
     plot_training_curves,
 )
+from gwtorch.modules.neural_net import create_transformer_model
 from gwtorch.modules.data_loading import (
     NpyGWDataset,
     collate_with_weights,
@@ -54,7 +51,7 @@ def setup_directories(model_name):
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train Transformer for binary GW classification (eccentric vs lensed)")
-    parser.add_argument('--model', type=str, default='ViT', choices=['CvT', 'ViT'], help='Model to train')
+    parser.add_argument('--model', type=str, default='ViT', choices=['CvT', 'ViT', 'ViTLinear'], help='Model to train')
     parser.add_argument('--batch-size', type=int, default=512)
     parser.add_argument('--epochs', type=int, default=20)
     parser.add_argument('--lr', type=float, default=3e-5)
@@ -137,17 +134,13 @@ def load_all_data(path_name='data', seed=42, batch_size=32):
     return num_channels, train_loader, val_loader, test_loader, class_weights
 
 def get_model(name, num_channels, device):
-    if name == 'CvT':
-        return CvT(num_classes=2, s1_emb_dim=64, s1_emb_kernel=7, s1_emb_stride=4, s1_proj_kernel=3,
-                   s1_kv_proj_stride=2, s1_heads=1, s1_depth=1, s1_mlp_mult=4, s2_emb_dim=192,
-                   s2_emb_kernel=3, s2_emb_stride=2, s2_proj_kernel=3, s2_kv_proj_stride=2, s2_heads=3,
-                   s2_depth=2, s2_mlp_mult=4, s3_emb_dim=384, s3_emb_kernel=3, s3_emb_stride=2,
-                   s3_proj_kernel=3, s3_kv_proj_stride=2, s3_heads=4, s3_depth=10, s3_mlp_mult=4,
-                   dropout=0.4).to(device)
-    else:
-        transformer = Linformer(dim=128, seq_len=50, depth=12, heads=8, k=64, dropout=0.4)
-        return ViT(dim=128, image_size=224, patch_size=32, num_classes=2,
-                   transformer=transformer, channels=num_channels).to(device)
+    return create_transformer_model(
+        name=name,
+        num_channels=num_channels,
+        device=device,
+        num_classes=2,
+        dropout=0.4,
+    )
 
 def train_model(model, train_loader, valid_loader, device, epochs, lr, gamma, class_weights=None):
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)

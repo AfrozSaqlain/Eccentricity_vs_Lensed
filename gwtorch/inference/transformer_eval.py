@@ -38,7 +38,7 @@ def setup_directories(results_dir, model_name='ViT'):
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Test Transformer for GW classification")
-    parser.add_argument('--model', type=str, default='ViT', choices=['CvT', 'ViT'], help='Model architecture to evaluate')
+    parser.add_argument('--model', type=str, default='ViT', choices=['CvT', 'ViT', 'ViTLinear'], help='Model architecture to evaluate')
     parser.add_argument('--batch-size', type=int, default=512)
     parser.add_argument('--model-path', type=str, default='vit_model.pth', help='Model file name inside models directory')
     parser.add_argument('--path-name', type=str, default='data', help='Path to the dataset directory.')
