@@ -18,7 +18,19 @@ def resolve_env_executable(command_name):
     return command_name
 
 
-def generate_submit_file(memory, disk, cpu, model, model_subtype, classification_scheme, epochs, batch_size, data_file_path):
+def generate_submit_file(
+    memory,
+    disk,
+    cpu,
+    model,
+    model_subtype,
+    classification_scheme,
+    epochs,
+    batch_size,
+    data_file_path,
+    accounting_group,
+    accounting_group_user,
+):
     if classification_scheme == 'binary':
         path=f"submit/{classification_scheme}_{model_subtype}_train.sub"
         executable_name = 'binary_' + model + '_train_gwtorch'
@@ -47,8 +59,8 @@ error = HTCondor_Logs/$(job_name).error
 stream_error = True
 stream_output = True
 
-accounting_group = iucaa.gw_lens
-accounting_group_user = saqlain.afroz
+accounting_group = {accounting_group}
+accounting_group_user = {accounting_group_user}
 
 should_transfer_files = yes
 transfer_input_files = results
@@ -90,6 +102,10 @@ def main():
                         help="Batch size for training")
     parser.add_argument("--data-file-path", type=str, default="data",
                         help="Path to the dataset directory")
+    parser.add_argument("--accounting-group", type=str, default=os.getenv("GWTORCH_ACCOUNTING_GROUP", "iucaa.gw_lens"),
+                        help="HTCondor accounting group")
+    parser.add_argument("--accounting-group-user", type=str, default=os.getenv("GWTORCH_ACCOUNTING_GROUP_USER", "saqlain.afroz"),
+                        help="HTCondor accounting group user")
     
     args = parser.parse_args()
     
@@ -98,10 +114,10 @@ def main():
     os.makedirs("results", exist_ok=True)
     os.makedirs("HTCondor_Logs", exist_ok=True)
 
-    if args.model == 'cnn':
-        assert args.model_subtype in ['CNN', 'SimpleCNN'], "For CNN model, model-subtype must be 'CNN' or 'SimpleCNN'."
-    elif args.model == 'transformer':
-        assert args.model_subtype in ['ViT', 'ViTLinear', 'CvT'], "For transformer model, model-subtype must be 'ViT', 'ViTLinear', or 'CvT'."
+    if args.model == 'cnn' and args.model_subtype not in ['CNN', 'SimpleCNN']:
+        raise ValueError("For CNN model, model-subtype must be 'CNN' or 'SimpleCNN'.")
+    if args.model == 'transformer' and args.model_subtype not in ['ViT', 'ViTLinear', 'CvT']:
+        raise ValueError("For transformer model, model-subtype must be 'ViT', 'ViTLinear', or 'CvT'.")
     
     # Generate all necessary files
     executable = generate_submit_file(
@@ -113,7 +129,9 @@ def main():
         classification_scheme=args.classification_scheme,
         epochs=args.epochs,
         batch_size=args.batch_size,
-        data_file_path=args.data_file_path
+        data_file_path=args.data_file_path,
+        accounting_group=args.accounting_group,
+        accounting_group_user=args.accounting_group_user,
     )
 
     print(f"✅ Successfully generated submit file for training {args.model_subtype} model in the 'submit' directory.")

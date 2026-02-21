@@ -18,7 +18,17 @@ def resolve_env_executable(command_name):
     return command_name
 
 
-def generate_submit_file(memory, disk, samples, cpu, snr_dist, executable, path="submit/short_gen.sub"):
+def generate_submit_file(
+    memory,
+    disk,
+    samples,
+    cpu,
+    snr_dist,
+    executable,
+    accounting_group,
+    accounting_group_user,
+    path="submit/short_gen.sub",
+):
     """Generates the HTCondor submit file for the data generation jobs."""
     content = f"""executable = {executable}
 
@@ -37,8 +47,8 @@ error = HTCondor_Logs/$(job_name).error
 stream_error = True
 stream_output = True
 
-accounting_group = iucaa.gw_lens
-accounting_group_user = saqlain.afroz
+accounting_group = {accounting_group}
+accounting_group_user = {accounting_group_user}
 
 should_transfer_files = yes
 transfer_input_files = results
@@ -224,6 +234,10 @@ def main():
                         help='Minimum of SNR values to sample from. Default is 8.')
     parser.add_argument("--snr-max", type=int, default=100,
                         help='Maximum of SNR values to sample from. Default is 100.')
+    parser.add_argument("--accounting-group", type=str, default=os.getenv("GWTORCH_ACCOUNTING_GROUP", "iucaa.gw_lens"),
+                        help="HTCondor accounting group")
+    parser.add_argument("--accounting-group-user", type=str, default=os.getenv("GWTORCH_ACCOUNTING_GROUP_USER", "saqlain.afroz"),
+                        help="HTCondor accounting group user")
     
     args = parser.parse_args()
     
@@ -242,6 +256,8 @@ def main():
         cpu=args.cpu,
         snr_dist=args.snr_dist,
         executable=executable,
+        accounting_group=args.accounting_group,
+        accounting_group_user=args.accounting_group_user,
     )
     generate_merge_sh()
     generate_combine_csv_sh()

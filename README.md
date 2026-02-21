@@ -80,6 +80,7 @@ To install the package just run: `bash install.sh`
 - **`cnn_train_gwtorch --batch_size [default: 128] --epochs [default: 20] --lr [default: 3e-4] --gamma [default: 0.7] --model_path [default: cnn_model0.pth]  --k-folds [default: 5] --use-kfold [stores Truth value]`**: Train the CNN model on the data generated using previous code. The directory `models` is created if it doesn't exist.
 
 - **`transformer_train_gwtorch --model [ViT | ViTLinear | CvT, default: ViT] --batch_size [default: 512] --epochs [default 20] --lr [default: 3e-5] --gamma [default: 0.7] --seed [default: 42] --k-folds [default: 5] --use-kfold [stores Truth value]`**:  Train the Transformer model on the data generated.
+- **`hyperparameter_tune_gwtorch --task [cnn | binary_cnn | vit | binary_vit] --model [architecture] --trials [int] --epochs [int] ...`**: Random-search hyperparameter tuning. You can pick the exact neural-network architecture to tune.
 
 # 🌊 How GW waveforms are generated
 
@@ -264,6 +265,7 @@ cnn_inference_gwtorch \
   --batch-size 512 \
   --model-path cnn_model.pth \
   --path-name data \
+  --eval-split test \
   --meta-csv results/data_parameters.csv \
   --results-dir inference_results \
   --seed 42
@@ -277,6 +279,7 @@ transformer_inference_gwtorch \
   --batch-size 512 \
   --model-path vit_model.pth \
   --path-name data \
+  --eval-split test \
   --meta-csv results/data_parameters.csv \
   --results-dir inference_results \
   --seed 42
@@ -287,6 +290,10 @@ Optional lnB-filtered confusion matrix for transformer inference:
 ```bash
 --lnB-min 0 --lnB-max 10
 ```
+
+Inference split behavior:
+- `--eval-split test` (default): evaluates only the held-out test split (same 70/15/15 split logic and `--seed` as training).
+- `--eval-split all`: evaluates all samples under `--path-name` (explicit opt-in) and requires `--allow-all-eval`.
 
 ## 6) Grad-CAM
 
@@ -332,7 +339,9 @@ generate_data_dagman_gwtorch \
   --disk 20G \
   --samples 100 \
   --cpu 5 \
-  --snr-dist powerlaw
+  --snr-dist powerlaw \
+  --accounting-group iucaa.gw_lens \
+  --accounting-group-user saqlain.afroz
 ```
 
 Submit:
@@ -350,7 +359,9 @@ generate_training_condor_gwtorch \
   --classification-scheme multi-class \
   --epochs 20 \
   --batch-size 512 \
-  --data-file-path data
+  --data-file-path data \
+  --accounting-group iucaa.gw_lens \
+  --accounting-group-user saqlain.afroz
 ```
 
 ## 8) Recommended Dataset Naming Convention
@@ -377,6 +388,68 @@ This helps training/inference find lnB metadata automatically.
   - training/inference can still run with fewer worker processes.
 - If metadata CSV is missing, scripts can still run but lnB-dependent analysis will be limited.
 - For tiny datasets, `train_test_split(..., stratify=...)` may fail. Increase `--num-samples`.
+
+## 11) Hyperparameter Tuning
+
+Tune any specific model family with one command.
+
+Examples:
+
+```bash
+# Multi-class CNN
+hyperparameter_tune_gwtorch \
+  --task cnn \
+  --model CNN \
+  --path-name data \
+  --trials 20 \
+  --epochs 20 \
+  --save-best-model
+```
+
+```bash
+# Binary CNN (eccentric vs lensed)
+hyperparameter_tune_gwtorch \
+  --task binary_cnn \
+  --model SimpleCNN \
+  --path-name data \
+  --trials 20 \
+  --epochs 20 \
+  --save-best-model
+```
+
+```bash
+# Multi-class transformer
+hyperparameter_tune_gwtorch \
+  --task vit \
+  --model ViTLinear \
+  --path-name data \
+  --trials 20 \
+  --epochs 20 \
+  --save-best-model
+```
+
+```bash
+# Binary transformer
+hyperparameter_tune_gwtorch \
+  --task binary_vit \
+  --model CvT \
+  --path-name data \
+  --trials 20 \
+  --epochs 20 \
+  --save-best-model
+```
+
+Notes:
+- Model choices by task:
+  - `cnn`, `binary_cnn`: `CNN`, `SimpleCNN`
+  - `vit`, `binary_vit`: `ViT`, `ViTLinear`, `CvT`
+- Each tuning run is isolated under `results/hyperparameter_tuning/<task>_<model>/<run_name>/`.
+  - Use `--run-name <name>` to set it manually.
+  - Use `--overwrite-run` to reuse an existing run directory.
+- Tuning outputs are saved as:
+  - `trials.jsonl` (all trial results)
+  - `best_result.json`
+  - `best_model.pth` (if `--save-best-model`)
 
 ---
 

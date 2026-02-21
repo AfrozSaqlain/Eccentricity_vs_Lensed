@@ -20,8 +20,13 @@ dependencies = [
 
 [project.optional-dependencies]
 ml = [
+    "torch>=2.2",
+    "torchvision>=0.17",
     "vit-pytorch==1.10.1",
-    "scikit-learn>=1.6.1"
+    "linformer>=0.2.3",
+    "scikit-learn>=1.6.1",
+    "seaborn>=0.13",
+    "grad-cam>=1.5.4"
 ]
 
 gw = [
@@ -31,6 +36,13 @@ gw = [
 ]
 
 all = [
+    "torch>=2.2",
+    "torchvision>=0.17",
+    "vit-pytorch==1.10.1",
+    "linformer>=0.2.3",
+    "scikit-learn>=1.6.1",
+    "seaborn>=0.13",
+    "grad-cam>=1.5.4",
     "PyCBC==2.9.0",
     "bilby==2.5.1",
     "gwpy==3.0.12"
@@ -51,7 +63,7 @@ cnn_train_gwtorch = "gwtorch.training.cnn:main"
 transformer_train_gwtorch = "gwtorch.training.transformer:main"
 binary_transformer_train_gwtorch = "gwtorch.training.binary_transformer_classifier:main"
 binary_cnn_train_gwtorch = "gwtorch.training.binary_cnn_classifier:main"
-hybrid_transformer_train_gwtorch = "gwtorch.training.hybrid_transformer:main"
+hyperparameter_tune_gwtorch = "gwtorch.hyperparameter_tuning.tune:main"
 
 # Inference tools
 transformer_inference_gwtorch = "gwtorch.inference.transformer_eval:main"

@@ -170,7 +170,7 @@ def main():
     if not files:
         raise FileNotFoundError(f"No .npy files found under {args.path_name}/*/*.npy")
 
-    transform = default_transform_224(antialias=True)
+    transform = default_transform_224(antialias=False)
     dataset = GWDataset(files, transform=transform, flip_x=args.flip_x)
     loader = DataLoader(
         dataset,

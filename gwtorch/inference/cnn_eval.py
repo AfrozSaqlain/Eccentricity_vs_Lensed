@@ -4,6 +4,7 @@ from pathlib import Path
 
 import torch
 from torch.utils.data import DataLoader, Dataset
+from sklearn.model_selection import train_test_split
 
 from sklearn.metrics import classification_report
 
@@ -26,6 +27,7 @@ from gwtorch.modules.data_loading import (
     safe_num_workers,
 )
 from gwtorch.modules.pathing import discover_npy_files
+from gwtorch.modules.pathing import class_from_file_path
 
 
 def setup_directories(results_dir, model_name='CNN'):
@@ -40,6 +42,10 @@ def parse_args():
     parser.add_argument('--path-name', type=str, default='data', help='Path to the dataset directory. Default is "data".')
     parser.add_argument('--results-dir', type=str, default='inference_results', help='Path to save inference results.')
     parser.add_argument('--meta-csv', type=str, default='./results/data_parameters.csv', help='Path to metadata CSV file.')
+    parser.add_argument('--eval-split', type=str, default='test', choices=['test', 'all'],
+                        help='Dataset subset used for evaluation. "test" follows the same 70/15/15 split as training using --seed.')
+    parser.add_argument('--allow-all-eval', action='store_true',
+                        help='Required with --eval-split all to avoid accidental full-dataset evaluation.')
     parser.add_argument('--seed', type=int, default=42, help='Random seed for reproducibility.')
     return parser.parse_args()
 
@@ -65,14 +71,25 @@ def custom_collate_fn(batch):
     return collate_with_lnb(batch)
 
 
-def load_all_data(path_name='data', batch_size=32, meta_csv='./results/data_parameters.csv'):
+def load_all_data(path_name='data', batch_size=32, meta_csv='./results/data_parameters.csv', seed=42, eval_split='test'):
     all_files = discover_npy_files(path_name)
     if not all_files:
         raise FileNotFoundError(f"No .npy files found under {path_name}/*/*.npy")
+    all_labels = [class_from_file_path(path) for path in all_files]
 
-    transform = default_transform_224(antialias=True)
+    if eval_split == 'test':
+        _, temp_files, _, temp_labels = train_test_split(
+            all_files, all_labels, test_size=0.3, stratify=all_labels, random_state=seed
+        )
+        _, eval_files, *_ = train_test_split(
+            temp_files, temp_labels, test_size=0.5, stratify=temp_labels, random_state=seed
+        )
+    else:
+        eval_files = all_files
 
-    test_data = GWDataset(all_files, transform=transform, meta_csv=meta_csv)
+    transform = default_transform_224(antialias=False)
+
+    test_data = GWDataset(eval_files, transform=transform, meta_csv=meta_csv)
 
     num_channels = test_data[0][0].shape[0]
 
@@ -84,7 +101,7 @@ def load_all_data(path_name='data', batch_size=32, meta_csv='./results/data_para
         collate_fn=custom_collate_fn,
     )
 
-    return num_channels, test_loader
+    return num_channels, test_loader, len(eval_files), len(all_files)
 
 
 def evaluate_and_plot(model, test_loader, device, results_dir, model_name='CNN'):
@@ -114,17 +131,26 @@ def evaluate_and_plot(model, test_loader, device, results_dir, model_name='CNN')
 
 def main():
     args = parse_args()
+    if args.eval_split == 'all' and not args.allow_all_eval:
+        raise ValueError("Using --eval-split all requires --allow-all-eval.")
+
     setup_directories(results_dir=args.results_dir, model_name=args.model)
     seed_everything(args.seed)
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f"Using device: {device}")
 
-    num_channels, test_loader = load_all_data(
+    num_channels, test_loader, eval_count, total_count = load_all_data(
         path_name=args.path_name,
         batch_size=args.batch_size,
         meta_csv=args.meta_csv,
+        seed=args.seed,
+        eval_split=args.eval_split,
     )
+    if args.eval_split == 'test':
+        print(f"Evaluating held-out test split: {eval_count}/{total_count} samples")
+    else:
+        print(f"Evaluating all samples (explicit opt-in): {eval_count}/{total_count} samples")
 
     model = get_model(name=args.model, num_channels=num_channels, device=device)
 

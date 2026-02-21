@@ -296,7 +296,7 @@ def run_kfold_training(args, device, get_model=None, model_name=None):
 
     fold_results = {
         'val_accuracies': [],
-        'test_accuracies': [],  # We'll use validation as test for k-fold
+        'test_accuracies': [],
         'val_roc_aucs': [],
         'train_losses_all': [],
         'val_losses_all': [],
@@ -358,8 +358,11 @@ def run_kfold_training(args, device, get_model=None, model_name=None):
 
         fold_results['roc_data'].append((val_fpr, val_tpr, val_roc_auc_detailed))
 
+        test_preds_arr, test_labels_arr, _ = evaluate_model(model, test_loader, device)
+        test_accuracy = float((test_preds_arr == test_labels_arr).mean())
+
         fold_results['val_accuracies'].append(val_accs[-1])
-        fold_results['test_accuracies'].append(test_roc_auc) 
+        fold_results['test_accuracies'].append(test_accuracy)
         fold_results['val_roc_aucs'].append(val_roc_auc)
 
         fold_dir = Path(f'results/{model_name}_results') / f'fold_{fold+1}'
