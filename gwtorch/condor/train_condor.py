@@ -108,6 +108,10 @@ def main():
                         help="HTCondor accounting group user")
     
     args = parser.parse_args()
+    data_file_path = Path(args.data_file_path).expanduser()
+    if not data_file_path.is_absolute():
+        data_file_path = Path.cwd() / data_file_path
+    data_file_path = data_file_path.resolve()
     
     # Create directories needed for the workflow
     os.makedirs("submit", exist_ok=True)
@@ -129,7 +133,7 @@ def main():
         classification_scheme=args.classification_scheme,
         epochs=args.epochs,
         batch_size=args.batch_size,
-        data_file_path=args.data_file_path,
+        data_file_path=str(data_file_path),
         accounting_group=args.accounting_group,
         accounting_group_user=args.accounting_group_user,
     )
