@@ -1,18 +1,48 @@
 import os
 import argparse
+import shutil
+import sys
+from pathlib import Path
 
-def generate_submit_file(memory, disk, cpu, model, model_subtype, classification_scheme, epochs, batch_size, data_file_path):
+
+def resolve_env_executable(command_name):
+    env_bin = Path(sys.executable).resolve().parent
+    env_command = env_bin / command_name
+    if env_command.exists() and os.access(env_command, os.X_OK):
+        return str(env_command)
+
+    which_command = shutil.which(command_name)
+    if which_command:
+        return which_command
+
+    return command_name
+
+
+def generate_submit_file(
+    memory,
+    disk,
+    cpu,
+    model,
+    model_subtype,
+    classification_scheme,
+    epochs,
+    batch_size,
+    data_file_path,
+    accounting_group,
+    accounting_group_user,
+):
     if classification_scheme == 'binary':
         path=f"submit/{classification_scheme}_{model_subtype}_train.sub"
-        executable = 'binary_' + model + '_train_gwtorch'
+        executable_name = 'binary_' + model + '_train_gwtorch'
         job_name = f"{classification_scheme}_{model_subtype}_train"
     else:
         path=f"submit/{model_subtype}_train.sub"
-        executable = model + '_train_gwtorch'
+        executable_name = model + '_train_gwtorch'
         job_name = f"{model_subtype}_train"
+    executable = resolve_env_executable(executable_name)
 
     """Generates the HTCondor submit file for the model training."""
-    content = f"""executable = /home/saqlain.afroz/miniconda3/envs/gwtorch-env/bin/{executable}
+    content = f"""executable = {executable}
 
 job_name = {job_name}
 
@@ -29,8 +59,8 @@ error = HTCondor_Logs/$(job_name).error
 stream_error = True
 stream_output = True
 
-accounting_group = iucaa.gw_lens
-accounting_group_user = saqlain.afroz
+accounting_group = {accounting_group}
+accounting_group_user = {accounting_group_user}
 
 should_transfer_files = yes
 transfer_input_files = results
@@ -43,6 +73,7 @@ queue
 """
     with open(path, "w") as f:
         f.write(content)
+    return executable
 
 def main():
     parser = argparse.ArgumentParser(
@@ -52,7 +83,7 @@ def main():
     # Required argument
     parser.add_argument("--model", type=str, choices=['cnn', 'transformer'],
                         help="Model type for training jobs")
-    parser.add_argument("--model-subtype", type=str, choices=['CNN', 'SimpleCNN', 'ViT', 'CvT'],
+    parser.add_argument("--model-subtype", type=str, choices=['CNN', 'SimpleCNN', 'ViT', 'ViTLinear', 'CvT'],
                         help="Model type for training jobs")
     parser.add_argument("--classification-scheme", type=str, choices=['binary', 'multi-class'],
                         help="Classification scheme for the model")
@@ -71,21 +102,29 @@ def main():
                         help="Batch size for training")
     parser.add_argument("--data-file-path", type=str, default="data",
                         help="Path to the dataset directory")
+    parser.add_argument("--accounting-group", type=str, default=os.getenv("GWTORCH_ACCOUNTING_GROUP", "iucaa.gw_lens"),
+                        help="HTCondor accounting group")
+    parser.add_argument("--accounting-group-user", type=str, default=os.getenv("GWTORCH_ACCOUNTING_GROUP_USER", "saqlain.afroz"),
+                        help="HTCondor accounting group user")
     
     args = parser.parse_args()
+    data_file_path = Path(args.data_file_path).expanduser()
+    if not data_file_path.is_absolute():
+        data_file_path = Path.cwd() / data_file_path
+    data_file_path = data_file_path.resolve()
     
     # Create directories needed for the workflow
     os.makedirs("submit", exist_ok=True)
     os.makedirs("results", exist_ok=True)
     os.makedirs("HTCondor_Logs", exist_ok=True)
 
-    if args.model == 'cnn':
-        assert args.model_subtype in ['CNN', 'SimpleCNN'], "For CNN model, model-subtype must be 'CNN' or 'SimpleCNN'."
-    elif args.model == 'transformer':
-        assert args.model_subtype in ['ViT', 'CvT'], "For transformer model, model-subtype must be 'ViT' or 'CvT'."
+    if args.model == 'cnn' and args.model_subtype not in ['CNN', 'SimpleCNN']:
+        raise ValueError("For CNN model, model-subtype must be 'CNN' or 'SimpleCNN'.")
+    if args.model == 'transformer' and args.model_subtype not in ['ViT', 'ViTLinear', 'CvT']:
+        raise ValueError("For transformer model, model-subtype must be 'ViT', 'ViTLinear', or 'CvT'.")
     
     # Generate all necessary files
-    generate_submit_file(
+    executable = generate_submit_file(
         memory=args.memory,
         disk=args.disk,
         cpu=args.cpu,
@@ -94,10 +133,13 @@ def main():
         classification_scheme=args.classification_scheme,
         epochs=args.epochs,
         batch_size=args.batch_size,
-        data_file_path='data'
+        data_file_path=str(data_file_path),
+        accounting_group=args.accounting_group,
+        accounting_group_user=args.accounting_group_user,
     )
 
     print(f"✅ Successfully generated submit file for training {args.model_subtype} model in the 'submit' directory.")
+    print(f"Using executable: {executable}")
     
     if args.classification_scheme == 'binary':
         print(f"To run, execute: condor_submit submit/{args.classification_scheme}_{args.model_subtype}_train.sub")

@@ -33,6 +33,7 @@ def parse_args():
     parser.add_argument('--model-path', type=str, default='cnn_model.pth', help="Model will be saved in models directory with extention as .pth")
     parser.add_argument('--path-name', type=str, default='data', help='Path to the dataset directory. Default is "data".')
     parser.add_argument('--results-dir', type=str, default='inference_results', help='Path to save the results of the inference made by the model.')
+    parser.add_argument('--num-classes', type=int, choices=[2, 3], default=3, help='Number of output classes in the checkpoint.')
     return parser.parse_args()
 
 class GWDataset(Dataset):
@@ -57,7 +58,7 @@ class GWDataset(Dataset):
         
         arr = self.transform(arr)
 
-        label_str = file_path.split("/")[2].lower()
+        label_str = Path(file_path).parent.name.lower()
         label = {'lensed': 0, 'eccentric': 1, 'unlensed': 2}[label_str]
 
         return arr, label, file_path
@@ -77,11 +78,11 @@ def custom_collate_fn(batch):
 
     return torch.stack(images), torch.tensor(labels), weights, img_paths
 
-def load_all_data(path_name='data', batch_size=32):
+def load_all_data(path_name='data', batch_size=32, num_classes=3):
 
     all_files = glob.glob(f'{path_name}/*/*.npy')
-    all_labels = [path.split('/')[2] for path in all_files]
-
+    if num_classes == 2:
+        all_files = [p for p in all_files if Path(p).parent.name.lower() in {'lensed', 'eccentric'}]
 
     transform = transforms.Compose([
         # transforms.Lambda(lambda x: torch.tensor(x).permute(2, 0, 1)),
@@ -99,8 +100,7 @@ def load_all_data(path_name='data', batch_size=32):
 
     return num_channels, test_loader
 
-def evaluate_and_plot(model, test_loader, device, results_dir, model_name='CNN'):
-    class_names = ['Lensed', 'Eccentric', 'Quasi-Circular Unlensed']
+def evaluate_and_plot(model, test_loader, device, results_dir, class_names, model_name='CNN'):
     results_dir = Path(f'./{results_dir}/{model_name}_results')
 
     
@@ -134,9 +134,9 @@ def main():
 
     print(f"Using device: {device}")
 
-    num_channels, test_loader = load_all_data(path_name=args.path_name, batch_size=args.batch_size)
+    num_channels, test_loader = load_all_data(path_name=args.path_name, batch_size=args.batch_size, num_classes=args.num_classes)
 
-    model = CNN_Model(input_channlels=num_channels).to(device)
+    model = CNN_Model(input_channels=num_channels, num_classes=args.num_classes).to(device)
 
     if os.path.exists(f'./models/{args.model_path}'):
         model.load_state_dict(torch.load(f'./models/{args.model_path}', map_location=device))
@@ -144,7 +144,8 @@ def main():
     else:
         raise FileNotFoundError(f"No pre-trained model found at {args.model_path}.")
     
-    test_misclassified = evaluate_and_plot(model, test_loader, device, args.results_dir)
+    class_names = ['Lensed', 'Eccentric'] if args.num_classes == 2 else ['Lensed', 'Eccentric', 'Quasi-Circular Unlensed']
+    test_misclassified = evaluate_and_plot(model, test_loader, device, args.results_dir, class_names)
 
     print("\nTraining complete. Summary:")
     print(f"Test misclassifications: {len(test_misclassified)}")

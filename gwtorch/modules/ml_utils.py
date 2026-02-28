@@ -16,10 +16,13 @@ import pandas as pd
 from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split, StratifiedKFold
 
-from linformer import Linformer
-from vit_pytorch.efficient import ViT
-from vit_pytorch.cvt import CvT
-from gwtorch.modules.neural_net import CNN_Model, SimpleCNN
+from gwtorch.modules.neural_net import (
+    CNN_Model,
+    SimpleCNN,
+    create_cvt_model,
+    create_vit_model,
+    create_vit_linear_model,
+)
 
 from gwtorch.modules.general_utils import (
     compute_roc_auc_with_misclassifications,
@@ -31,9 +34,23 @@ from gwtorch.modules.general_utils import (
     plot_kfold_roc_curves,
     plot_average_training_curves
 )
+###################################################################################################
+# Constants for ML training and evaluation. Adjust as needed for different experiments or datasets.
+###################################################################################################
 
 dropout = 0.2
 class_names = ["Lensed", "Eccentric", "Quasi-Circular Unlensed"]
+
+###################################################################################################
+
+def _collect_dataset_files(path_name):
+    all_files = glob.glob(f'{path_name}/*/*.npy')
+    if not all_files:
+        raise FileNotFoundError(
+            f"No '.npy' files found under '{path_name}/*/'. "
+            "Expected class subdirectories (e.g., lensed/eccentric/unlensed)."
+        )
+    return all_files
 
 def seed_everything(seed):
     random.seed(seed)
@@ -105,7 +122,7 @@ def filenames_to_label_indices(file_list):
 
 def load_all_data(path_name='data', seed=42, batch_size=32):
 
-    all_files = glob.glob(f'{path_name}/*/*.npy')
+    all_files = _collect_dataset_files(path_name)
     all_labels = [path.split('/')[-2] for path in all_files]
 
     train_files, temp_files, train_labels, temp_labels = train_test_split(
@@ -144,7 +161,7 @@ def load_all_data(path_name='data', seed=42, batch_size=32):
 def prepare_kfold_data(path_name='data'):
     """Prepare data for k-fold cross validation"""
 
-    all_files = glob.glob(f'{path_name}/*/*.npy')
+    all_files = _collect_dataset_files(path_name)
     all_labels = [path.split('/')[-2] for path in all_files]
     
     return all_files, all_labels
@@ -170,23 +187,22 @@ def create_fold_loaders(train_files, val_files, batch_size):
 
     return num_channels, train_loader, val_loader
 
-def get_model(name, num_channels, device):
+def get_model(name, num_channels, device, num_classes=3, dropout_rate=dropout):
     if name == 'CvT':
-        return CvT(num_classes=3, channels=num_channels, s1_emb_dim=64, s1_emb_kernel=7, s1_emb_stride=4, s1_proj_kernel=3,
-                   s1_kv_proj_stride=2, s1_heads=1, s1_depth=1, s1_mlp_mult=4, s2_emb_dim=192,
-                   s2_emb_kernel=3, s2_emb_stride=2, s2_proj_kernel=3, s2_kv_proj_stride=2, s2_heads=3,
-                   s2_depth=2, s2_mlp_mult=4, s3_emb_dim=384, s3_emb_kernel=3, s3_emb_stride=2,
-                   s3_proj_kernel=3, s3_kv_proj_stride=2, s3_heads=4, s3_depth=10, s3_mlp_mult=4,
-                   dropout=dropout).to(device)
+        model = create_cvt_model(num_classes=num_classes, num_channels=num_channels, dropout=dropout_rate)
     elif name == 'ViT':
-        transformer = Linformer(dim=128, seq_len=50, depth=12, heads=8, k=64, dropout=dropout)
-        return ViT(dim=128, image_size=224, patch_size=32, num_classes=3,
-                   transformer=transformer, channels=num_channels).to(device)
+        model = create_vit_model(num_classes=num_classes, num_channels=num_channels, dropout=dropout_rate)
+    elif name == 'ViTLinear':
+        model = create_vit_linear_model(num_classes=num_classes, num_channels=num_channels, dropout=dropout_rate)
     elif name == 'CNN':
-        return CNN_Model(input_channels=num_channels, dropout=dropout).to(device)
+        model = CNN_Model(input_channels=num_channels, dropout=dropout_rate, num_classes=num_classes)
     elif name == 'SimpleCNN':
-        return SimpleCNN(input_channels=num_channels, dropout=dropout).to(device)
-    
+        model = SimpleCNN(input_channels=num_channels, dropout=dropout_rate, num_classes=num_classes)
+    else:
+        raise ValueError(f"Unsupported model: {name}")
+
+    return model.to(device)
+
 def train_model(model, train_loader, valid_loader, device, epochs, lr, gamma, class_weights=None):
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     scheduler = StepLR(optimizer, step_size=5, gamma=gamma)
@@ -371,9 +387,11 @@ def run_kfold_training(args, device, get_model=None, model_name=None):
         fold_results['train_accs_all'].append(train_accs)
         fold_results['val_accs_all'].append(val_accs)
 
-        val_misclassified, test_misclassified, val_roc_auc, test_roc_auc = evaluate_and_plot(
+        val_misclassified, test_misclassified, val_roc_auc, _test_roc_auc = evaluate_and_plot(
             model, val_loader, test_loader, device, fold=fold+1, model_name=model_name
         )
+        test_preds, test_true, _ = evaluate_model(model, test_loader, device)
+        test_accuracy = float(np.mean(test_preds == test_true))
 
         val_fpr, val_tpr, val_roc_auc_detailed, _, _, _, _ = compute_roc_auc_with_misclassifications(
             model, val_loader, device, class_names
@@ -382,7 +400,7 @@ def run_kfold_training(args, device, get_model=None, model_name=None):
         fold_results['roc_data'].append((val_fpr, val_tpr, val_roc_auc_detailed))
 
         fold_results['val_accuracies'].append(val_accs[-1])
-        fold_results['test_accuracies'].append(test_roc_auc) 
+        fold_results['test_accuracies'].append(test_accuracy)
         fold_results['val_roc_aucs'].append(val_roc_auc)
 
         fold_dir = Path(f'results/{model_name}_results') / f'fold_{fold+1}'
@@ -406,6 +424,9 @@ def run_kfold_training(args, device, get_model=None, model_name=None):
     print(f"Validation Accuracy: {val_acc_mean:.4f} ± {val_acc_std:.4f}")
     print(f"Individual fold accuracies: {[f'{acc:.4f}' for acc in fold_results['val_accuracies']]}")
 
+    # Populates mean/std AUC keys inside fold_results for summary output.
+    plot_kfold_roc_curves(fold_results, Path(f'results/{model_name}_results'), class_names)
+
     summary_path = Path(f'./results/{model_name}_results/kfold_summary.txt')
     with open(summary_path, 'w') as f:
         f.write(f"K-Fold Cross Validation Summary ({args.k_folds} folds)\n")
@@ -418,7 +439,7 @@ def run_kfold_training(args, device, get_model=None, model_name=None):
         f.write(f"Validation Accuracy: {val_acc_mean:.4f} ± {val_acc_std:.4f}\n")
         f.write(f"Individual fold accuracies: {fold_results['val_accuracies']}\n\n")
 
-        if hasattr(fold_results, 'mean_auc_lensed'):
+        if 'mean_auc_lensed' in fold_results:
             f.write("ROC AUC Summary:\n")
             f.write("-" * 20 + "\n")
             for class_name in class_names:
@@ -429,7 +450,5 @@ def run_kfold_training(args, device, get_model=None, model_name=None):
                     f.write(f"{class_name}: {mean_auc:.4f} ± {std_auc:.4f}\n")
 
     plot_average_training_curves(fold_results, Path(f'results/{model_name}_results'))
-
-    plot_kfold_roc_curves(fold_results, Path(f'results/{model_name}_results'), class_names)
     
     return fold_results

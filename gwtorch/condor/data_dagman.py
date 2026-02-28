@@ -1,9 +1,40 @@
 import os
 import argparse
+import shutil
+import sys
+from pathlib import Path
 
-def generate_submit_file(memory, disk, samples, cpu, snr_dist, path="submit/short_gen.sub"):
+
+def resolve_env_executable(command_name):
+    env_bin = Path(sys.executable).resolve().parent
+    env_command = env_bin / command_name
+    if env_command.exists() and os.access(env_command, os.X_OK):
+        return str(env_command)
+
+    which_command = shutil.which(command_name)
+    if which_command:
+        return which_command
+
+    return command_name
+
+
+def generate_submit_file(
+    memory,
+    disk,
+    samples,
+    cpu,
+    snr_dist,
+    executable,
+    accounting_group,
+    accounting_group_user,
+    path="submit/short_gen.sub",
+):
     """Generates the HTCondor submit file for the data generation jobs."""
-    content = f"""executable = /home/saqlain.afroz/miniconda3/envs/gwtorch-env/bin/generate_match_dataset_dag_gwtorch
+
+    pwd = Path.cwd().resolve()
+    dataset_dir_template = f"{pwd}/$(ARG2)_$(ARG1)"
+
+    content = f"""executable = {executable}
 
 job_name = short_gen_batch_$(ARG1)
 
@@ -12,6 +43,7 @@ request_cpus = {cpu}
 request_disk = {disk}
 
 getenv = True
+initialdir = {pwd}
 
 log = HTCondor_Logs/$(job_name).log
 output = HTCondor_Logs/$(job_name).output
@@ -20,15 +52,12 @@ error = HTCondor_Logs/$(job_name).error
 stream_error = True
 stream_output = True
 
-accounting_group = iucaa.gw_lens
-accounting_group_user = saqlain.afroz
+accounting_group = {accounting_group}
+accounting_group_user = {accounting_group_user}
 
-should_transfer_files = yes
-transfer_input_files = results
-when_to_transfer_output = ON_EXIT
-transfer_output_files = $(ARG2)_$(ARG1), results
+should_transfer_files = NO
 
-arguments = --num-samples {samples} --snr-prior {snr_dist} --snr-min $(ARG3) --snr-max $(ARG4) --path-name $(ARG2)_$(ARG1) --batch-size {samples // 2} --seed $(ARG1)
+arguments = --num-samples {samples} --snr-prior {snr_dist} --snr-min $(ARG3) --snr-max $(ARG4) --path-name {dataset_dir_template} --batch-size {samples // 2} --seed $(ARG1)
 
 queue
 """
@@ -41,6 +70,10 @@ def generate_merge_sh(path="submit/merge.sh"):
     Generates the script to merge data directories and then clean them up.
     """
     script = """#!/bin/bash
+set -e
+
+BASE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$BASE_DIR"
 
 # Create the central data folder and subdirectories
 mkdir -p data/eccentric data/lensed data/unlensed
@@ -75,6 +108,11 @@ def generate_combine_csv_sh(path="submit/combine_csv.sh"):
     Generates the script to combine CSV files and then clean them up.
     """
     script = """#!/bin/bash
+set -e
+
+BASE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$BASE_DIR"
+
 # Combine CSV files named data_{i}_parameters.csv into one file in order of i.
 
 # Directory containing the CSV files
@@ -130,6 +168,8 @@ def generate_wrapper_sh(path="submit/run_local_scripts.sh"):
 # This script is executed on the submit node after all jobs are done.
 set -e
 
+BASE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
 echo "----------------------------------------------------"
 echo "All data generation jobs have completed successfully."
 echo "Starting post-processing on the access point..."
@@ -137,11 +177,11 @@ echo "----------------------------------------------------"
 
 # Run the first script
 echo "Executing merge.sh..."
-submit/merge.sh
+"$BASE_DIR/submit/merge.sh"
 
 # Run the second script
 echo "Executing combine_csv.sh..."
-submit/combine_csv.sh
+"$BASE_DIR/submit/combine_csv.sh"
 
 echo "----------------------------------------------------"
 echo "Post-processing complete."
@@ -207,6 +247,10 @@ def main():
                         help='Minimum of SNR values to sample from. Default is 8.')
     parser.add_argument("--snr-max", type=int, default=100,
                         help='Maximum of SNR values to sample from. Default is 100.')
+    parser.add_argument("--accounting-group", type=str, default=os.getenv("GWTORCH_ACCOUNTING_GROUP", "iucaa.gw_lens"),
+                        help="HTCondor accounting group")
+    parser.add_argument("--accounting-group-user", type=str, default=os.getenv("GWTORCH_ACCOUNTING_GROUP_USER", "saqlain.afroz"),
+                        help="HTCondor accounting group user")
     
     args = parser.parse_args()
     
@@ -215,13 +259,18 @@ def main():
     os.makedirs("results", exist_ok=True)
     os.makedirs("HTCondor_Logs", exist_ok=True)
     
+    executable = resolve_env_executable("generate_match_dataset_dag_gwtorch")
+
     # Generate all necessary files
     generate_submit_file(
         memory=args.memory,
         disk=args.disk,
         samples=args.samples,
         cpu=args.cpu,
-        snr_dist=args.snr_dist
+        snr_dist=args.snr_dist,
+        executable=executable,
+        accounting_group=args.accounting_group,
+        accounting_group_user=args.accounting_group_user,
     )
     generate_merge_sh()
     generate_combine_csv_sh()
@@ -230,6 +279,7 @@ def main():
     generate_dagman(num_jobs=args.jobs, snr_range=(args.snr_min, args.snr_max))
 
     print(f"✅ Successfully generated workflow for {args.jobs} jobs in the 'submit' directory.")
+    print(f"Using executable: {executable}")
     print("To run, execute: condor_submit_dag submit/workflow.dag")
 
 

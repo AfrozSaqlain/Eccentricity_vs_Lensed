@@ -14,32 +14,24 @@ from torchvision import transforms
 from sklearn.metrics import classification_report
 import matplotlib.pyplot as plt
 
-# --- Model Imports ---
-from linformer import Linformer
-from vit_pytorch.cvt import CvT
-from vit_pytorch.efficient import ViT
-
 # --- Grad-CAM Imports ---
-try:
-    from pytorch_grad_cam import GradCAM
-    from pytorch_grad_cam.utils.image import show_cam_on_image
-    from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
-except ImportError:
-    print("Error: 'grad-cam' library not found. Please install it using:")
-    print("pip install grad-cam")
-    sys.exit(1)
+from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam.utils.image import show_cam_on_image
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
-from gwtorch.modules.ml_utils import seed_everything
+
+from gwtorch.modules.ml_utils import seed_everything, get_model
 
 
 # ================= ARGUMENTS =================
 def parse_args():
     parser = argparse.ArgumentParser(description="Test Transformer for GW classification with Grad-CAM")
-    parser.add_argument('--model', type=str, default='ViT', choices=['CvT', 'ViT'])
+    parser.add_argument('--model', type=str, default='ViT', choices=['CvT', 'ViT', 'ViTLinear'])
     parser.add_argument('--batch-size', type=int, default=32)
     parser.add_argument('--model-path', type=str, default='vit_model.pth')
     parser.add_argument('--path-name', type=str, default='data')
     parser.add_argument('--results-dir', type=str, default='inference_results')
+    parser.add_argument('--num-classes', type=int, choices=[2, 3], default=3)
     return parser.parse_args()
 
 
@@ -80,8 +72,10 @@ def custom_collate_fn(batch):
     return torch.stack(images), torch.tensor(labels), paths
 
 
-def load_all_data(path_name='data', batch_size=32):
+def load_all_data(path_name='data', batch_size=32, num_classes=3):
     all_files = glob.glob(f'{path_name}/*/*.npy')
+    if num_classes == 2:
+        all_files = [p for p in all_files if Path(p).parent.name.lower() in {'lensed', 'eccentric'}]
     if not all_files:
         print(f"No files found in {path_name}")
         sys.exit(1)
@@ -100,30 +94,6 @@ def load_all_data(path_name='data', batch_size=32):
     return num_channels, loader
 
 
-# ================= MODEL =================
-def get_model(name, num_channels, device):
-    if name == 'CvT':
-        return CvT(
-            num_classes=3,
-            s1_emb_dim=64, s1_emb_kernel=7, s1_emb_stride=4,
-            s1_proj_kernel=3, s1_kv_proj_stride=2, s1_heads=1, s1_depth=1, s1_mlp_mult=4,
-            s2_emb_dim=192, s2_emb_kernel=3, s2_emb_stride=2,
-            s2_proj_kernel=3, s2_kv_proj_stride=2, s2_heads=3, s2_depth=2, s2_mlp_mult=4,
-            s3_emb_dim=384, s3_emb_kernel=3, s3_emb_stride=2,
-            s3_proj_kernel=3, s3_kv_proj_stride=2, s3_heads=6, s3_depth=10, s3_mlp_mult=4,
-            dropout=0.
-        ).to(device)
-    else:  # ViT
-        transformer = Linformer(
-            dim=128, seq_len=50, depth=12, heads=8, k=64, dropout=0.4
-        )
-        vit = ViT(
-            dim=128, image_size=224, patch_size=32, num_classes=3,
-            transformer=transformer, channels=num_channels
-        ).to(device)
-        return vit
-
-
 # ================= GRAD-CAM HELPERS =================
 def vit_reshape_transform(tensor, height=7, width=7):
     result = tensor[:, 1:, :] 
@@ -136,7 +106,7 @@ def visualize_gradcam(model, loader, device, class_names, results_dir, model_nam
     print("\nGenerating Grad-CAM maps...")
     
     # 1. Select Target Layer
-    if model_name == 'ViT':
+    if model_name in {'ViT', 'ViTLinear'}:
         target_layers = [model.transformer]
         reshape_transform = vit_reshape_transform
     elif model_name == 'CvT':
@@ -247,8 +217,7 @@ def visualize_gradcam(model, loader, device, class_names, results_dir, model_nam
 
 
 # ================= EVALUATION =================
-def evaluate(model, loader, device, results_dir, model_name):
-    class_names = ['Lensed', 'Eccentric', 'Quasi-Circular Unlensed']
+def evaluate(model, loader, device, results_dir, model_name, class_names):
     results_dir = Path(f'./{results_dir}/{model_name}_results')
     os.makedirs(results_dir, exist_ok=True)
 
@@ -292,11 +261,12 @@ def main():
     # 1. Load Data
     num_channels, loader = load_all_data(
         path_name=args.path_name,
-        batch_size=args.batch_size
+        batch_size=args.batch_size,
+        num_classes=args.num_classes,
     )
 
     # 2. Initialize Model
-    model = get_model(args.model, num_channels, device)
+    model = get_model(args.model, num_channels, device, num_classes=args.num_classes)
     
     # 3. Load Weights
     model_path = f'./models/{args.model_path}'
@@ -315,7 +285,8 @@ def main():
         print(f"Warning: Model path {model_path} not found. Running with random weights.")
 
     # 4. Run
-    evaluate(model, loader, device, args.results_dir, args.model)
+    class_names = ['Lensed', 'Eccentric'] if args.num_classes == 2 else ['Lensed', 'Eccentric', 'Quasi-Circular Unlensed']
+    evaluate(model, loader, device, args.results_dir, args.model, class_names)
 
 
 if __name__ == "__main__":

@@ -1,15 +1,19 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from linformer import Linformer
+from vit_pytorch import ViT
+from vit_pytorch.efficient import ViT as ViTLinear
+from vit_pytorch.cvt import CvT
 
 class CNN_Model(nn.Module):
-    def __init__(self, input_channels=3, dropout=0.2):
+    def __init__(self, input_channels=3, dropout=0.2, num_classes=3):
         super(CNN_Model, self).__init__()
         self.conv1 = nn.Conv2d(input_channels, 32, kernel_size=3, stride=1, padding=1)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
         self.conv3 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1)
         self.fc1 = nn.Linear(128 * 28 * 28, 256)
-        self.fc2 = nn.Linear(256, 3)
+        self.fc2 = nn.Linear(256, num_classes)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
@@ -26,12 +30,12 @@ class CNN_Model(nn.Module):
         return x
     
 class SimpleCNN(nn.Module):
-    def __init__(self, input_channels=3, dropout=0.2):
+    def __init__(self, input_channels=3, dropout=0.2, num_classes=3):
         super(SimpleCNN, self).__init__()
         self.conv1 = nn.Conv2d(input_channels, 16, kernel_size=3, stride=1, padding=1)
         self.conv2 = nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1)
         self.fc1 = nn.Linear(32 * 56 * 56, 64)  # <- need to calculate this
-        self.fc2 = nn.Linear(64, 3)
+        self.fc2 = nn.Linear(64, num_classes)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
@@ -46,40 +50,82 @@ class SimpleCNN(nn.Module):
         return x
 
 
-class CNN_Meta_Model(nn.Module):
-    def __init__(self, input_features=3, hidden_features=32, output_features=3):
-        super(CNN_Model, self).__init__()
-        self.input_features = input_features
-        self.hidden_features = hidden_features
-        self.output_features = output_features
+def create_cvt_model(num_classes, num_channels, dropout):
+    return CvT(
+        num_classes=num_classes,
+        channels=num_channels,
+        s1_emb_dim=64,
+        s1_emb_kernel=7,
+        s1_emb_stride=4,
+        s1_proj_kernel=3,
+        s1_kv_proj_stride=2,
+        s1_heads=1,
+        s1_depth=1,
+        s1_mlp_mult=4,
+        s2_emb_dim=192,
+        s2_emb_kernel=3,
+        s2_emb_stride=2,
+        s2_proj_kernel=3,
+        s2_kv_proj_stride=2,
+        s2_heads=3,
+        s2_depth=2,
+        s2_mlp_mult=4,
+        s3_emb_dim=384,
+        s3_emb_kernel=3,
+        s3_emb_stride=2,
+        s3_proj_kernel=3,
+        s3_kv_proj_stride=2,
+        s3_heads=4,
+        s3_depth=10,
+        s3_mlp_mult=4,
+        dropout=dropout,
+    )
 
-        self.conv1 = nn.Conv2d(self.input_features, 32, kernel_size=3, stride=1, padding=1)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
-        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1)
 
-        self.pool = nn.MaxPool2d(2, 2)
+def create_vit_model(num_classes, num_channels, dropout):
+    return ViT(
+        image_size=224,
+        patch_size=32,
+        num_classes=num_classes,
+        dim=128,
+        depth=12,
+        heads=8,
+        mlp_dim=512,
+        channels=num_channels,
+        dropout=dropout,
+        emb_dropout=dropout,
+    )
 
-        # Placeholder for dynamic FC layer
-        self.fc1 = None
-        self.fc2 = nn.Linear(256, self.output_features)  # output stays fixed
 
-    def forward(self, x):
-        x = F.relu(self.conv1(x))     # -> (B, 32, H, W)
-        x = self.pool(x)              # -> (B, 32, H/2, W/2)
+def create_vit_linear_model(num_classes, num_channels, dropout):
+    transformer = Linformer(dim=128, seq_len=50, depth=12, heads=8, k=64, dropout=dropout)
+    return ViTLinear(
+        dim=128,
+        image_size=224,
+        patch_size=32,
+        num_classes=num_classes,
+        transformer=transformer,
+        channels=num_channels,
+    )
 
-        x = F.relu(self.conv2(x))     # -> (B, 64, H/2, W/2)
-        x = self.pool(x)              # -> (B, 64, H/4, W/4)
 
-        x = F.relu(self.conv3(x))     # -> (B, 128, H/4, W/4)
-        x = self.pool(x)              # -> (B, 128, H/8, W/8)
+class CNNBinaryModel(CNN_Model):
+    def __init__(self, input_channels=3, dropout=0.2):
+        super().__init__(input_channels=input_channels, dropout=dropout, num_classes=2)
 
-        x = x.view(x.size(0), -1)     # flatten
 
-        # Dynamically create fc1 based on input feature map
-        if self.fc1 is None:
-            in_features = x.size(1)
-            self.fc1 = nn.Linear(in_features, 256).to(x.device)
+class SimpleCNNBinary(SimpleCNN):
+    def __init__(self, input_channels=3, dropout=0.2):
+        super().__init__(input_channels=input_channels, dropout=dropout, num_classes=2)
 
-        x = F.relu(self.fc1(x))
-        x = self.fc2(x)
-        return x
+
+def create_transformer_model(name, num_channels, device, num_classes=3, dropout=0.2):
+    if name == "CvT":
+        model = create_cvt_model(num_classes=num_classes, num_channels=num_channels, dropout=dropout)
+    elif name == "ViT":
+        model = create_vit_model(num_classes=num_classes, num_channels=num_channels, dropout=dropout)
+    elif name == "ViTLinear":
+        model = create_vit_linear_model(num_classes=num_classes, num_channels=num_channels, dropout=dropout)
+    else:
+        raise ValueError(f"Unsupported transformer model: {name}")
+    return model.to(device)

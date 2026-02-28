@@ -53,6 +53,7 @@ def parse_args():
     parser.add_argument('--epochs', type=int, default=20)
     parser.add_argument('--lr', type=float, default=3e-5)
     parser.add_argument('--gamma', type=float, default=0.7)
+    parser.add_argument('--dropout', type=float, default=0.2)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--model-file-name', type=str, default='cnn_model_binary')
     parser.add_argument('--path-name', type=str, default='data', help='Path to the dataset directory. Default is "data".')
@@ -259,9 +260,9 @@ def main():
     
     num_channels, train_loader, valid_loader, test_loader, class_weights = load_all_data(path_name=args.path_name, seed=args.seed, batch_size=args.batch_size)
 
-    model = get_model(name=args.model, num_channels=num_channels, device=device)
+    model = get_model(name=args.model, num_channels=num_channels, device=device, num_classes=2, dropout_rate=args.dropout)
 
-    if os.path.exists(f'./models/{args.model_file_name}.pth'):
+    if os.path.exists(f'./models/Binary_{args.model_file_name}.pth'):
         print("Pretrained model found. Loading...\n")
         model.load_state_dict(torch.load(f'./models/Binary_{args.model_file_name}.pth', map_location=device))
     else:

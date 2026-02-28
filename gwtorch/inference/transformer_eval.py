@@ -15,10 +15,6 @@ from sklearn.preprocessing import LabelBinarizer
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from linformer import Linformer
-from vit_pytorch.cvt import CvT
-from vit_pytorch.efficient import ViT
-
 from gwtorch.modules.general_utils import (
     print_misclassified_files,
     save_misclassified_files_to_txt,
@@ -27,12 +23,13 @@ from gwtorch.modules.general_utils import (
 )
 
 from gwtorch.modules.ml_utils import (
+    get_model,
     seed_everything,
 )
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Test Transformer for GW classification")
-    parser.add_argument('--model', type=str, default='ViT', choices=['CvT', 'ViT'], help='Model to train')
+    parser.add_argument('--model', type=str, default='ViT', choices=['CvT', 'ViT', 'ViTLinear'], help='Model to evaluate')
     parser.add_argument('--batch-size', type=int, default=512)
     parser.add_argument('--model-path', type=str, default='vit_model.pth', help="Path to the trained model (.pth file)")
     parser.add_argument('--path-name', type=str, default='data', help='Path to the dataset directory.')
@@ -40,6 +37,7 @@ def parse_args():
     parser.add_argument('--meta-csv', type=str, default='./results/data_parameters.csv', help='Path to the metadata CSV file.')
     parser.add_argument('--lnB-min', type=float, default=None, help='Minimum lnB value for confusion matrix filtering.')
     parser.add_argument('--lnB-max', type=float, default=None, help='Maximum lnB value for confusion matrix filtering.')
+    parser.add_argument('--num-classes', type=int, choices=[2, 3], default=3, help='Number of output classes in the checkpoint.')
     return parser.parse_args()
 
 
@@ -100,8 +98,10 @@ def custom_collate_fn(batch):
     return torch.stack(images), torch.tensor(labels), lnBs, img_paths
 
 
-def load_all_data(path_name='data', batch_size=32, meta_csv='./results/data_parameters.csv'):
+def load_all_data(path_name='data', batch_size=32, meta_csv='./results/data_parameters.csv', num_classes=3):
     all_files = glob.glob(f'{path_name}/*/*.npy')
+    if num_classes == 2:
+        all_files = [p for p in all_files if Path(p).parent.name.lower() in {'lensed', 'eccentric'}]
 
     transform = transforms.Compose([
         transforms.Resize((224, 224), antialias=True),
@@ -115,20 +115,6 @@ def load_all_data(path_name='data', batch_size=32, meta_csv='./results/data_para
                              num_workers=os.cpu_count(), collate_fn=custom_collate_fn)
 
     return num_channels, test_loader
-
-
-def get_model(name, num_channels, device):
-    if name == 'CvT':
-        return CvT(num_classes=3, s1_emb_dim=64, s1_emb_kernel=7, s1_emb_stride=4, s1_proj_kernel=3,
-                   s1_kv_proj_stride=2, s1_heads=1, s1_depth=1, s1_mlp_mult=4, s2_emb_dim=192,
-                   s2_emb_kernel=3, s2_emb_stride=2, s2_proj_kernel=3, s2_kv_proj_stride=2, s2_heads=3,
-                   s2_depth=2, s2_mlp_mult=4, s3_emb_dim=384, s3_emb_kernel=3, s3_emb_stride=2,
-                   s3_proj_kernel=3, s3_kv_proj_stride=2, s3_heads=4, s3_depth=10, s3_mlp_mult=4,
-                   dropout=0.4).to(device)
-    else: # ViT
-        transformer = Linformer(dim=128, seq_len=50, depth=12, heads=8, k=64, dropout=0.4)
-        return ViT(dim=128, image_size=224, patch_size=32, num_classes=3,
-                   transformer=transformer, channels=num_channels).to(device)
 
 
 # <-- MODIFIED: Function now collects and returns lnB values -->
@@ -162,9 +148,11 @@ def compute_roc_auc_with_misclassifications(model, data_loader, device, class_na
         'predicted_class': class_names[all_predictions[idx]],
     } for idx in misclassified_indices]
 
-    # ROC computation (remains the same)
+    # ROC computation
     label_binarizer = LabelBinarizer().fit(all_labels)
     y_true_binary = label_binarizer.transform(all_labels)
+    if y_true_binary.shape[1] == 1:
+        y_true_binary = np.hstack([1 - y_true_binary, y_true_binary])
     n_classes = y_true_binary.shape[1]
     
     fpr, tpr, roc_auc = dict(), dict(), dict()
@@ -209,8 +197,7 @@ def plot_confusion_matrix(y_true, y_pred, class_names, title_suffix="", results_
 
 
 # <-- MODIFIED: Function now accepts args to perform filtering -->
-def evaluate_and_plot(model, test_loader, device, results_dir, model_name, args):
-    class_names = ['Lensed', 'Eccentric', 'Quasi-Circular Unlensed']
+def evaluate_and_plot(model, test_loader, device, results_dir, model_name, args, class_names):
     results_dir = Path(f'./{results_dir}/{model_name}_results')
 
     test_fpr, test_tpr, test_roc_auc, test_labels, test_preds, test_misclassified, test_lnBs = \
@@ -266,9 +253,10 @@ def main():
     num_channels, test_loader = load_all_data(
         path_name=args.path_name,
         batch_size=args.batch_size,
-        meta_csv=args.meta_csv # <-- Pass meta_csv path
+        meta_csv=args.meta_csv, # <-- Pass meta_csv path
+        num_classes=args.num_classes,
     )
-    model = get_model(args.model, num_channels=num_channels, device=device)
+    model = get_model(args.model, num_channels=num_channels, device=device, num_classes=args.num_classes)
 
     model_full_path = f'./models/{args.model_path}'
     if os.path.exists(model_full_path):
@@ -278,7 +266,8 @@ def main():
         print(f"Error: No model found at {model_full_path}. Please provide a valid model path.")
         return
 
-    evaluate_and_plot(model, test_loader, device, args.results_dir, args.model, args)
+    class_names = ['Lensed', 'Eccentric'] if args.num_classes == 2 else ['Lensed', 'Eccentric', 'Quasi-Circular Unlensed']
+    evaluate_and_plot(model, test_loader, device, args.results_dir, args.model, args, class_names)
 
 
 if __name__ == "__main__":

@@ -159,11 +159,10 @@ def main():
     else:
         results_dir = Path('results')
     
-    if not output_path.exists():
-        output_path.mkdir(parents=True, exist_ok=True)
-        eccentric_path.mkdir(parents=True, exist_ok=True)
-        lensed_path.mkdir(parents=True, exist_ok=True)
-        unlensed_path.mkdir(parents=True, exist_ok=True)
+    output_path.mkdir(parents=True, exist_ok=True)
+    eccentric_path.mkdir(parents=True, exist_ok=True)
+    lensed_path.mkdir(parents=True, exist_ok=True)
+    unlensed_path.mkdir(parents=True, exist_ok=True)
     if not results_dir.exists():
         results_dir.mkdir(exist_ok=True)
 

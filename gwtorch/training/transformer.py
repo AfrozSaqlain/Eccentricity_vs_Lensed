@@ -24,6 +24,7 @@ BATCH_SIZE = 512
 EPOCHS = 20
 LR = 3e-5
 GAMMA = 0.7
+DROPOUT = 0.2
 K_FOLDS = 5
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -32,11 +33,12 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train Transformer for GW classification")
-    parser.add_argument('--model', type=str, default='ViT', choices=['CvT', 'ViT'], help='Model to train')
+    parser.add_argument('--model', type=str, default='ViT', choices=['CvT', 'ViT', 'ViTLinear'], help='Model to train')
     parser.add_argument('--batch-size', type=int, default=BATCH_SIZE)
     parser.add_argument('--epochs', type=int, default=EPOCHS)
     parser.add_argument('--lr', type=float, default=LR)
     parser.add_argument('--gamma', type=float, default=GAMMA)
+    parser.add_argument('--dropout', type=float, default=DROPOUT)
     parser.add_argument('--seed', type=int, default=RANDOM_SEED)
     parser.add_argument('--model-file-name', type=str, default='vit_model', help="Model will be saved in models directory with extention as .pth")
     parser.add_argument('--k-folds', type=int, default=K_FOLDS, help="Number of folds for k-fold cross validation")
@@ -62,7 +64,7 @@ def main():
         print("\nRunning single train/validation/test split...")
         num_channels, train_loader, valid_loader, test_loader, class_weights = load_all_data(path_name=args.path_name, seed=args.seed, batch_size=args.batch_size)
         
-        model = get_model(name=args.model, num_channels=num_channels, device=device)
+        model = get_model(name=args.model, num_channels=num_channels, device=device, dropout_rate=args.dropout)
 
         if os.path.exists(f'models/{args.model_file_name}.pth'):
             print("Pretrained model found. Loading...\n")
