@@ -558,6 +558,49 @@ def plot_confusion_matrix(y_true, y_pred, class_names, title_suffix="", results_
     plt.close()
 
 
+# def plot_training_curves(train_losses, val_losses, train_accuracies, val_accuracies, results_dir=None):
+
+#     prefix = get_file_prefix(results_dir) if results_dir else ''
+
+#     # --- Save Metadata ---
+#     if results_dir:
+#         metadata = {
+#             'train_losses': train_losses,
+#             'val_losses': val_losses,
+#             'train_accuracies': train_accuracies,
+#             'val_accuracies': val_accuracies
+#         }
+#         save_plot_metadata(metadata, results_dir, f'{prefix}_Training_curves.pkl')
+#     # ---------------------
+
+#     print("Generating training curves...")
+#     fig, axs = plt.subplots(1, 2, figsize=(15, 5))
+
+#     axs[0].plot(train_losses, label='Train Loss')
+#     axs[0].plot(val_losses, label='Validation Loss')
+#     axs[0].set_title('Training and Validation Loss')
+#     axs[0].set_xlabel('Epoch')
+#     axs[0].set_ylabel('Loss')
+#     axs[0].legend()
+#     axs[0].grid(True, alpha=0.3)
+#     set_tick_sizes(axs[0])
+
+#     axs[1].plot(train_accuracies, label='Train Accuracy')
+#     axs[1].plot(val_accuracies, label='Validation Accuracy')
+#     axs[1].set_title('Training and Validation Accuracy')
+#     axs[1].set_xlabel('Epoch')
+#     axs[1].set_ylabel('Accuracy')
+#     axs[1].legend()
+#     axs[1].grid(True, alpha=0.3)
+#     set_tick_sizes(axs[1])
+
+#     plt.tight_layout()
+#     if results_dir:
+#         results_dir = Path(results_dir)
+#         os.makedirs(results_dir / 'Plots', exist_ok=True)
+#         fig.savefig(results_dir / f'Plots/{prefix}_Training_curves.pdf', dpi=300, bbox_inches='tight')
+#     plt.close()
+
 def plot_training_curves(train_losses, val_losses, train_accuracies, val_accuracies, results_dir=None):
 
     prefix = get_file_prefix(results_dir) if results_dir else ''
@@ -572,33 +615,49 @@ def plot_training_curves(train_losses, val_losses, train_accuracies, val_accurac
         }
         save_plot_metadata(metadata, results_dir, f'{prefix}_Training_curves.pkl')
     # ---------------------
+    COLOR_MAP = {
+        'train_loss': '#1f77b4',   # blue
+        'val_loss': '#ff7f0e',     # orange
+        'train_acc': '#2ca02c',    # green
+        'val_acc': '#d62728'       # red
+    }
 
     print("Generating training curves...")
-    fig, axs = plt.subplots(1, 2, figsize=(15, 5))
 
-    axs[0].plot(train_losses, label='Train Loss')
-    axs[0].plot(val_losses, label='Validation Loss')
-    axs[0].set_title('Training and Validation Loss')
-    axs[0].set_xlabel('Epoch')
-    axs[0].set_ylabel('Loss')
-    axs[0].legend()
-    axs[0].grid(True, alpha=0.3)
-    set_tick_sizes(axs[0])
+    fig, ax1 = plt.subplots(figsize=(8, 5))
 
-    axs[1].plot(train_accuracies, label='Train Accuracy')
-    axs[1].plot(val_accuracies, label='Validation Accuracy')
-    axs[1].set_title('Training and Validation Accuracy')
-    axs[1].set_xlabel('Epoch')
-    axs[1].set_ylabel('Accuracy')
-    axs[1].legend()
-    axs[1].grid(True, alpha=0.3)
-    set_tick_sizes(axs[1])
+    epochs = range(len(train_losses))
+
+    # --- Loss (left axis) ---
+    l1 = ax1.plot(epochs, train_losses, label='Train Loss', linestyle='-', color=COLOR_MAP['train_loss'])
+    l2 = ax1.plot(epochs, val_losses, label='Validation Loss', linestyle='--', color=COLOR_MAP['val_loss'])
+
+    ax1.set_xlabel('Epoch')
+    ax1.set_ylabel('Loss')
+    ax1.grid(True, alpha=0.3)
+    set_tick_sizes(ax1)
+
+    # --- Accuracy (right axis) ---
+    ax2 = ax1.twinx()
+    l3 = ax2.plot(epochs, train_accuracies, label='Train Accuracy', linestyle='-', color=COLOR_MAP['train_acc'])
+    l4 = ax2.plot(epochs, val_accuracies, label='Validation Accuracy', linestyle='--', color=COLOR_MAP['val_acc'])
+    ax2.set_ylabel('Accuracy')
+    set_tick_sizes(ax2)
+
+    # --- Combined legend ---
+    lines = l1 + l2 + l3 + l4
+    labels = [line.get_label() for line in lines]
+    ax1.legend(lines, labels, loc='center right')
+
+    # ax1.set_title('Training Loss and Accuracy')
 
     plt.tight_layout()
+
     if results_dir:
         results_dir = Path(results_dir)
         os.makedirs(results_dir / 'Plots', exist_ok=True)
         fig.savefig(results_dir / f'Plots/{prefix}_Training_curves.pdf', dpi=300, bbox_inches='tight')
+
     plt.close()
 
 def plot_kfold_roc_curves(fold_results, results_dir=None, class_names=None):
@@ -743,8 +802,66 @@ def plot_kfold_roc_curves(fold_results, results_dir=None, class_names=None):
     
     print("ROC curve plots saved successfully!")
     
+# def plot_average_training_curves(fold_results, results_dir=None):
+#     """Plot average training curves across all folds"""
+
+#     # --- Save Metadata ---
+#     if results_dir:
+#         metadata = {
+#             'fold_results': fold_results
+#         }
+#         save_plot_metadata(metadata, results_dir, 'average_training_curves_kfold_data.pkl')
+#     # ---------------------
+
+#     # Calculate means and stds
+#     train_losses_mean = np.mean(fold_results['train_losses_all'], axis=0)
+#     train_losses_std = np.std(fold_results['train_losses_all'], axis=0)
+#     val_losses_mean = np.mean(fold_results['val_losses_all'], axis=0)
+#     val_losses_std = np.std(fold_results['val_losses_all'], axis=0)
+    
+#     train_accs_mean = np.mean(fold_results['train_accs_all'], axis=0)
+#     train_accs_std = np.std(fold_results['train_accs_all'], axis=0)
+#     val_accs_mean = np.mean(fold_results['val_accs_all'], axis=0)
+#     val_accs_std = np.std(fold_results['val_accs_all'], axis=0)
+    
+#     epochs = range(1, len(train_losses_mean) + 1)
+    
+#     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+    
+#     # Loss plot
+#     ax1.plot(epochs, train_losses_mean, 'b-', label='Training Loss')
+#     ax1.fill_between(epochs, train_losses_mean - train_losses_std, 
+#                     train_losses_mean + train_losses_std, alpha=0.2, color='blue')
+#     ax1.plot(epochs, val_losses_mean, 'r-', label='Validation Loss')
+#     ax1.fill_between(epochs, val_losses_mean - val_losses_std, 
+#                     val_losses_mean + val_losses_std, alpha=0.2, color='red')
+#     ax1.set_title('Average Training and Validation Loss (K-Fold)')
+#     ax1.set_xlabel('Epoch')
+#     ax1.set_ylabel('Loss')
+#     ax1.legend()
+#     ax1.grid(True)
+    
+#     # Accuracy plot
+#     ax2.plot(epochs, train_accs_mean, 'b-', label='Training Accuracy')
+#     ax2.fill_between(epochs, train_accs_mean - train_accs_std, 
+#                     train_accs_mean + train_accs_std, alpha=0.2, color='blue')
+#     ax2.plot(epochs, val_accs_mean, 'r-', label='Validation Accuracy')
+#     ax2.fill_between(epochs, val_accs_mean - val_accs_std, 
+#                     val_accs_mean + val_accs_std, alpha=0.2, color='red')
+#     ax2.set_title('Average Training and Validation Accuracy (K-Fold)')
+#     ax2.set_xlabel('Epoch')
+#     ax2.set_ylabel('Accuracy')
+#     ax2.legend()
+#     ax2.grid(True)
+    
+#     plt.tight_layout()
+#     if results_dir:
+#         plt.savefig(results_dir / 'average_training_curves_kfold.pdf', dpi=300, bbox_inches='tight')
+#     plt.close()
+
+
 def plot_average_training_curves(fold_results, results_dir=None):
-    """Plot average training curves across all folds"""
+    """Plot average training curves across all folds (single plot, dual y-axis)"""
 
     # --- Save Metadata ---
     if results_dir:
@@ -766,38 +883,69 @@ def plot_average_training_curves(fold_results, results_dir=None):
     val_accs_std = np.std(fold_results['val_accs_all'], axis=0)
     
     epochs = range(1, len(train_losses_mean) + 1)
+
+    COLOR_MAP = {
+        'train_loss': '#1f77b4',   # blue
+        'val_loss': '#ff7f0e',     # orange
+        'train_acc': '#2ca02c',    # green
+        'val_acc': '#d62728'       # red
+    }
     
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
-    
-    # Loss plot
-    ax1.plot(epochs, train_losses_mean, 'b-', label='Training Loss')
-    ax1.fill_between(epochs, train_losses_mean - train_losses_std, 
-                    train_losses_mean + train_losses_std, alpha=0.2, color='blue')
-    ax1.plot(epochs, val_losses_mean, 'r-', label='Validation Loss')
-    ax1.fill_between(epochs, val_losses_mean - val_losses_std, 
-                    val_losses_mean + val_losses_std, alpha=0.2, color='red')
-    ax1.set_title('Average Training and Validation Loss (K-Fold)')
+    fig, ax1 = plt.subplots(figsize=(9, 5))
+
+    # --- Loss (left axis) ---
+    l1 = ax1.plot(epochs, train_losses_mean, label='Training Loss',
+              linestyle='-', color=COLOR_MAP['train_loss'])
+    ax1.fill_between(epochs,
+                    train_losses_mean - train_losses_std,
+                    train_losses_mean + train_losses_std,
+                    alpha=0.2, color=COLOR_MAP['train_loss'])
+
+    l2 = ax1.plot(epochs, val_losses_mean, label='Validation Loss',
+                linestyle='--', color=COLOR_MAP['val_loss'])
+    ax1.fill_between(epochs,
+                    val_losses_mean - val_losses_std,
+                    val_losses_mean + val_losses_std,
+                    alpha=0.2, color=COLOR_MAP['val_loss'])
+
     ax1.set_xlabel('Epoch')
     ax1.set_ylabel('Loss')
-    ax1.legend()
-    ax1.grid(True)
-    
-    # Accuracy plot
-    ax2.plot(epochs, train_accs_mean, 'b-', label='Training Accuracy')
-    ax2.fill_between(epochs, train_accs_mean - train_accs_std, 
-                    train_accs_mean + train_accs_std, alpha=0.2, color='blue')
-    ax2.plot(epochs, val_accs_mean, 'r-', label='Validation Accuracy')
-    ax2.fill_between(epochs, val_accs_mean - val_accs_std, 
-                    val_accs_mean + val_accs_std, alpha=0.2, color='red')
-    ax2.set_title('Average Training and Validation Accuracy (K-Fold)')
-    ax2.set_xlabel('Epoch')
+    ax1.grid(True, alpha=0.3)
+    set_tick_sizes(ax1)
+
+    # --- Accuracy (right axis) ---
+    ax2 = ax1.twinx()
+
+    l3 = ax2.plot(epochs, train_accs_mean, label='Training Accuracy',
+              linestyle='-', color=COLOR_MAP['train_acc'])
+    ax2.fill_between(epochs,
+                    train_accs_mean - train_accs_std,
+                    train_accs_mean + train_accs_std,
+                    alpha=0.2, color=COLOR_MAP['train_acc'])
+
+    l4 = ax2.plot(epochs, val_accs_mean, label='Validation Accuracy',
+                linestyle='--', color=COLOR_MAP['val_acc'])
+    ax2.fill_between(epochs,
+                    val_accs_mean - val_accs_std,
+                    val_accs_mean + val_accs_std,
+                    alpha=0.2, color=COLOR_MAP['val_acc'])
+
     ax2.set_ylabel('Accuracy')
-    ax2.legend()
-    ax2.grid(True)
-    
+    set_tick_sizes(ax2)
+
+    # --- Combined legend ---
+    lines = l1 + l2 + l3 + l4
+    labels = [line.get_label() for line in lines]
+    ax1.legend(lines, labels, loc='center right')
+
+    # ax1.set_title('Average Training Curves (K-Fold)')
+
     plt.tight_layout()
+
     if results_dir:
-        plt.savefig(results_dir / 'average_training_curves_kfold.pdf', dpi=300, bbox_inches='tight')
+        plt.savefig(Path(results_dir) / 'average_training_curves_kfold.pdf',
+                    dpi=300, bbox_inches='tight')
+
     plt.close()
 
 def plot_misclassification_lnB_histogram(misclassified_files, title_suffix, output_dir, meta_csv='./results/data_parameters.csv'):

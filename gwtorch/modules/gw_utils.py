@@ -871,7 +871,7 @@ def save_simple_qtransform(ts, file_name):
     plt.close()
 
 
-def display_qtransform(ts, method='mean'):
+def display_qtransform(ts, method='mean', display=True):
     """
     Compute and save the Q-transform spectrogram of a time series.
 
@@ -895,11 +895,12 @@ def display_qtransform(ts, method='mean'):
 
     qt = ts.q_transform(logf=True, norm=method, frange=(F_LOWER, 512), qrange=(4, 64), whiten=True)
     
-    plt.figure(figsize=(12, 8), frameon=False)
-    plt.pcolormesh(np.array(qt.data).T)
-    plt.axis('off')
-    plt.yscale('log')
-    plt.show()
+    if display:
+        plt.figure(figsize=(12, 8), frameon=False)
+        plt.pcolormesh(np.array(qt.data).T)
+        plt.axis('off')
+        plt.yscale('log')
+        plt.show()
 
     return qt
 
