@@ -1,0 +1,9 @@
+Validation Classification Report:
+              precision    recall  f1-score   support
+
+      lensed       0.93      0.91      0.92     12000
+   eccentric       0.91      0.93      0.92     12000
+
+    accuracy                           0.92     24000
+   macro avg       0.92      0.92      0.92     24000
+weighted avg       0.92      0.92      0.92     24000

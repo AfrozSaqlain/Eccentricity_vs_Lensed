@@ -1,0 +1,11 @@
+K-Fold Cross Validation Summary (4 folds)
+==================================================
+Model: SimpleCNN
+Epochs: 30
+Learning Rate: 3e-05
+Batch Size: 512
+Seed: 42
+
+Validation Accuracy: 0.8379 ± 0.0035
+Individual fold accuracies: [0.8407025711333498, 0.8396706004092034, 0.8394628211538843, 0.8319342865588817]
+

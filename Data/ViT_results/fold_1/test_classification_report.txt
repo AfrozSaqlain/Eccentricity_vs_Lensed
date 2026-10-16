@@ -1,0 +1,10 @@
+Test Classification Report:
+                         precision    recall  f1-score   support
+
+                 Lensed       0.92      0.83      0.87     16000
+              Eccentric       0.90      0.78      0.84     16000
+Quasi-Circular Unlensed       0.72      0.88      0.80     16000
+
+               accuracy                           0.83     48000
+              macro avg       0.85      0.83      0.84     48000
+           weighted avg       0.85      0.83      0.84     48000

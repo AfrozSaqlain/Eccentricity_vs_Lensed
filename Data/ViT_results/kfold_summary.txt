@@ -1,0 +1,11 @@
+K-Fold Cross Validation Summary (4 folds)
+==================================================
+Model: ViT
+Epochs: 30
+Learning Rate: 3e-05
+Batch Size: 512
+Seed: 42
+
+Validation Accuracy: 0.8331 ± 0.0021
+Individual fold accuracies: [0.833915115036863, 0.8352033464198417, 0.8295933065262246, 0.833506482712766]
+
